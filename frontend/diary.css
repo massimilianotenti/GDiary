@@ -1,0 +1,71 @@
+/* Journal-specific design: one reading column, quiet chrome, amber selection. */
+body.vue-diary{background:var(--paint-fff);color:var(--paint-303237);font-family:'Segoe UI',system-ui,sans-serif}
+body.vue-diary .app{grid-template-columns:190px minmax(0,1fr)}
+body.vue-diary .sidebar{background:var(--paint-f5f6f7);padding:24px 12px;border-right:1px solid var(--paint-e3e5e7)}
+body.vue-diary .brand{font-size:21px;margin-bottom:22px}
+body.vue-diary .sidebar button{font-size:13px;padding:8px 10px;margin:2px 0;border-radius:4px}
+body.vue-diary .sidebar button.active{background:var(--paint-e7e9ec);color:var(--paint-25282d);border:0}
+body.vue-diary .workspace{max-width:1100px;padding:18px 38px!important;background:var(--paint-fff)}
+body.vue-diary .workspace>.topbar{margin:0 0 6px;padding:0;background:none;gap:8px}
+body.vue-diary #search{background:var(--paint-fff);border:0;border-bottom:1px solid var(--paint-e7e8ea);border-radius:0;font-size:13px;padding:7px 0;min-height:32px}
+body.vue-diary .topbar>button{font-size:12px;padding:6px 10px}
+body.vue-diary #message{min-height:28px;font-size:12px;padding:5px 0;color:var(--paint-85898e)}
+body.vue-diary #message.error{color:var(--paint-ae3434)}
+body.vue-diary .layout{gap:24px}
+.vue-diary-page{min-width:0;font-weight:400;max-width:900px;margin:0 auto}
+.diary-header{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--paint-ececee);padding:12px 0 18px}
+.diary-eyebrow{font-size:12px;color:var(--paint-92969c)}
+.diary-header h1{font-size:23px;font-weight:500;line-height:1.3;margin:3px 0 0}
+.diary-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.diary-actions button{font-size:13px;padding:7px 10px;border-color:var(--paint-e6e7e9);border-radius:5px}
+.diary-actions .primary{background:var(--paint-f7b733);border-color:var(--paint-f7b733);font-weight:500}
+.diary-search{position:relative}
+.diary-search summary{font-size:25px;cursor:pointer;list-style:none;color:var(--paint-90949a);padding:0 7px}
+.diary-search-slot{position:absolute;right:0;top:34px;z-index:30;background:var(--paint-fff);border:1px solid var(--paint-e4e6e9);border-radius:6px;padding:10px;width:360px;box-shadow:0 6px 24px #0001}
+.diary-search-slot .topbar{display:flex;gap:8px}
+.diary-search-slot .topbar>.primary{display:none}
+.diary-status-slot{margin:0}
+.diary-reflection{border-left:2px solid var(--paint-f0d08a);padding-left:14px;font-size:13px;color:var(--paint-89816b)}
+.diary-reflection h3{font-size:12px;font-weight:500;margin:12px 0 4px}.diary-reflection p{margin:0 0 12px}
+body.vue-diary .stitch-masthead{display:none}
+body.vue-diary .performance-panel{margin-bottom:0;font-size:10px}
+@media(max-width:650px){.diary-search-slot{left:0;right:auto;width:min(330px,calc(100vw - 40px))}}
+.diary-period{display:flex;align-items:center;gap:12px;padding:13px 0 8px;color:var(--paint-81868d);font-size:13px}
+.diary-period button{border:0;padding:4px 6px;background:none;font-size:13px}
+.diary-period span{text-transform:capitalize}
+.diary-paper{max-width:900px;margin:0 auto}
+.diary-day{padding-top:22px}
+.diary-day-heading{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.diary-day-heading>button{border:0;padding:0;background:none;font-size:17px;font-weight:500;text-align:left}
+.diary-today{font-size:11px;color:var(--paint-c48b20)}
+.diary-day-menu{margin-left:auto;position:relative}
+.diary-day-menu summary{cursor:pointer;list-style:none;color:var(--paint-c99431);padding:3px 8px;font-size:20px}
+.diary-day-menu>div{position:absolute;z-index:20;right:0;top:30px;padding:6px;background:white;border:1px solid var(--paint-e5e6e8);border-radius:6px;box-shadow:0 4px 20px #0001;display:flex}
+body.vue-diary .continuous-block{border:1px solid transparent;border-radius:5px;box-shadow:none;background:white;margin:2px 0;padding:13px 16px;position:relative}
+body.vue-diary .continuous-block.continuous-active{border-color:var(--paint-f2ce87);background:var(--paint-fffdf7)}
+body.vue-diary .continuous-block[data-type=task]{padding-top:9px;padding-bottom:9px}
+body.vue-diary .continuous-title{font-size:18px;font-weight:400;line-height:1.4;padding:0;min-height:26px;border:0;background:transparent;resize:none;box-shadow:none;color:var(--paint-34373c)}
+body.vue-diary .continuous-block[data-type=task] .continuous-title{font-size:15px;min-height:22px}
+body.vue-diary .continuous-block-head{display:flex;align-items:center;gap:10px;min-width:0}
+body.vue-diary .continuous-note-mark{border-color:var(--paint-e5b04c);width:12px;height:12px;flex:0 0 12px;margin:0}
+body.vue-diary .continuous-check{width:16px;height:16px;margin:0;flex:0 0 16px;accent-color:var(--paint-cf9b37)}
+body.vue-diary .continuous-due{margin-left:auto;width:auto;flex:0 0 132px}
+body.vue-diary .continuous-due label{font-size:0;margin:0}
+body.vue-diary .continuous-due input{width:132px;font-size:12px;min-height:29px;padding:3px 5px;background:var(--paint-fff7e7);border:0;border-radius:4px;color:var(--paint-9f731f)}
+body.vue-diary .continuous-block .rich-area{font-size:15px;line-height:1.75;min-height:40px;padding:10px 0 5px 22px;border:0;background:transparent;box-shadow:none;color:var(--paint-3b3d42)}
+body.vue-diary .continuous-block .rich-area p{margin:0 0 5px;line-height:1.75}
+body.vue-diary .continuous-note-tools{gap:7px;min-height:20px;margin:4px 0 0 22px;flex-wrap:wrap}
+body.vue-diary .continuous-note-date{font-size:11px;color:var(--paint-a0a3a8);margin-left:auto}
+body.vue-diary .continuous-badges{margin:0;gap:4px}
+body.vue-diary .continuous-badges .tag{font-size:11px;padding:1px 5px;border-radius:3px;background:var(--paint-eef4ef);color:var(--paint-618469)}
+body.vue-diary .continuous-sync{font-size:10px;color:var(--paint-b59a63)}
+body.vue-diary .continuous-format,body.vue-diary .continuous-collapse{border:0;font-size:11px;padding:2px 4px;background:none;color:var(--paint-92969b)}
+body.vue-diary .continuous-commands>summary{font-size:18px;color:var(--paint-8d9297)}
+body.vue-diary .continuous-properties{margin:12px 0 0 22px;background:var(--paint-fafafa);padding:12px;border:1px solid var(--paint-e8e9eb);border-radius:5px}
+body.vue-diary .continuous-properties:not([open]){display:none}
+body.vue-diary .continuous-properties label{font-size:12px;text-transform:none;margin-top:10px}
+body.vue-diary .continuous-validation{margin-left:22px}
+body.vue-diary .continuous-block.has-error{border-color:var(--paint-c65c54)}
+.diary-footnote,.diary-empty{font-size:12px;color:var(--paint-999da3);line-height:1.6;margin:24px 0}
+@media(max-width:850px){body.vue-diary .workspace{padding:16px 22px!important}.diary-header{align-items:flex-start;flex-direction:column;gap:10px}.diary-header h1{font-size:21px}}
+@media(max-width:650px){body.vue-diary .app{grid-template-columns:1fr}body.vue-diary .workspace{padding:12px 14px!important}body.vue-diary .sidebar{padding:10px}body.vue-diary .continuous-block{padding:10px 8px}body.vue-diary .continuous-title{font-size:17px}body.vue-diary .continuous-due{flex:0 0 112px}body.vue-diary .continuous-due input{width:112px;font-size:11px}.diary-day-heading>button{font-size:16px}.diary-actions{width:100%}.diary-day{padding-top:18px}}

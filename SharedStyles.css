@@ -1,0 +1,56 @@
+/* Stile condiviso. Le regole precedenti definiscono soltanto le disposizioni delle viste. */
+:root{
+ --font-ui:'Segoe UI',system-ui,sans-serif;
+ --ink:#172032;--muted:#788493;--line:#e0e5ed;--surface:#fff;--sidebar:#f5f6f8;
+ --accent:#f5b42c;--accent-hover:#efaa1d;--accent-soft:#fff3dc;--link:#2679d5;
+ --radius:7px;--text:15px;--title:30px;--section:22px;--card-title:18px;--small:13px;
+ --space:8px;
+ font-family:var(--font-ui);color:var(--ink);font-size:var(--text);background:var(--surface);
+}
+body{font-family:var(--font-ui);color:var(--ink)}
+button,input,select,textarea{font-family:var(--font-ui);font-size:14px;border-color:var(--line);border-radius:var(--radius);color:var(--ink)}
+button{padding:9px 13px;line-height:1.35}button:hover{background:var(--accent-soft)}
+button.primary,.primary{background:var(--accent);border-color:var(--accent);color:var(--ink);font-weight:600}
+button.primary:hover{background:var(--accent-hover)}
+input,select,textarea{background:var(--surface);padding:10px 12px;line-height:1.5}
+textarea{font-size:var(--text);min-height:110px}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--link);outline-offset:3px}
+h1,.journal-view .journal-header h1{font-size:var(--title);font-weight:700;letter-spacing:-.7px;line-height:1.2;margin:0 0 8px}
+h2,.journal-view #detail h2,.journal-view .dayhead button,body:has(.habit-actions) #detail h2{font-size:var(--section);font-weight:650;letter-spacing:-.35px;line-height:1.3}
+h3,.journal-view .detail-title,.detail-title{font-size:var(--card-title);font-weight:650;line-height:1.4}
+label{font-size:14px;font-weight:600;color:var(--ink);margin:16px 0 7px}
+#detail form>label,.journal-view #detail form>label,body:has(.habit-actions) #detail label{font-size:var(--card-title);font-weight:600}
+p{line-height:1.55}.muted,.hint,.excerpt{color:var(--muted)}.hint,.muted{font-size:var(--small)}
+#content>h1+.muted,.journal-view #content>.muted,.cycle-caption{font-size:18px;color:#596779}
+a,.detail-actions button,.detail-breadcrumb button{color:var(--link)}
+.sidebar,.journal-view .sidebar{background:var(--sidebar);padding:26px 16px;border-color:var(--line)}
+.brand,.journal-view .brand{font-size:27px;letter-spacing:-.8px;margin:0 12px 26px}
+.sidebar nav button,.journal-view .sidebar nav button{font-size:14px;padding:11px 12px;margin:4px 0;border-radius:var(--radius)}
+.sidebar nav button.active{background:var(--accent-soft);border-left-color:var(--accent)}
+.sidebar small,.journal-view .sidebar small{margin:24px 12px 10px;font-size:11px}
+.sidebar small:last-child,.journal-view .sidebar small:last-child{margin-top:auto}
+.project-dot{width:19px;height:15px;background:#83b6ed;border-color:#68a5e8;border-radius:3px}
+#projectnav button:nth-child(even) .project-dot{background:#b495e8;border-color:#a682de}
+#projectnav button:nth-child(3n) .project-dot{background:#69c8a4;border-color:#50b98f}
+.workspace,.journal-view .workspace{padding:26px 32px}
+#detail,.journal-view #detail{border-color:var(--line);padding-left:26px}
+.entrytitle,.journal-view .entrytitle{font-size:16px;font-weight:600;letter-spacing:-.2px;color:var(--ink)}
+.entrytitle.done{color:var(--muted)}
+.entry.selected,.journal-view .entry.selected{background:#fff7e8;border-radius:var(--radius)}
+.entry input[type=checkbox]{accent-color:#318cda;width:19px;height:19px}
+.excerpt,.journal-view .excerpt{font-size:14px;line-height:1.55}
+.tag,.personal,.due,.badge,.journal-view .tag,.journal-view .personal{font-size:12px;line-height:1.35;border-radius:12px;padding:3px 8px}
+.tag{background:#eaf3fe;color:#3976b7}.personal{background:#fff3dc;color:#8a713f}.due{background:#fff0d1;color:#936415}.overdue{background:#ffe9e9;color:#a33d3d}
+.goal-card,.doc-source,.journal-view .doc-source,.review{border-color:var(--line);border-radius:var(--radius)}
+.doc-source,.journal-view .doc-source{background:#fff;padding:16px}
+#detail textarea,.journal-view #detail textarea{font-size:var(--text);line-height:1.55;border:1px solid var(--line);border-radius:var(--radius);padding:12px}
+#detail .file,.journal-view #detail .file{border:1px solid var(--line);padding:12px;border-radius:var(--radius);text-decoration:none;margin:8px 0;font-size:14px}
+#detail .hint,.journal-view #detail .hint{font-size:var(--small)}
+.week-plan,.week-review{padding:20px;border:1px solid var(--line);border-radius:var(--radius)}
+.week-review{background:#fffcf5}.week-editor .review{background:transparent;padding:0}
+.projectitem{border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:12px 0;background:var(--surface)}
+.stats{gap:12px}.stats>div{border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;background:#fafbfd}.stats strong{font-size:24px;color:var(--ink)}
+@media(min-width:1400px){.app,.journal-view .app,body:has(.habit-actions) .app{grid-template-columns:260px minmax(0,1fr)}.layout,.journal-view .layout,body:has(.habit-actions) .layout{grid-template-columns:minmax(0,1fr) 385px;gap:30px}.layout.solo{grid-template-columns:1fr}}
+@media(max-width:650px){:root{--title:26px;--section:20px;--card-title:17px}.workspace,.journal-view .workspace{padding:18px}.entrytitle,.journal-view .entrytitle{font-size:15px}.sidebar,.journal-view .sidebar{padding:18px 12px}.brand,.journal-view .brand{margin-bottom:18px}.week-plan,.week-review{padding:14px}}
+
+@media(min-width:1101px){.journal-view .layout.solo{padding-top:36px}.journal-view:has(.layout.solo) .journal-status{top:8px}}
