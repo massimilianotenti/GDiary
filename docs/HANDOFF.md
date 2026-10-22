@@ -32,7 +32,9 @@ La conversazione precedente non è necessaria per compilare il progetto; le disc
 Aggiornamento 22 ottobre 2026: implementata localmente la
 [SPEC-001](specs/001-tracing-prestazioni.md), diagnostica prestazioni opzionale
 in Impostazioni con export JSON filtrato, misure RPC/backend/rendering e batch
-di salvataggio correlati. Nessun deployment eseguito: il collaudo autenticato
-resta da effettuare dopo un aggiornamento esplicitamente richiesto.
+di salvataggio correlati. Pubblicazione autorizzata eseguita il 22 ottobre:
+deployment esistente aggiornato alla versione Apps Script 63, stesso URL.
+Inclusa la correzione dell'allineamento dei comandi nota/task. Il collaudo
+autenticato e la raccolta della baseline reale restano da effettuare.
 
 IndexedDB, sincronizzazione offline bidirezionale, PWA ed Electron sono stati discussi, ma NON implementati. Non sostituire il salvataggio corrente basandosi soltanto sulla discussione. La prossima eventuale fase deve validare persistenza e identità dell'archivio nel contesto Apps Script.

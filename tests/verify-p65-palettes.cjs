@@ -1,6 +1,6 @@
 const fs=require('fs'),path=require('path'),assert=require('assert'),{pathToFileURL}=require('url');
 const{chromium}=require('playwright');
-const chrome='C:/Program Files/Google/Chrome/Application/chrome.exe';
+const chrome=process.env.CHROME_PATH||undefined;
 async function checkDarkText(page){const results=await page.evaluate(()=>{
  function lum(rgb){return rgb.match(/[\d.]+/g).slice(0,3).map(v=>{v=Number(v)/255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4);}).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0);}
  const selectors=['.sidebar button','#content>h1','#content .hint','#content label','.palette-option','#refresh','.diary-header h1','.continuous-metadata','.continuous-collapse','.continuous-note-date','.continuous-note-clock','.continuous-title','.rich-area','.diary-summary','#content .primary','.topbar>.primary','.diary-actions .primary'];

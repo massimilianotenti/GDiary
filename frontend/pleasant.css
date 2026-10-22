@@ -306,7 +306,7 @@ body.bullet-theme :is(.continuous-collapse,.daily-section-actions button[aria-ex
 body.bullet-theme :is(.continuous-collapse[aria-expanded=true],.daily-section-actions button[aria-expanded=true],.day-reflection-heading button[aria-expanded=true]:last-child,.diary-habits[open] .diary-habit-toggle)::before{content:'▴'}
 
 /* P84: size task disclosure independently from its accessible label. */
-body.bullet-theme .continuous-block .continuous-note-tools{grid-template-columns:minmax(0,1fr) 22px 82px max-content 24px;column-gap:4px}
+body.bullet-theme .continuous-block .continuous-note-tools{grid-template-columns:minmax(0,1fr) 22px 82px 76px 24px;column-gap:4px}
 
 /* P86: distinguish when to work from the independent deadline. */
 body.bullet-theme .continuous-due .continuous-date-caption{display:block;font-size:9px;font-weight:400;line-height:1.4;letter-spacing:.2px;color:var(--diary-muted);margin:0 0 3px}

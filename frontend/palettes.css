@@ -34,7 +34,7 @@ body.bullet-theme[data-palette=dark] .palette-option[aria-pressed=true]{backgrou
 body.bullet-theme[data-palette=dark] .continuous-block.continuous-active{background:#293b44;border-color:#809cad;border-bottom-color:#809cad!important}
 body.bullet-theme[data-palette=dark] :is(.diary-save-state,.continuous-sync){color:#bbd6c9}
 body.bullet-theme[data-palette=dark] :is(.diary-save-state.is-unsaved,.continuous-validation,.form-error,#message.error){color:#ffcebc!important}
-@media(max-width:650px){body.bullet-theme .continuous-block .continuous-note-tools{grid-template-columns:minmax(0,1fr) 22px 77px max-content 24px;gap:4px}}
+@media(max-width:650px){body.bullet-theme .continuous-block .continuous-note-tools{grid-template-columns:minmax(0,1fr) 22px 77px 76px 24px;gap:4px}}
 body.bullet-theme .palette-panel{margin:24px 0 30px;padding-bottom:24px;border-bottom:1px solid var(--diary-line)}
 body.bullet-theme .palette-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 body.bullet-theme .palette-option{display:flex;flex-direction:column;gap:10px;text-align:left;padding:12px;border:1px solid var(--diary-line);background:var(--diary-paper);color:var(--diary-ink)}

@@ -1,5 +1,29 @@
 # Verifica repository — 17 ottobre 2026
 
+## Pubblicazione autorizzata — 22 ottobre 2026
+
+Dopo l'abilitazione dell'Apps Script API da parte dell'utente, `npm run deploy`
+ha superato tutti i controlli, caricato i sei file e aggiornato il deployment
+esistente dalla versione Apps Script 62 alla 63, mantenendo lo stesso URL.
+La versione applicativa resta v2.0.3, con diagnostica SPEC-001 e correzione
+dell'allineamento dei comandi. Nessun setup o migrazione dei dati eseguiti.
+Resta da verificare la web app autenticata e raccogliere la baseline reale.
+
+## Correzioni dei controlli di deploy — 22 ottobre 2026
+
+Il disallineamento P64 era riproducibile su Chrome e Chromium anche nella
+base precedente al tracing. La colonna del comando Espandi/Comprimi e
+Mostra/Nascondi aveva larghezza `max-content`: le etichette diverse spostavano
+Progetti e tag di circa 4,5 px. Fissata la colonna a 76 px su desktop e mobile,
+senza cambiare la soglia del test. P64, P77, P65, `npm test` e `test:release`
+superati; Demo.html e Index.html rigenerati. P65 ora usa CHROME_PATH, se
+presente, oppure Chromium Playwright anziché un percorso Windows fisso.
+
+Superata anche l'intera sequenza di controlli prevista da `npm run deploy`.
+Il successivo `clasp push --force` è stato rifiutato da Google perché l'Apps
+Script API non è abilitata nelle impostazioni dell'account. Nessun caricamento
+riuscito, versione o aggiornamento del deployment eseguito in questo tentativo.
+
 ## SPEC-001 — 22 ottobre 2026
 
 Build e `npm test` superati con la diagnostica completata localmente.
