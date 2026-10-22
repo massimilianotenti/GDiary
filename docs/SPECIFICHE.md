@@ -39,3 +39,12 @@ Obiettivi e abitudini collegate, registrazioni giornaliere e microazioni. Comple
 Tag privati e modalità di visibilità devono essere rispettati in voci, conteggi, anteprime, filtri e recupero bozze. I salvataggi su più mesi possono riuscire parzialmente: conservare i blocchi falliti per ritentare. Non sovrascrivere silenziosamente modifiche concorrenti o formattazione Docs non supportata.
 
 Quattro palette e layout adattivo; verificare anche 320 e 390 px. Il catalogo utente corrente è in Changelog.html (32 funzionalità consolidate).
+
+## Diagnostica prestazioni
+
+Modalità locale facoltativa in Impostazioni, disattivata inizialmente. Raccoglie
+fino a 200 eventi nella memoria della scheda, esportabili come JSON senza
+contenuti del diario o identificativi dell'archivio. Include chiamate remote,
+errori, batch di salvataggio e rendering. La preferenza resta nel browser;
+le misure si cancellano ricaricando, disattivando o con il comando dedicato.
+Vedere [SPEC-001](specs/001-tracing-prestazioni.md) per copertura e limiti.

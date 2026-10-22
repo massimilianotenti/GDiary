@@ -24,6 +24,13 @@ Esistono cache/bozze locali e preferenze browser, ma non costituiscono un protoc
 
 ## Punti di manutenzione
 
+La diagnostica facoltativa usa `traceApi` in Code.gs come dispatcher limitato
+alle API applicative. La risposta contiene il risultato normale e misure
+richiesta-locali; `traceMeasure_` raccoglie durate inclusive degli helper.
+Il frontend ammette nell'export solo metriche note. Con tracing spento usa
+direttamente le API esistenti. Non sono scritti log diagnostici su Google.
+Il caricamento del changelog mantiene il proprio percorso diretto.
+
 - Filtri task: taskFilters, continuousKey, taskDiaryBlocks e loadContinuous.
 - Settimana: renderWeek, polishWeek, weekTaskMatches e renderWeekTaskReview.
 - Sezioni giornaliere/abitudini: dailySectionNode, diaryHabitNode e relative mappe di apertura.

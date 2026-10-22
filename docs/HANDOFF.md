@@ -29,4 +29,10 @@ La conversazione precedente non è necessaria per compilare il progetto; le disc
 
 ## Stato delle ipotesi locali
 
+Aggiornamento 22 ottobre 2026: implementata localmente la
+[SPEC-001](specs/001-tracing-prestazioni.md), diagnostica prestazioni opzionale
+in Impostazioni con export JSON filtrato, misure RPC/backend/rendering e batch
+di salvataggio correlati. Nessun deployment eseguito: il collaudo autenticato
+resta da effettuare dopo un aggiornamento esplicitamente richiesto.
+
 IndexedDB, sincronizzazione offline bidirezionale, PWA ed Electron sono stati discussi, ma NON implementati. Non sostituire il salvataggio corrente basandosi soltanto sulla discussione. La prossima eventuale fase deve validare persistenza e identità dell'archivio nel contesto Apps Script.

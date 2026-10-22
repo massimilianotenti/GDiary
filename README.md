@@ -34,6 +34,7 @@ Per usare Chrome già installato nei test: impostare `CHROME_PATH` al suo esegui
 | tools/ | Build, preparazione staging e deploy esplicito |
 | tests/ | Verifiche locali e backend simulato |
 | docs/ | Specifiche attuali e passaggio di consegne |
+| docs/specs/ | Specifiche evolutive numerate, da approvare prima dello sviluppo |
 | docs/history/ | Documentazione storica, non specifica corrente |
 
 ## Documentazione da leggere
@@ -45,6 +46,7 @@ Per usare Chrome già installato nei test: impostare `CHROME_PATH` al suo esegui
 5. [Sviluppo e verifiche](docs/SVILUPPO.md)
 6. [Configurazione e pubblicazione](docs/DEPLOY.md)
 7. [Ipotesi future: locale e sincronizzazione](docs/ROADMAP.md)
+8. [Specifiche evolutive](docs/specs/README.md)
 
 ## Creare il repository GitHub
 

@@ -51,18 +51,36 @@ function setup() {
   });
 }
 
+// Request-local diagnostics. No content or trace is persisted on Google.
+let ACTIVE_TRACE=null;
+function traceMeasure_(category,fn){
+ if(!ACTIVE_TRACE)return fn();
+ const trace=ACTIVE_TRACE,outer=!trace.depth[category],start=Date.now();
+ trace.depth[category]=(trace.depth[category]||0)+1;
+ try{return fn();}finally{trace.depth[category]--;if(outer){trace.metrics[category+'Ms']=(trace.metrics[category+'Ms']||0)+Date.now()-start;trace.metrics[category+'Calls']=(trace.metrics[category+'Calls']||0)+1;}}
+}
+function traceApi(p){
+ const handlers={getState,getCommonState,getJournalPage,getEntryDetail,saveJournalPage,saveDay,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
+ if(!p||!Object.prototype.hasOwnProperty.call(handlers,p.operation)||!/^[-a-zA-Z0-9]{10,80}$/.test(p.traceId||''))throw Error('Richiesta diagnostica non valida.');
+ const previous=ACTIVE_TRACE,start=Date.now(),trace={metrics:{},depth:{}};
+ const arg={...(p.arg||{}),context:{...(p.arg&&p.arg.context||{}),traceId:p.traceId}};
+ ACTIVE_TRACE=trace;ACTIVE_CONTEXT=arg.context;
+ try{const value=handlers[p.operation](arg);return {ok:true,value,diagnostics:{traceId:p.traceId,totalMs:Date.now()-start,...trace.metrics}};}
+ catch(error){return {ok:false,error:String(error.message||error),diagnostics:{traceId:p.traceId,totalMs:Date.now()-start,...trace.metrics}};}
+ finally{ACTIVE_TRACE=previous;}
+}
 function locked_(fn,readOnly=false,background=false) {
   DB_HANDLE=null;ENTRY_SMALL_CACHE=null;ENTRY_TAG_HEADER_CHECKED=false;ENTRY_TAG_HEADER_WRITTEN=false;ioReset_();
   const lock = LockService.getScriptLock();
-  if(background){if(!lock.tryLock(0))return {processed:0,busy:true,pending:null,errors:[]};}else lock.waitLock(30000);
-  try { return fn(); } finally { try { if(!readOnly)SpreadsheetApp.flush(); } finally { lock.releaseLock(); } }
+  if(background){if(!traceMeasure_('lock',()=>lock.tryLock(0)))return {processed:0,busy:true,pending:null,errors:[]};}else traceMeasure_('lock',()=>lock.waitLock(30000));
+  try { return fn(); } finally { try { if(!readOnly)traceMeasure_('flush',()=>SpreadsheetApp.flush()); } finally { lock.releaseLock(); } }
 }
-function db_() {
+function db_() {return traceMeasure_('sheets',()=>{
   if(DB_HANDLE)return DB_HANDLE;
   const id = PropertiesService.getScriptProperties().getProperty('DB_ID');
   if (!id) throw new Error('Esegui setup prima di usare la web app.');
   return DB_HANDLE=SpreadsheetApp.openById(id);
-}
+});}
 function verify_(sheet,headers) {
   if(sheet.getName()==='Goals'){ensureGoalIconHeader_(sheet);return;}
   if(sheet.getName()==='Habits'||sheet.getName()==='HabitLogs'){ensureHabitHeaders_(sheet);return;}
@@ -141,7 +159,7 @@ function cachedRows_(sheet, headers) {
   return data;
 }
 
-function append_(sheet, rows) {
+function append_(sheet, rows) {return traceMeasure_('sheets',()=>{
   const cached=IO.tables&&IO.tables.get(sheet.getName());
   if (!rows.length) return;
   if(sheet.getName()==='Entries')ensureEntryTagHeader_(sheet,true);
@@ -150,7 +168,7 @@ function append_(sheet, rows) {
   range.setValues(rows.map(r=>r.map(v=>/^[=+\-@']/.test(String(v)) ? "'"+v : String(v))));
   ioInvalidate_(sheet);
   if(cached)IO.tables.set(sheet.getName(),{width:cached.width,values:cached.values.concat(rows.map(r=>r.map(v=>String(v)).slice(0,cached.width)))});else ioInvalidate_(sheet);
-}
+});}
 function validDate_(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const d = new Date(value+'T12:00:00Z');
@@ -215,7 +233,7 @@ function state_() {
     taskPlans:cachedRows_(db.getSheetByName('TaskPlans'),PLAN_HEADERS),
     habitLogs:rows_(db.getSheetByName('HabitLogs'),LOG_HEADERS)
  };
- return {today,month,entries,files,...common,settings:reflectionSettings_(),...(allTags?{allTags}:{}),commonIncluded:!(context.commonFresh||context.deferCommon),driveConfigured:!!PropertiesService.getScriptProperties().getProperty('ROOT_ID'),performance:{entriesMs,previewsMs,filesMs,commonMs:Date.now()-commonStarted,totalMs:Date.now()-started}};
+ return {today,month,entries,files,...common,settings:reflectionSettings_(),...(allTags?{allTags}:{}),commonIncluded:!(context.commonFresh||context.deferCommon),driveConfigured:!!PropertiesService.getScriptProperties().getProperty('ROOT_ID'),performance:{traceId:context.traceId||'',entriesMs,previewsMs,filesMs,commonMs:Date.now()-commonStarted,totalMs:Date.now()-started}};
 }
 
 function saveGoalImpl_(p) {
@@ -277,7 +295,7 @@ function addJournalImpl_(payload) {
     const response={delta:true,commonIncluded:false,entries:saved.map((e,i)=>{const r=refs[i],p=previewMap.get(e.id);return {...e,excerpt:p?p.excerpt:existing.length?'':description.slice(0,220),previewRich:p?readPreviewRuns_(p.richExcerpt):existing.length?[]:previewRuns_(plainRich_(description)),docPending:!!r.pending,docName:r.docName||'',docUrl:r.docId?'https://docs.google.com/document/d/'+r.docId+'/edit#bookmark='+r.bookmark:''};})};
     responseMs=Date.now()-responseStarted;return response;
   });
-  const totalMs=Date.now()-started;result.performance={kind:'journalCreate',totalMs,validationMs,lockWaitMs:entered-started-validationMs,sheetsMs,sectionMs,responseMs,finaliseMs:Math.max(0,totalMs-(entered-started)-sheetsMs-sectionMs-responseMs)};return result;
+  const totalMs=Date.now()-started;result.performance={kind:'journalCreate',traceId:ACTIVE_CONTEXT.traceId||'',totalMs,validationMs,lockWaitMs:entered-started-validationMs,sheetsMs,sectionMs,responseMs,finaliseMs:Math.max(0,totalMs-(entered-started)-sheetsMs-sectionMs-responseMs)};return result;
 }
 function saveProjectImpl_(payload) {
   const slug=payload.slug?slug_(payload.slug):slug_(payload && payload.name);const name=text_(payload.name,200);if(!name)throw new Error('Nome progetto richiesto.');
@@ -305,11 +323,11 @@ function setTaskStatusImpl_(payload) {
   });
 }
 
-function writeRow_(sheet,row,values) {
+function writeRow_(sheet,row,values) {return traceMeasure_('sheets',()=>{
   ioInvalidate_(sheet);
   if(sheet.getName()==='Entries')ensureEntryTagHeader_(sheet,true);
   sheet.getRange(row,1,1,values.length).setNumberFormat('@').setValues([values.map(v=>/^[=+\-@']/.test(String(v))?"'"+v:String(v))]);
-}
+});}
 function text_(value,max) {
   if (typeof value!=='string' || value.length>max) throw new Error('Testo mancante o troppo lungo.');
   return value.trim();
@@ -392,7 +410,7 @@ function addFileLink(p){ACTIVE_CONTEXT=p&&p.context||{};return addFileLinkImpl_(
 function saveWeek(p){ACTIVE_CONTEXT=p&&p.context||{};return saveWeekImpl_(p);}
 function saveDay(p){ACTIVE_CONTEXT=p&&p.context||{};return saveDayImpl_(p);}
 
-function getCommonState(){ACTIVE_CONTEXT={view:'habits'};return readState_();}
+function getCommonState(p){ACTIVE_CONTEXT={...((p&&p.context)||{}),view:'habits'};return readState_();}
 
 
 function setEntryProjects(p){ACTIVE_CONTEXT=p.context||{};return locked_(function(){const db=db_(),sheet=db.getSheetByName('Entries'),found=findRows_(sheet,1,p.id,false);if(!found.length)throw new Error('Voce non trovata.');const e=readEntry_(found[0]);if(e.updatedAt!==p.updatedAt)throw new Error('Voce modificata altrove. Aggiorna e riprova.');const selected=Array.from(new Set(String(p.projects||'').split(',').filter(Boolean)));const known=rows_(db.getSheetByName('Projects'),PROJECT_HEADERS).map(p=>p.slug);if(selected.some(s=>!known.includes(s)&&!e.projects.split(',').includes(s)))throw new Error('Seleziona un progetto esistente.');e.projects=selected.join(',');e.scope=selected.length?'project':'personal';e.updatedAt=new Date(Math.max(Date.now(),Date.parse(e.updatedAt)+1)).toISOString();ioInvalidate_(sheet);sheet.getRange(found[0],5).setNumberFormat('@').setValues([[/^[=+\-@']/.test(e.projects)?"'"+e.projects:e.projects]]);sheet.getRange(found[0],9,1,3).setValues([[e.updatedAt,e.requestId,e.scope]]);ENTRY_SMALL_CACHE=null;attachSchedules_([e]);return {delta:true,metadataOnly:true,preserveDetailId:e.id,entries:[e],commonIncluded:false};});}

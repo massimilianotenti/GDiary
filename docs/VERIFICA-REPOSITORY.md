@@ -1,5 +1,34 @@
 # Verifica repository — 17 ottobre 2026
 
+## SPEC-001 — 22 ottobre 2026
+
+Build e `npm test` superati con la diagnostica completata localmente.
+`npm run test:tracing` verifica letture cold/warm, correlazione, batch e coda,
+errori e ripristino del contesto, elenco delle API ammesse, attivazione locale,
+rendering, export JSON filtrato e cancellazione/disattivazione durante richieste
+in volo. Verificato anche un gruppo di batch con successo e fallimento.
+`npm run test:release` superato con Chromium Playwright; `verify-p82-tasks.cjs`
+superato per task, privacy, ricerca e salvataggi multi-mese parziali con retry.
+I test browser sono eseguiti fuori dalla sandbox che ne impedisce l'avvio.
+Index.html e Demo.html rigenerati, bootstrap UTF-8 e staging di sei file
+verificati dalla suite. Nessun deploy o accesso ai dati reali. Il tracing dei
+tempi reali Apps Script resta da collaudare dopo un aggiornamento autorizzato.
+
+## Aggiornamento dipendenze — 22 ottobre 2026
+
+Rigenerato package-lock.json dal registro npm mantenendo le cinque versioni
+dirette dichiarate in package.json. Il vecchio albero transitivo richiedeva
+content-disposition@2.0.2, non disponibile sul registro; il nuovo risolve 2.0.1
+secondo i vincoli pubblicati delle dipendenze. `npm ci --no-audit --no-fund`
+completato (329 pacchetti), build e `npm test` superati. Index.html e Demo.html
+rigenerati. `CHROME_PATH=/usr/bin/google-chrome npm run test:release` superato
+fuori dalla sandbox, che impedisce l'avvio del browser. Confermati
+esattamente sei file nello staging. Questi controlli includono
+le modifiche al tracing in lavorazione, senza attestare il completamento della
+SPEC-001. Nessun accesso a Google o deploy.
+
+## Verifiche della consegna iniziale
+
 - Build completata nella nuova cartella, con sei file di staging.
 - npm test superato: backend simulato, conflitti, cache, ricerca, tag, progetti e pipeline.
 - npm run test:release superato: preferenze, frecce e filtri task settimanali.
