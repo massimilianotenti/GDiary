@@ -37,4 +37,11 @@ deployment esistente aggiornato alla versione Apps Script 63, stesso URL.
 Inclusa la correzione dell'allineamento dei comandi nota/task. Il collaudo
 autenticato e la raccolta della baseline reale restano da effettuare.
 
+Successivamente raccolta una prima baseline reale e avviata la fase 0 della
+SPEC-002: estensione locale del tracing con tempi esclusivi, dettaglio
+DocContent/cache, motivi osservabili dei miss, correlazione delle pagine e
+benchmark get/getAll facoltativo. Estensione pubblicata su richiesta nella
+versione Apps Script 64, mantenendo lo stesso URL; le ottimizzazioni applicative
+restano proposte in attesa delle nuove misure.
+
 IndexedDB, sincronizzazione offline bidirezionale, PWA ed Electron sono stati discussi, ma NON implementati. Non sostituire il salvataggio corrente basandosi soltanto sulla discussione. La prossima eventuale fase deve validare persistenza e identità dell'archivio nel contesto Apps Script.

@@ -1,5 +1,32 @@
 # Verifica repository — 17 ottobre 2026
 
+## Pubblicazione fase 0 SPEC-002 — 22 ottobre 2026
+
+Su richiesta dell'utente eseguito `npm run deploy`: build e tutti i controlli
+preliminari superati, sei file caricati e deployment esistente aggiornato dalla
+versione Apps Script 63 alla 64 con lo stesso URL. Nessun setup o benchmark
+sui dati reali eseguito. Il nuovo export con measurementVersion 2 è pronto
+per la raccolta della baseline da parte dell'utente.
+
+## Tracing di dettaglio SPEC-002, fase 0 — 22 ottobre 2026
+
+Build, `npm test`, `npm run test:tracing`, `npm run test:release` e
+`node tests/verify-p82-tasks.cjs` superati localmente. Test browser eseguiti
+fuori dalla sandbox che ne impedisce l'avvio, con dati simulati e richieste
+HTTPS della pagina bloccate. Demo/Index rigenerati; sei file nello staging.
+
+Verificati tempi esclusivi con orologio deterministico, conteggio UTF-8,
+cache cold/warm/pending, dettagli DocContent, servizio cache non disponibile,
+valori malformati, oltre-soglia e revisioni cambiate/mancanti. Benchmark
+get/getAll con cinque ripetizioni e nessuna scrittura in cache. Test browser
+verifica nuove metriche filtrate, unico evento RPC dopo vista in cache,
+correlazione navigazione/pagine, export e cancellazione/disattivazione.
+Restano superati task, privacy, bozze e salvataggi multi-mese con retry.
+
+Nessun deploy né benchmark su Google eseguito per questa estensione. La fase 0
+resta da pubblicare su richiesta e da usare per una nuova baseline reale;
+nessuna ottimizzazione dei percorsi di lettura/scrittura è stata introdotta.
+
 ## Pubblicazione autorizzata — 22 ottobre 2026
 
 Dopo l'abilitazione dell'Apps Script API da parte dell'utente, `npm run deploy`

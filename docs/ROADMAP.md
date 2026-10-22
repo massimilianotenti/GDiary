@@ -1,5 +1,15 @@
 # Ipotesi future — non implementate
 
+## Primo intervento sulle prestazioni
+
+La [SPEC-002](specs/002-primo-intervento-prestazioni.md) propone interventi
+circoscritti sull'architettura attuale a partire dal primo tracing reale:
+fase 0 di tracing dettagliato per decidere tra bulk cache e letture DocContent raggruppate; task
+visibili durante la paginazione e correzione dei conteggi diagnostici.
+Include un confronto esplorativo degli snapshot documento/mese e mantiene
+le risposte di salvataggio incrementali come intervento secondario.
+È una proposta da verificare prima dell'evoluzione verso storage locale.
+
 ## Dati locali e sincronizzazione
 
 Discussa una futura architettura con IndexedDB: apertura immediata da dati locali, lettura remota in background e, in una seconda fase, scrittura locale con coda di sincronizzazione. L'utente ha chiarito che SQLite non è un requisito: IndexedDB va bene.

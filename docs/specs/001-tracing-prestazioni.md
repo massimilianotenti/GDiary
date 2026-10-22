@@ -101,6 +101,40 @@ richiede un aggiornamento esplicito del deployment da parte dell'utente.
 
 ## Evoluzioni previste
 
+### Estensione diagnostica — fase 0 SPEC-002
+
+L'export mantiene il formato v1 e aggiunge `measurementVersion: 2`. Oltre ai
+tempi inclusivi include `*SelfMs` esclusivi degli helper strumentati e
+`unaccountedMs`: sommare soltanto i SelfMs distinti più unaccountedMs per
+confrontare con totalMs. Non sommare parenti inclusivi e figli. La differenza
+client/backend conserva il significato di trasporto, avvio e serializzazione.
+
+Nuovi segmenti: cacheGet/Parse/Serialize/Put, driveCheck/Revision, docsBody/Index,
+docContent e contentSearch/Headers/Version/Payload/Assemble. pendingContent e
+syncedContent distinguono i due motivi di recupero; sono parenti inclusivi,
+non segmenti aggiuntivi da sommare a docContent. responseSerialize misura le
+serializzazioni delle voci già presenti nel calcolo del budget, non la
+serializzazione finale effettuata dalla piattaforma Google.
+
+Contatori anonimi osservano eccezioni cache, elementi invalidi, assenze di
+causa ignota, bypass, oltre-soglia e revisioni cambiate/non verificabili.
+Righe trovate, celle e byte payload, figli dei corpi Docs e fasce di numero
+frammenti/versioni descrivono il lavoro eseguito. Possono comprendere la voce
+letta ma esclusa per budget: non coincidono sempre con entriesCount restituito.
+Nessuna chiave, identificativo o hash stabile viene esportato.
+
+Gli eventi journalNavigation aggregano le pagine mediante actionId casuale;
+ogni RPC getJournalPage ha pageIndex. Il caricamento e la paginazione restano
+quelli precedenti. Eliminato il doppio evento getState con cache:true che
+duplicava la rilettura remota dopo la visualizzazione della copia locale.
+
+Il comando facoltativo «Confronta cache get/getAll» confronta cinque volte
+le stesse chiavi del mese, ad ordine alternato, e una chiave assente. Esporta
+solo numero chiavi/ripetizioni, durate aggregate, errori e differenze. Non
+scrive nella cache né modifica dati. Zero chiavi eleggibili significa che il
+confronto riguarda soltanto la chiave assente. È un esperimento controllato,
+non un nuovo comportamento di lettura dell'app.
+
 Se verrà approvata un'architettura local-first, estendere questo schema a
 IndexedDB, outbox, batch di sincronizzazione, retry, conflitti e ritardo di
 replica. Le decisioni su quel protocollo saranno oggetto di una specifica

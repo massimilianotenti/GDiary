@@ -55,18 +55,23 @@ function setup() {
 let ACTIVE_TRACE=null;
 function traceMeasure_(category,fn){
  if(!ACTIVE_TRACE)return fn();
- const trace=ACTIVE_TRACE,outer=!trace.depth[category],start=Date.now();
+ const trace=ACTIVE_TRACE,outer=!trace.depth[category],start=Date.now(),frame={children:0};
+ trace.stack.push(frame);
  trace.depth[category]=(trace.depth[category]||0)+1;
- try{return fn();}finally{trace.depth[category]--;if(outer){trace.metrics[category+'Ms']=(trace.metrics[category+'Ms']||0)+Date.now()-start;trace.metrics[category+'Calls']=(trace.metrics[category+'Calls']||0)+1;}}
+ try{return fn();}finally{const elapsed=Date.now()-start,self=Math.max(0,elapsed-frame.children);trace.stack.pop();if(trace.stack.length)trace.stack[trace.stack.length-1].children+=elapsed;trace.accounted+=self;trace.metrics[category+'SelfMs']=(trace.metrics[category+'SelfMs']||0)+self;trace.depth[category]--;if(outer){trace.metrics[category+'Ms']=(trace.metrics[category+'Ms']||0)+elapsed;trace.metrics[category+'Calls']=(trace.metrics[category+'Calls']||0)+1;}}
 }
+function traceCount_(key,value=1){if(ACTIVE_TRACE)ACTIVE_TRACE.metrics[key]=(ACTIVE_TRACE.metrics[key]||0)+value;}
+function traceBytes_(value){let bytes=0;for(let i=0;i<value.length;i++){const c=value.charCodeAt(i);if(c<128)bytes++;else if(c<2048)bytes+=2;else if(c>=0xD800&&c<=0xDBFF&&i+1<value.length&&value.charCodeAt(i+1)>=0xDC00&&value.charCodeAt(i+1)<=0xDFFF){bytes+=4;i++;}else bytes+=3;}return bytes;}
+function traceDistribution_(prefix,count){traceCount_(prefix+(count===1?'1':count<=3?'2to3':count<=9?'4to9':'10plus'));}
 function traceApi(p){
- const handlers={getState,getCommonState,getJournalPage,getEntryDetail,saveJournalPage,saveDay,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
+ const handlers={benchmarkJournalCache,getState,getCommonState,getJournalPage,getEntryDetail,saveJournalPage,saveDay,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
  if(!p||!Object.prototype.hasOwnProperty.call(handlers,p.operation)||!/^[-a-zA-Z0-9]{10,80}$/.test(p.traceId||''))throw Error('Richiesta diagnostica non valida.');
- const previous=ACTIVE_TRACE,start=Date.now(),trace={metrics:{},depth:{}};
+ const previous=ACTIVE_TRACE,start=Date.now(),trace={metrics:{},depth:{},stack:[],accounted:0};
+ const diagnostics=()=>{const totalMs=Date.now()-start;return {traceId:p.traceId,totalMs,unaccountedMs:Math.max(0,totalMs-trace.accounted),...trace.metrics};};
  const arg={...(p.arg||{}),context:{...(p.arg&&p.arg.context||{}),traceId:p.traceId}};
  ACTIVE_TRACE=trace;ACTIVE_CONTEXT=arg.context;
- try{const value=handlers[p.operation](arg);return {ok:true,value,diagnostics:{traceId:p.traceId,totalMs:Date.now()-start,...trace.metrics}};}
- catch(error){return {ok:false,error:String(error.message||error),diagnostics:{traceId:p.traceId,totalMs:Date.now()-start,...trace.metrics}};}
+ try{const value=handlers[p.operation](arg);return {ok:true,value,diagnostics:diagnostics()};}
+ catch(error){return {ok:false,error:String(error.message||error),diagnostics:diagnostics()};}
  finally{ACTIVE_TRACE=previous;}
 }
 function locked_(fn,readOnly=false,background=false) {

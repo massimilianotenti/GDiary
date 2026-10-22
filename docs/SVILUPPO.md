@@ -32,3 +32,16 @@ L'export JSON non contiene contenuti del diario; confrontare una lettura a
 freddo con una ripetuta e includere eventuali errori o salvataggi parziali.
 Disattivare il tracing al termine. Limiti e significato delle metriche sono
 descritti nella [SPEC-001](specs/001-tracing-prestazioni.md).
+
+Con measurementVersion 2 raccogliere R1 e poi R2 subito dopo sulla stessa
+pagina; R3 dopo una normale modifica e sincronizzazione scelta dall'utente.
+Esportare prima di ricaricare, annotando separatamente quali operazioni sono
+state eseguite. Ripetere in sessioni comparabili. I miss ripetuti non provano
+da soli una scadenza: il TTL configurato è già sei ore e gli elementi possono
+essere invalidati o non essere stati memorizzati.
+
+Facoltativamente eseguire una volta «Confronta cache get/getAll» dalle
+impostazioni, al termine delle normali letture. L'esperimento usa al massimo
+25 chiavi sincronizzate del mese corrente e non popola la cache. Inviare il
+nuovo export per l'analisi; mantenere distinte le metriche del benchmark dai
+tempi delle normali operazioni. L'export conserva solo le ultime 200 misure.
