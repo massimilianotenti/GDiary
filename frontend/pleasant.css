@@ -1,13 +1,18 @@
 /* P60: a quiet writing surface. These tokens own the Vue diary's visual theme. */
-body.bullet-theme .diary-cycle-memory{margin:14px 0 24px;padding:16px 18px;border-left:2px solid var(--diary-accent);background:var(--diary-wash);border-radius:0 6px 6px 0;overflow-wrap:anywhere}
+/* The quarterly reminder has its own hue, distinct from daily section bands. */
+body.bullet-theme .diary-cycle-memory{--memory-bg:#e2edf3;--memory-ink:#263d4b;--memory-muted:#4a6170;--memory-accent:#346b84;--memory-line:#a4bdcb;margin:14px 0 24px;padding:16px 18px;border:1px solid var(--memory-line);border-left:4px solid var(--memory-accent);background:var(--memory-bg);border-radius:8px;overflow-wrap:anywhere}
+body.bullet-theme[data-palette=sage] .diary-cycle-memory{--memory-bg:#ede6f4;--memory-ink:#3f334d;--memory-muted:#685776;--memory-accent:#72548a;--memory-line:#c3b1d3}
+body.bullet-theme[data-palette=slate] .diary-cycle-memory{--memory-bg:#f7e7da;--memory-ink:#49362c;--memory-muted:#735748;--memory-accent:#9a5b31;--memory-line:#d3b59f}
+body.bullet-theme[data-palette=dark] .diary-cycle-memory{--memory-bg:#3a3427;--memory-ink:#fff0d0;--memory-muted:#e0cda3;--memory-accent:#e4b668;--memory-line:#9a7945}
+body.bullet-theme[data-palette=plum] .diary-cycle-memory{--memory-bg:#e1f0ea;--memory-ink:#243f38;--memory-muted:#47665b;--memory-accent:#356b5b;--memory-line:#9cbeb0}
 body.bullet-theme .diary-cycle-memory>header{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px 14px;margin-bottom:12px}
-body.bullet-theme .diary-cycle-memory h2{font:400 22px/1.3 Georgia,serif;letter-spacing:-.3px;margin:0;color:var(--diary-ink)}
-body.bullet-theme .diary-cycle-memory>header p{margin:0;font-size:11px;color:var(--diary-muted)}
-body.bullet-theme .diary-cycle-memory article+article{margin-top:14px;padding-top:14px;border-top:1px solid var(--diary-line)}
-body.bullet-theme .diary-cycle-memory h3{display:flex;align-items:flex-start;gap:8px;font-size:14px;font-weight:600;line-height:1.5;color:var(--diary-ink);margin:0}
-body.bullet-theme .diary-cycle-memory h3>.outline-icon{width:19px;height:19px;flex:0 0 19px;margin-top:1px;color:var(--diary-accent)}
+body.bullet-theme .diary-cycle-memory h2{font:400 22px/1.3 Georgia,serif;letter-spacing:-.3px;margin:0;color:var(--memory-ink)}
+body.bullet-theme .diary-cycle-memory>header p{margin:0;font-size:11px;color:var(--memory-muted)}
+body.bullet-theme .diary-cycle-memory article+article{margin-top:14px;padding-top:14px;border-top:1px solid var(--memory-line)}
+body.bullet-theme .diary-cycle-memory h3{display:flex;align-items:flex-start;gap:8px;font-size:14px;font-weight:600;line-height:1.5;color:var(--memory-ink);margin:0}
+body.bullet-theme .diary-cycle-memory h3>.outline-icon{width:19px;height:19px;flex:0 0 19px;margin-top:1px;color:var(--memory-accent)}
 body.bullet-theme .diary-cycle-memory h3>span{min-width:0}
-body.bullet-theme .diary-cycle-memory .diary-cycle-description{font-size:13px;line-height:1.7;color:var(--diary-ink);white-space:pre-wrap;margin:5px 0 0}
+body.bullet-theme .diary-cycle-memory .diary-cycle-description{font-size:13px;line-height:1.7;color:var(--memory-ink);white-space:pre-wrap;margin:5px 0 0}
 @media(max-width:650px){body.bullet-theme .diary-cycle-memory{padding:13px 12px}body.bullet-theme .diary-cycle-memory h2{font-size:20px}}
 body.bullet-theme{--diary-ink:var(--paint-292e32);--diary-muted:var(--paint-737872);--diary-line:var(--paint-e8e6df);--diary-paper:var(--paint-fffefa);--diary-accent:var(--paint-a66b21);--diary-wash:var(--paint-f4ede0);background:var(--paint-f8f7f3);color:var(--diary-ink);font-family:'Segoe UI',system-ui,sans-serif}
 body.bullet-theme .app{grid-template-columns:220px minmax(0,1fr)}

@@ -1,9 +1,22 @@
-const assert=require('assert'),path=require('path'),{pathToFileURL}=require('url'),{chromium}=require('playwright');
+const fs=require('fs'),assert=require('assert'),path=require('path'),{pathToFileURL}=require('url'),{chromium}=require('playwright');
 (async()=>{const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||undefined});try{
  const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('https://**/*',r=>r.abort());await page.goto(pathToFileURL(path.resolve(__dirname,'../Demo.html')).href);await page.waitForFunction(()=>continuousSession?.loaded&&!busy&&commonReadAt>0);
  await page.evaluate(()=>{window.memoryCalls=[];window.memoryApi=api;api=(name,...args)=>{memoryCalls.push(name);return memoryApi(name,...args);};state.goals=[{id:'memory-q1',cycle:'2026-Q1',title:'Primo trimestre',icon:'🎯',description:'Una direzione per iniziare'},{id:'memory-q4',cycle:'2026-Q4',title:'Ricordare ciò che conta',icon:'book',description:'Prima riga\nSeconda riga <b>testo letterale</b>'},{id:'memory-empty',cycle:'2026-Q4',title:'Senza descrizione',icon:'none',description:''},{id:'memory-next',cycle:'2027-Q1',title:'Anno successivo',description:'Altro anno'}];renderContinuous($('content'));});
  const memory=page.getByRole('region',{name:'Obiettivi del trimestre',exact:true});assert.equal(await memory.locator('article').count(),2);assert.equal(await memory.locator('.diary-cycle-description').innerText(),'Prima riga\nSeconda riga <b>testo letterale</b>');assert.equal(await memory.locator('b').count(),0);assert.equal(await memory.locator('article').first().locator('svg path').getAttribute('d'),await page.evaluate(()=>outlineIcon('book').querySelector('path').getAttribute('d')));assert.equal(await memory.locator('article').nth(1).locator('svg').count(),0);assert.equal(await memory.locator('h3').nth(1).innerText(),'Senza descrizione');assert(await memory.evaluate(e=>e.compareDocumentPosition(document.querySelector('.diary-day'))&Node.DOCUMENT_POSITION_FOLLOWING));assert.deepEqual(await page.evaluate(()=>memoryCalls),[]);
  await page.evaluate(()=>{const prior=month;month='2026-01';window.legacyMemoryPath=diaryCycleMemory().goals[0].iconPath;month=prior;});assert.equal(await page.evaluate(()=>legacyMemoryPath),await page.evaluate(()=>outlineIcon('target').querySelector('path').getAttribute('d')));
+ // Each theme gives the reminder a distinct hue with readable text and icons.
+ fs.mkdirSync(path.resolve(__dirname,'../artifacts'),{recursive:true});
+ for(const palette of ['warm','sage','slate','dark','plum']){
+  await page.evaluate(p=>applyPalette(p),palette);
+  const ratios=await memory.evaluate(el=>{
+   const lum=color=>color.match(/[\d.]+/g).slice(0,3).map(v=>{v=Number(v)/255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4);}).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+   const style=getComputedStyle(el),background=lum(style.backgroundColor),ratio=color=>{const l=lum(color);return(Math.max(l,background)+.05)/(Math.min(l,background)+.05);};
+   return {distinct:style.getPropertyValue('--memory-bg').trim()!==style.getPropertyValue('--diary-wash').trim(),text:[...el.querySelectorAll('h2,h3,p')].map(n=>ratio(getComputedStyle(n).color)),icon:ratio(getComputedStyle(el.querySelector('svg')).color)};
+  });
+  assert(ratios.distinct,'reminder hue '+palette);assert(ratios.text.every(r=>r>=4.5),'reminder text contrast '+palette+' '+ratios.text);assert(ratios.icon>=3,'reminder icon contrast '+palette);
+  await memory.screenshot({path:path.resolve(__dirname,'../artifacts/cycle-memory-highlight-'+palette+'.png')});
+ }
+ await page.evaluate(()=>applyPalette('warm'));
  // Calendar navigation uses the displayed month, including year boundaries.
  await page.getByRole('button',{name:'Mese precedente',exact:true}).click();await page.waitForFunction(()=>continuousSession?.loaded&&!busy&&month==='2026-09');assert.equal(await memory.count(),0);
  await page.getByRole('button',{name:'Mese successivo',exact:true}).click();await page.waitForFunction(()=>continuousSession?.loaded&&!busy&&month==='2026-10');assert.equal(await memory.locator('article').count(),2);

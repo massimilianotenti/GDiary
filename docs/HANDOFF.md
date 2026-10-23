@@ -280,3 +280,30 @@ selezionabile con preferenza locale coerente, nessun overflow in impostazioni
 o diario desktop, nessuna bozza pendente. Coda zero pending/errori e 67
 completate invariata. Ripristinata la preferenza palette precedente al termine;
 nessun salvataggio dei dati del diario o esportazione di contenuti.
+
+## Evidenza cromatica del promemoria — sviluppo locale
+
+Su richiesta il riquadro Obiettivi del trimestre usa una tonalità distinta
+dalle sezioni giornaliere e un bordo più marcato: azzurro in Carta calda,
+lavanda in Salvia, pesca in Blu ardesia, ambra nello Scuro e menta in Prugna.
+Token CSS locali `--memory-*`, nessuna modifica a contenuti, API o flussi.
+Build, npm test, test:diary-goals e test:release superati. Il test del
+promemoria verifica anche sfondo distinto, contrasto testo almeno 4,5:1 e
+icone almeno 3:1 sul riquadro in tutte le cinque palette; confermate le
+geometrie mobile e la conservazione delle bozze. Ispezionati screenshot
+simulati in artifacts/cycle-memory-highlight-*.png, esclusi da Git.
+Nessun deploy o accesso ai dati reali: online resta Apps Script 74.
+
+Deploy successivamente richiesto ed eseguito: Apps Script 75, stesso deployment,
+URL e accesso privato. Build, npm test, test:diary-goals, test:release e tutti
+i controlli aggiuntivi della procedura superati. Backup dei sei sorgenti remoti
+fuori repository e confronto HEAD/versione 74/base Git senza divergenze.
+ROOT_FOLDER_ID passato solo tramite ambiente allo staging. Verifica remota
+successiva: sei sorgenti identici allo staging, versione 75 attiva e manifest
+MYSELF/USER_DEPLOYING conservato. Nessun setupDrive o salvataggio reale.
+
+Verifica autenticata v75 superata: riquadro distinto nelle cinque palette,
+contrasto minimo del testo misurato 5,36:1; icona, titolo e descrizione
+corrispondenti al record. Nessun overflow desktop o bozza pendente. Coda
+zero pending/errori, 67 completate. Ripristinata la palette precedente al
+termine; nessuna scrittura ai dati del diario o esportazione dei contenuti.

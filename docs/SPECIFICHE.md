@@ -16,6 +16,9 @@ Un diario che rende semplice scrivere, ritrovare e portare avanti attività. Tip
   copia dei dati o modifica automatica del diario.
   Dalla versione 73 compare accanto al titolo l'icona scelta per ciascun
   obiettivo, usando il catalogo esistente e rispettando «Nessuna icona».
+  Dalla versione 75 il promemoria usa una tonalità propria, distinta dalle fasce
+  giornaliere, con bordo perimetrale e accento laterale più marcato. Colori
+  coordinati per testo e icone nelle cinque palette, senza cambiare i dati.
 - Note con titolo facoltativo/automatico e task con titolo esplicito; descrizioni modificabili nello stesso editor.
 - Corpo con formattazione, checklist, link, elenchi, titoli e codice; preservare testo e struttura durante l'editing.
 - Progetti facoltativi e multipli; tag suggeriti dal catalogo già usato, con possibilità di crearne altri.

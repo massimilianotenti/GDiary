@@ -82,6 +82,9 @@ aggiornamento del promemoria non ricrea i nodi degli editor del diario.
 Il seguito con icone riusa `OUTLINE_ICONS` e la conversione `LEGACY_ICONS`:
 il modello espone solo il path SVG del catalogo, senza HTML arbitrario.
 Icone decorative accanto al titolo, omesse se assenti o impostate a `none`.
+Il seguito visivo della versione 75 definisce token `--memory-*` sul solo riquadro:
+sfondo, testo, testo secondario, icone e bordi cambiano insieme per ciascuna
+palette. Gli altri componenti mantengono i token e gli stili precedenti.
 
 ## Palette Prugna — Apps Script 74
 
