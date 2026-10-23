@@ -1,7 +1,7 @@
 # Specifiche evolutive
 
 Questa cartella raccoglie le specifiche delle evoluzioni proposte dopo la base
-v2.0.3. Ogni documento fissa obiettivo, confini, decisioni, criteri di
+v2.0.4. Ogni documento fissa obiettivo, confini, decisioni, criteri di
 accettazione e questioni aperte prima dell'implementazione.
 
 Le specifiche non sostituiscono la documentazione corrente in `docs/`: quando

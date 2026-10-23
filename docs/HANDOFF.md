@@ -137,3 +137,13 @@ Stato parziale, nodo editor/focus/selezione conservati senza modifiche.
 Coda prima/dopo zero pending/errori, 64 completate. Nessun salvataggio del
 diario, setupDrive o nuovo deploy. Nessun miglioramento temporale complessivo
 dimostrato; dettagli e limiti in VERIFICA-DOCCONTENT-BATCH.md.
+
+
+## Release 2.0.4 preparata nei sorgenti
+
+Versione funzionale aggiornata da 2.0.3 a 2.0.4 per documentare il recupero
+raggruppato di DocContent. Il changelog descrive il beneficio strutturale e
+specifica che non è dimostrata una riduzione del tempo totale. package.json,
+lockfile, Demo, sorgenti UI e Changelog sono aggiornati; Index.html rigenerato
+con la build. Il deployment Apps Script attivo resta alla versione 68 e
+continua a mostrare v2.0.3. Nessun nuovo deploy eseguito per questa release.

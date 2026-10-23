@@ -1,6 +1,6 @@
 {
   "name": "bullet-journal-drive",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "private": true,
   "scripts": {
     "build": "vite build && node tools/assemble-frontend.cjs && node tools/prepare-apps-script.cjs",

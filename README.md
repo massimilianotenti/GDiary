@@ -1,6 +1,6 @@
 # GDiary
 
-Diario personale su Google Drive, con note e task nello stesso flusso, riflessioni giornaliere, checkup settimanale e abitudini. Base applicativa **v2.0.3**, preparata per repository il **17 ottobre 2026**.
+Diario personale su Google Drive, con note e task nello stesso flusso, riflessioni giornaliere, checkup settimanale e abitudini. Release **v2.0.4** preparata nei sorgenti; il deployment 68 attivo mostra ancora v2.0.3 fino a un nuovo deploy. Repository inizialmente preparato il **17 ottobre 2026**.
 
 ## Avvio su un nuovo PC
 
@@ -16,7 +16,7 @@ npm run test:release
 
 Aprire `Demo.html` nel browser: usa dati simulati, non l'archivio Google. Su PowerShell, se la policy impedisce npm.ps1, usare `npm.cmd` e `npx.cmd`. Il caricamento del changelog della demo via file:// può essere bloccato dal browser: non è una prova di errore del deployment Apps Script.
 
-Per usare Chrome già installato nei test: impostare `CHROME_PATH` al suo eseguibile; altrimenti viene usato Chromium installato da Playwright. `npm run test:e2e` esegue la suite browser storica, più ampia; `test:release` copre preferenze, frecce e task settimanali delle release 2.0.1–2.0.3.
+Per usare Chrome già installato nei test: impostare `CHROME_PATH` al suo eseguibile; altrimenti viene usato Chromium installato da Playwright. `npm run test:e2e` esegue la suite browser storica, più ampia; `test:release` copre preferenze, frecce e task settimanali delle release precedenti alla 2.0.4.
 
 ## Mappa del progetto
 

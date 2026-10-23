@@ -1,6 +1,8 @@
-# GDiary v2.0.3 — Funzionalità disponibili
+# GDiary v2.0.4 — Funzionalità disponibili
 
-Release 2.0.3 · Task della settimana in un riepilogo compatto, con gestione nel diario continuo e filtri dedicati.
+Release 2.0.4 · Recupero raggruppato dei contenuti del diario, con risultati equivalenti e meno ricerche ripetute su DocContent.
+
+Le verifiche reali confermano il recupero di una pagina di 25 contenuti con una ricerca raggruppata. Non è dimostrata una riduzione del tempo totale di caricamento.
 
 Riepilogo delle 32 funzionalità attualmente presenti nell’app, raccolte in sei aree. Le correzioni e le versioni intermedie sono state consolidate in questa base v2.
 
