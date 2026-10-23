@@ -1,6 +1,6 @@
 # SPEC-002 — Primo intervento sulle prestazioni
 
-**Stato:** Fase 0 pubblicata nella versione Apps Script 64; nuova baseline da raccogliere; ottimizzazioni in proposta
+**Stato:** Fase 0 pubblicata nella versione Apps Script 64; baseline raccolta; esperimento E pubblicato nella versione Apps Script 65
 
 **Data:** 22 ottobre 2026
 
@@ -56,9 +56,10 @@ ma non include il paint finale del browser.
 
 ## Fase 0 — Diagnostica di dettaglio e nuova baseline
 
-Implementazione autorizzata: estendere soltanto il tracing, mantenendo percorsi
-di lettura/salvataggio, limiti e cache attuali. I passi A–E non sono ancora
-autorizzati come modifiche applicative né scelti in ordine definitivo.
+Autorizzazione iniziale della fase 0: estendere soltanto il tracing, mantenendo
+percorsi di lettura/salvataggio, limiti e cache. Dopo la nuova baseline è stato
+autorizzato l’esperimento E locale (vedi aggiornamento sotto); A–D restano
+proposte per le parti applicative non ancora implementate.
 
 - Conservare i tempi inclusivi e aggiungere tempi esclusivi `*SelfMs`, che
   sottraggono i segmenti figli strumentati. `unaccountedMs` rappresenta la parte
@@ -101,7 +102,111 @@ e possibile proiezione versionata di editorAutoTitle. Quest'ultima richiederebbe
 analisi di schema/scrittori e fallback ai dati durevoli e non è inclusa nella
 fase 0. L'uso prevalentemente hit o miss deve essere misurato, non dedotto dal TTL.
 
-## E. Esperimento candidato: cache raggruppata
+## Baseline fase 0 — 22–23 ottobre 2026
+
+Misure condivise dall'utente, measurementVersion 2. Solo aggregati: nessun
+JSON originale, contenuto o identificativo dell'archivio conservato.
+
+- Cinque RPC comparabili della pagina da 25 voci, tutte hit: client
+  5,494 / 8,693 / 11,541 / 7,878 / 5,171 s; backend
+  4,144 / 6,885 / 10,463 / 6,468 / 3,788 s. Una RPC è riuscita ma la
+  navigazione associata è annullata: valida per il costo backend, esclusa
+  dalle navigazioni completate. Quattro navigazioni complete, non cinque.
+- Su questi campioni driveCheck inclusivo varia da 1,949 a 8,732 s;
+  cacheGet da 0,702 a 1,054 s. Nel campione più lento il costo è nel
+  controllo Drive, non nell'apertura Docs (zero aperture).
+- Due benchmark da 25 chiavi, cinque round ciascuno: media per round
+  individuale 835 / 1272 ms; bulk 52 / 48 ms. Rapporto circa 16–27 volte
+  sul solo segmento cache; non una previsione del miglioramento pagina.
+- Tre navigazioni task complete da 60 voci (25+25+10): prima mista
+  12 hit / 48 miss, 45,996 s client e 41,479 s backend aggregato;
+  successive tutte hit 15,928 / 21,319 s client, 12,106 / 17,317 s backend.
+  Ricerca DocContent nella mista: 18,517 s complessivi. Controlli Drive
+  inclusivi nelle due warm: 6,349 / 8,877 s; cacheGet 1,767 / 2,464 s.
+- Salvataggio normale di una voce: azione 7,466 s, RPC 7,401 s,
+  backend 5,497 s, queue inclusivo 2,522 s, Sheets 1,512 s.
+  Sincronizzazione completata e modifica visibile confermate dall'utente.
+  Prima rilettura 9,215 s client / 7,350 s backend, 16 hit / 9 miss,
+  un Docs aperto; seconda 4,528 / 3,463 s, 25 hit, zero Docs aperti.
+  I nove miss sono compatibili con la revisione documentale cambiata;
+  cacheAbsentUnknown non certifica la causa.
+
+Non sommare tempi inclusivi. Le ripetizioni sono una baseline diagnostica,
+non una distribuzione statistica o un confronto causale fra implementazioni.
+Non confrontare la giornata successiva come se lo stato iniziale fosse identico.
+Restano da completare cinque navigazioni task confrontabili per il confronto
+formale prima/dopo; nessuna stima su Days/HabitLogs dai campioni disponibili.
+
+### Esperimento E locale — 23 ottobre 2026
+
+Autorizzato dall'utente dopo la raccolta. getJournalPage prepara al massimo
+25 candidati, controlla i documenti e raccoglie chiavi uniche. Esegue al massimo
+un getAll e un putAll, ciascuno soltanto quando necessario. Parsing e fallback
+restano per voce; pending prevale, bypass evita getAll, TTL sei ore e limite
+24000 unità di stringa restano invariati. Ricontrollo revisione per documento
+prima delle scritture, entrambe le revisioni richieste valide e uguali.
+La preparazione può verificare documenti di candidati poi esclusi dal budget;
+il cursore usa solo i risultati effettivamente restituiti e non salta voci.
+
+Tracing: aggiunte fasi cacheGetAll/cachePutAll (Ms, Calls, SelfMs) alla
+allowlist; formato e measurementVersion invariati, metriche additive.
+Demo supporta putAll. Il benchmark diagnostico individuale/bulk resta distinto.
+Test dedicato tests/verify-cache-bulk.cjs incluso in npm test.
+
+Analisi controlli Drive: driveCheck comprende getFileById, inside_ (visita
+getParents fino alla radice, con memoizzazione dell'appartenenza nella
+richiesta), isTrashed e lettura revisione. driveCheckSelfMs non è il solo
+costo della revisione né prova del costo preciso di getParents. Nessuna
+protezione rimossa e nessuna ottimizzazione di inside_ in questo esperimento.
+Un successivo dettaglio diagnostico può distinguere appartenenza/cestino.
+
+Pubblicazione autorizzata il 23 ottobre 2026 nella versione Apps Script 65,
+stesso deployment e URL; beneficio reale ancora da verificare separatamente. Il
+recupero raggruppato DocContent e la visualizzazione progressiva restano proposte.
+
+## Controlli Drive — versione 66, 23 ottobre 2026
+
+Dopo il collaudo reale della versione 65 l'utente ha autorizzato il lavoro
+sui controlli Drive. Pubblicazione successivamente richiesta ed eseguita:
+versione Apps Script 66 sul deployment esistente, URL e accesso privato invariati.
+
+inside_ memorizzava solo il file iniziale, non le cartelle del percorso che
+aveva effettivamente raggiunto la radice. Documenti diversi con genitori
+comuni ripercorrevano quindi la stessa catena nella stessa richiesta.
+Ora viene memorizzato soltanto il percorso riuscito, inclusi gli antenati;
+rami alternativi non dimostrati non vengono marcati. La prova è volatile,
+contenuta in IO.inside e cancellata da ioReset_ a ogni richiesta. Nessun
+riuso tra RPC, nessuna fiducia negli ID del Registry al posto del controllo.
+
+Tracing additivo: driveInside (intero controllo), driveRoot (risoluzione e
+verifica radice), driveParents (getParents e consumo completo dell'iteratore),
+driveTrash (radice e documenti nel percorso pagina). Aggiunti conteggi
+aggregati driveInsideNodes, driveParentEdges, driveInsideMemoHits, senza ID.
+I Calls dei segmenti descrivono helper, non RPC fisiche Google. driveRoot
+include anche invocazioni con radice già presente in IO; un memo hit può
+riguardare il file o un antenato. driveParentsMs non comprende ogni getId.
+La strumentazione non amplia l'export a contenuti o messaggi originali.
+
+Nella fixture con due documenti sotto cartella e anno comuni, getParents
+passa strutturalmente da sei visite a quattro; nessuna previsione temporale
+per l'archivio reale. Riutilizzo circoscritto al singolo percorso riuscito:
+se un ramo attraversato non appartiene all'archivio resta non attendibile.
+Restano invariati controlli cestino, revisione iniziale/finale e conflitti.
+
+Verifiche in docs/VERIFICA-CONTROLLI-DRIVE.md. Prossimo confronto reale dopo la pubblicazione della versione 66: cinque letture e cinque navigazioni
+con stessa metodologia della versione 65; separare numero di nodi/archi,
+getParents, driveInside e totale. Verificare il risparmio reale prima di
+considerare ulteriori cambi di API o cache tra richieste.
+
+Collaudo reale v66 successivo: cinque letture e cinque navigazioni tutte
+riuscite, coda zero pending/errori. Pagina mediana 5,629 s contro 4,499 s
+v65; Task 14,462 s contro 16,680 s v65. Risultato misto, nessuna causalità
+dimostrata dal confronto sequenziale. driveParents mediana pagina 1,785 s,
+contro 6 ms del cestino; riuso antenati attivo. Non attribuire il costo al
+cestino e non ampliare l'ottimizzazione senza confronto concreto. Risultati
+e limiti completi in docs/VERIFICA-CONTROLLI-DRIVE.md.
+
+## E. Cache raggruppata — pubblicata nella versione 65
 
 Nel percorso di lettura delle pagine, sostituire gli accessi individuali alle
 sezioni in cache con `getAll` e `putAll`. Conservare massimo 25 candidati per
@@ -314,8 +419,8 @@ richiesta esplicita separata.
 
 ## Ordine proposto
 
-Completare la fase 0 e raccogliere la nuova baseline prima di fissare la
-priorità tra E e A. Misurare C separatamente dal recupero dei contenuti: il caricamento
+Fase 0 e raccolta iniziale completate. E pubblicato nella versione 65; il confronto
+reale prima/dopo precede l’estensione ad A. Misurare C separatamente dal recupero dei contenuti: il caricamento
 progressivo non garantisce una prima pagina veloce: evita l'attesa delle
 successive e deve distinguere i risultati incompleti. Valutare B dopo i
 risultati degli interventi sulle letture.

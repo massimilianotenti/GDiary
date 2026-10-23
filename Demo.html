@@ -284,7 +284,7 @@ html{scrollbar-gutter:stable}
 <details id="capturePanel" class="capture-panel"><summary>+ Nuova nota</summary><form id="capture" class="capture"><div class="toolbar capture-modes"><label for="captureMode">Modalità</label><select id="captureMode" aria-label="Modalità inserimento"><option value="note" selected>Nota completa (un solo testo)</option><option value="bullets">Più voci · una per riga</option></select></div><div id="captureTitleWrap" hidden><label for="captureTitle">Titolo della nota</label><input id="captureTitle" maxlength="2000" aria-label="Titolo della nuova nota" placeholder="Es. Apertura del mio bullet journal"></div><div class="toolbar"><label for="captureDate">Data del diario</label><input id="captureDate" type="date" required aria-label="Data inserimento"><select id="scope" aria-label="Ambito"><option value="personal">Personale</option><option value="project">Di progetto</option></select><input id="captureProjects" class="projects" placeholder="Progetti: casa, video" aria-label="Progetti separati da virgola"></div><label for="captureTags">Tag (facoltativi, separati da virgola)</label><input id="captureTags" placeholder="lavoro, finanza" maxlength="2000"><p class="hint classification-help">Progetti nel selettore; tag come etichette. Nei nuovi bullet #nome indica un tag.</p><textarea id="captureText" required maxlength="20000" aria-label="Inserimento rapido" placeholder="• Una nota personale&#10;☐ Inviare il documento #documenti scadenza: 2026-10-05&#10;– Un’idea per il video #video"></textarea><div class="toolbar"><button class="primary" type="submit">+ Scrivi nel diario</button><span id="captureHint" class="hint">Una voce per riga · Clicca una voce per svilupparla e collegare file.</span></div></form></details>
 <div id="layout" class="layout solo"><section id="content"></section><aside id="detail" aria-label="Dettaglio voce"></aside></div></main></div>
 <script>const demoScriptCache=new Map();
-const CacheService={getScriptCache:()=>({get:k=>demoScriptCache.get(k)||null,getAll:keys=>Object.fromEntries(keys.filter(k=>demoScriptCache.has(k)).map(k=>[k,demoScriptCache.get(k)])),put:(k,v)=>demoScriptCache.set(k,v),remove:k=>demoScriptCache.delete(k)})};
+const CacheService={getScriptCache:()=>({get:k=>demoScriptCache.get(k)||null,getAll:keys=>Object.fromEntries(keys.filter(k=>demoScriptCache.has(k)).map(k=>[k,demoScriptCache.get(k)])),put:(k,v)=>demoScriptCache.set(k,v),putAll:values=>Object.entries(values).forEach(([k,v])=>demoScriptCache.set(k,v)),remove:k=>demoScriptCache.delete(k)})};
 
 let mockUuid=0;
 class MockSheet {
@@ -848,17 +848,28 @@ function managed_(key) {
  const sheet=db_().getSheetByName('Registry'),row=ioIndex_(sheet,REG_HEADERS.length).get(key);return row?Object.fromEntries(REG_HEADERS.map((h,i)=>[h,row[i]])):null;
 }
 function register_(key,kind,id,parent) {append_(db_().getSheetByName('Registry'),[[key,kind,id,parent]]);}
-function root_() {
+function root_() {return traceMeasure_('driveRoot',()=>{
  if(IO.root)return IO.root;
  const id=PropertiesService.getScriptProperties().getProperty('ROOT_ID');
  if(!id)throw new Error('Configura ROOT_FOLDER_ID ed esegui setupDrive dall’editor.');
- const root=DriveApp.getFolderById(id);if(root.isTrashed())throw new Error('Cartella principale nel cestino.');return IO.root=root;
-}
-function inside_(item) {
- if(IO.inside.has(item.getId()))return;const rootId=root_().getId(),queue=[item],seen=new Set();
- while(queue.length){const x=queue.pop();if(x.getId()===rootId||IO.inside.has(x.getId())){IO.inside.add(item.getId());return;}if(seen.has(x.getId()))continue;seen.add(x.getId());const parents=x.getParents();while(parents.hasNext())queue.push(parents.next());}
+ const root=DriveApp.getFolderById(id);if(traceMeasure_('driveTrash',()=>root.isTrashed()))throw new Error('Cartella principale nel cestino.');return IO.root=root;
+});}
+function inside_(item) {return traceMeasure_('driveInside',()=>{
+ const itemId=item.getId();if(IO.inside.has(itemId)){traceCount_('driveInsideMemoHits');return;}
+ const rootId=root_().getId(),queue=[{item,path:[]}],seen=new Set();
+ while(queue.length){const current=queue.pop(),x=current.item,id=x.getId();
+  if(id===rootId||IO.inside.has(id)){
+   if(id!==rootId)traceCount_('driveInsideMemoHits');
+   // Only the successful ancestry path is proven inside this archive.
+   // Never cache unrelated branches, and never retain this proof across requests.
+   current.path.forEach(parentId=>IO.inside.add(parentId));IO.inside.add(id);return;
+  }
+  if(seen.has(id))continue;seen.add(id);traceCount_('driveInsideNodes');
+  const parents=traceMeasure_('driveParents',()=>{const iterator=x.getParents(),items=[];while(iterator.hasNext()){items.push(iterator.next());traceCount_('driveParentEdges');}return items;});
+  const path=current.path.concat(id);parents.forEach(parent=>queue.push({item:parent,path}));
+ }
  throw new Error('File o cartella spostato fuori dalla directory assegnata. Ripristina il percorso prima di proseguire.');
-}
+});}
 function folder_(key,parent,name) {
  if(IO.folders.has(key))return IO.folders.get(key);const record=managed_(key);if(record){const f=DriveApp.getFolderById(record.id);if(f.isTrashed())throw new Error('Cartella nel cestino: '+name);inside_(f);IO.folders.set(key,f);return f;}
  inside_(parent);const found=parent.getFoldersByName(name);let f;
@@ -1120,8 +1131,23 @@ function journalLayout_(create=false){let s=db_().getSheetByName('JournalLayout'
 function editorRows_(month,taskArchive=false){const entries=(taskArchive?entrySearch_('type','^task$'):entrySearch_('date','^'+month+'-')).sort((a,b)=>b.date.localeCompare(a.date)||a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id)),s=journalLayout_(),layout=new Map(s?rows_(s,JOURNAL_LAYOUT_HEADERS).map(r=>[r.entryId,Number(r.position)]):[]),epoch=Date.parse('2020-01-01T00:00:00Z');entries.forEach(e=>{const time=Date.parse(e.createdAt),suffix=parseInt(e.id.replace(/[^a-f0-9]/gi,'').slice(0,5)||'0',16)/1048576;e.position=layout.has(e.id)?layout.get(e.id):(Number.isFinite(time)?time-epoch:0)+suffix;});return entries.sort((a,b)=>b.date.localeCompare(a.date)||a.position-b.position||a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id));}
 // Read-only cache: every document revision is checked in Drive on each request.
 function journalSectionIndex_(body){return traceMeasure_('docsIndex',()=>{const index=new Map(),count=body.getNumChildren();traceCount_('docsBodyChildren',count);for(let i=0;i<count;i++){const child=body.getChild(i),text=child.getText?child.getText():'';if(/^\[(?:BJ|END):/.test(text)){if(!index.has(text))index.set(text,[]);index.get(text).push(i);}}return index;});}
-function journalCacheGet_(key){if(!key){traceCount_('cacheNoRevision');return null;}let raw;try{raw=traceMeasure_('cacheGet',()=>CacheService.getScriptCache().get(key));}catch(ignore){traceCount_('cacheReadErrors');return null;}if(!raw){traceCount_('cacheAbsentUnknown');return null;}try{const value=traceMeasure_('cacheParse',()=>JSON.parse(raw));if(!value||typeof value.body!=='string'||!Array.isArray(value.rich)||typeof value.richUnsupported!=='boolean'){traceCount_('cacheInvalid');return null;}return value;}catch(ignore){traceCount_('cacheInvalid');return null;}}
-function journalCachePut_(key,value){if(!key)return;try{const raw=traceMeasure_('cacheSerialize',()=>JSON.stringify(value));if(raw.length>24000){traceCount_('cacheOversize');return;}traceMeasure_('cachePut',()=>CacheService.getScriptCache().put(key,raw,21600));traceCount_('cacheWrites');}catch(ignore){traceCount_('cachePutErrors');}}
+function journalCacheGetAll_(keys){
+ const unique=[...new Set(keys.filter(Boolean))];if(!unique.length)return {};
+ try{return traceMeasure_('cacheGetAll',()=>CacheService.getScriptCache().getAll(unique))||{};}
+ catch(ignore){traceCount_('cacheReadErrors');return {};}
+}
+function journalCacheParse_(key,values){
+ if(!key){traceCount_('cacheNoRevision');return null;}
+ const raw=Object.prototype.hasOwnProperty.call(values,key)?values[key]:null;
+ if(!raw){traceCount_('cacheAbsentUnknown');return null;}
+ try{const value=traceMeasure_('cacheParse',()=>JSON.parse(raw));if(!value||typeof value.body!=='string'||!Array.isArray(value.rich)||typeof value.richUnsupported!=='boolean'){traceCount_('cacheInvalid');return null;}return value;}
+ catch(ignore){traceCount_('cacheInvalid');return null;}
+}
+function journalCachePutAll_(writes){
+ const values={};for(const {key,value} of writes){if(!key)continue;try{const raw=traceMeasure_('cacheSerialize',()=>JSON.stringify(value));if(raw.length>24000){traceCount_('cacheOversize');continue;}values[key]=raw;}catch(ignore){traceCount_('cachePutErrors');}}
+ const count=Object.keys(values).length;if(!count)return;
+ try{traceMeasure_('cachePutAll',()=>CacheService.getScriptCache().putAll(values,21600));traceCount_('cacheWrites',count);}catch(ignore){traceCount_('cachePutErrors');}
+}
 // Explicit diagnostic experiment: reads existing cache keys, never populates it.
 function benchmarkJournalCache(p){
  if(!ACTIVE_TRACE)throw Error('Attiva la diagnostica prima del confronto.');
@@ -1142,11 +1168,17 @@ function getJournalPage(p){
  if(p.cursor&&!start)throw Error('La pagina è cambiata: ricarica il diario.');
  const candidates=all.slice(start,start+25),result=[],sources=new Map();attachSchedules_(candidates);attachPendingDocs_(candidates);
  const metadataMs=Date.now()-started,contentStart=Date.now();let size=0,documentsOpened=0,cacheHits=0,cacheMisses=0,queuedContents=0;
+ // Prepare at most 25 keys; failures remain local to their entry.
+ const prepared=new Map();
+ for(const e of candidates){if(e.docPending)continue;try{const r=ref_(e.id);if(!r){prepared.set(e,{r:null});continue;}
+   let source=sources.get(r.docId);if(!source){traceMeasure_('driveCheck',()=>{const file=traceMeasure_('drive',()=>DriveApp.getFileById(r.docId));inside_(file);if(traceMeasure_('driveTrash',()=>file.isTrashed()))throw Error('Documento nel cestino.');let stamp='';try{stamp=traceMeasure_('driveRevision',()=>String(file.getLastUpdated().getTime()));if(!/^\d+$/.test(stamp))stamp='';}catch(ignore){}source={file,stamp,body:null,index:null,writes:[]};sources.set(r.docId,source);});}
+   const key=source.stamp?'JP3:'+r.docId+':'+source.stamp+':'+e.id+':'+e.updatedAt:'';prepared.set(e,{r,source,key});
+ }catch(error){prepared.set(e,{error});}}
+ const cacheValues=p.refreshDocs===true?{}:journalCacheGetAll_([...prepared.values()].map(x=>x.key));
  for(const e of candidates){try{
   if(e.docPending){traceCount_('cachePendingBypass');const c=traceMeasure_('pendingContent',()=>docContent_(e.id));e.editorAutoTitle=c?.editorAutoTitle===true;Object.assign(e,{body:c?c.body:'',rich:c?writtenRich_(c.rich):writtenRich_(plainRich_('')),richUnsupported:false});queuedContents++;}
-  else{const r=ref_(e.id);if(r){
-   let source=sources.get(r.docId);if(!source){traceMeasure_('driveCheck',()=>{const file=traceMeasure_('drive',()=>DriveApp.getFileById(r.docId));inside_(file);if(file.isTrashed())throw Error('Documento nel cestino.');let stamp='';try{stamp=traceMeasure_('driveRevision',()=>String(file.getLastUpdated().getTime()));if(!/^\d+$/.test(stamp))stamp='';}catch(ignore){}source={file,stamp,body:null,index:null,writes:[]};sources.set(r.docId,source);});}
-   const key=source.stamp?'JP3:'+r.docId+':'+source.stamp+':'+e.id+':'+e.updatedAt:'',cached=p.refreshDocs===true?(traceCount_('cacheExplicitBypass'),null):journalCacheGet_(key);
+  else{const {r,source,key,error}=prepared.get(e);if(error)throw error;if(r){
+   const cached=p.refreshDocs===true?(traceCount_('cacheExplicitBypass'),null):journalCacheParse_(key,cacheValues);
    if(cached){Object.assign(e,cached);cacheHits++;}
    else{cacheMisses++;const c=traceMeasure_('syncedContent',()=>docContent_(e.id));if(!source.body){source.body=traceMeasure_('docsBody',()=>traceMeasure_('docsOpen',()=>DocumentApp.openById(r.docId)).getBody());source.index=journalSectionIndex_(source.body);documentsOpened++;}
     const content=sectionRich_(r,source.body,source.index),value={body:content.rich.map(b=>b.runs.map(r=>r.text).join('')).join('\n').trim(),rich:content.rich,richUnsupported:content.richUnsupported,editorAutoTitle:c?.editorAutoTitle===true};Object.assign(e,value);
@@ -1157,7 +1189,8 @@ function getJournalPage(p){
   }else{e.body='';e.rich=writtenRich_(plainRich_(''));e.editorError='Nota non migrata: usa il dettaglio o migrateDocsBatch.';}}
  }catch(err){e.body='';e.rich=[];e.editorError=String(err.message||err);}
  const bytes=traceMeasure_('responseSerialize',()=>JSON.stringify(e)).length;if(result.length&&size+bytes>600000)break;size+=bytes;result.push(e);}
- sources.forEach((source,id)=>{if(!source.writes.length)return;let after='';try{after=traceMeasure_('driveRevision',()=>String(traceMeasure_('drive',()=>DriveApp.getFileById(id)).getLastUpdated().getTime()));}catch(ignore){}if(after&&after===source.stamp)source.writes.forEach(x=>journalCachePut_(x.key,x.value));else traceCount_(after?'cacheWriteRevisionChanged':'cacheWriteRevisionUnavailable',source.writes.length);});
+ const cacheWrites=[];sources.forEach((source,id)=>{if(!source.writes.length)return;let after='';try{after=traceMeasure_('driveRevision',()=>String(traceMeasure_('drive',()=>DriveApp.getFileById(id)).getLastUpdated().getTime()));}catch(ignore){}if(/^\d+$/.test(after)&&source.stamp&&after===source.stamp)cacheWrites.push(...source.writes);else traceCount_(after?'cacheWriteRevisionChanged':'cacheWriteRevisionUnavailable',source.writes.length);});
+ journalCachePutAll_(cacheWrites);
  return {entries:result,total:all.length,nextCursor:start+result.length<all.length?result[result.length-1]?.id||'':'',nextEntry:start+result.length<all.length?{date:all[start+result.length].date,position:all[start+result.length].position}:null,month:p.month,performance:{kind:'journalPageRead',traceId:ACTIVE_CONTEXT.traceId||'',totalMs:Date.now()-started,metadataMs,contentMs:Date.now()-contentStart,documentsOpened,documentsChecked:sources.size,cacheHits,cacheMisses,queuedContents,entriesCount:result.length}};
 }
 function persistEditorRecords_(s,headers,records){if(!records.length)return;const before=rows_(s,headers),indices=new Map(before.map((r,i)=>[r[headers[0]],i+2])),groups=[],added=[];const updates=[];records.forEach(r=>{const values=headers.map(h=>String(r[h]??'')),row=indices.get(r[headers[0]]);if(row){if(JSON.stringify(headers.map(h=>String(before[row-2][h]??'')))!==JSON.stringify(values))updates.push({row,values});}else added.push(values);});updates.sort((a,b)=>a.row-b.row).forEach(x=>{const last=groups[groups.length-1];if(last&&last.start+last.values.length===x.row)last.values.push(x.values);else groups.push({start:x.row,values:[x.values]});});groups.forEach(g=>writeRows_(s,g.start,g.values));if(added.length)append_(s,added);}
@@ -1365,9 +1398,9 @@ function rememberView(){const key=cacheKey();viewCache.delete(key);viewCache.set
 function initialiseView(){day=day||state.today;week=week||monday(state.today);month=month||state.month||state.today.slice(0,7);cycle=cycle||cycleFor(state.today);if(!$('captureDate').value)$('captureDate').value=state.today;}
 const TRACE_OPERATIONS=new Set(['journalNavigation','benchmarkJournalCache','saveContinuous',"savePrivacySettings","getCommonState","getState","getEntryDetail","setTaskStatus","deleteNote","saveReflectionSettings","saveDay","saveWeek","previewProjectAsTag","convertProjectToTag","saveProject","rebaseDocQueue","saveNoteText","addFileLink","setEntryProjects","setEntryTags","setHabitLog","saveHabit","deleteHabit","saveGoal","getDriveInventory","beginProjectExport","continueProjectExport","searchArchive","refreshNotePreviews","addJournal","getAppChangelog","processTaskDocQueue","getDocQueueState","getJournalPage","saveJournalPage"]);
 const TRACE_NUMERIC_KEYS=new Set('docsWriteMs docsWriteCalls batchIndex batchesCount completedBatches failedBatches docsOpenMs docsOpenCalls driveMs driveCalls totalMs entriesMs previewsMs filesMs commonMs metadataMs contentMs documentsOpened documentsChecked cacheHits cacheMisses queuedContents entriesCount validationMs lockWaitMs sheetsMs sectionMs responseMs finaliseMs sheetReadMs sheetWriteMs sheetsCalls docsMs docsCalls queueMs queueCalls lockMs lockCalls flushMs flushCalls blocksCount idsCount itemsCount requestBytes responseBytes processed pending errorCount renderMs'.split(' '));
-const TRACE_PHASES='sheets docs docsOpen docsWrite drive queue lock flush cacheGet cacheParse cacheSerialize cachePut driveRevision driveCheck docsBody docsIndex responseSerialize docContent contentSearch contentHeaders contentVersion contentPayload contentAssemble pendingContent syncedContent cacheBenchSingle cacheBenchBulk cacheBenchAbsentSingle cacheBenchAbsentBulk'.split(' ');
+const TRACE_PHASES='sheets docs docsOpen docsWrite drive queue lock flush cacheGet cacheGetAll cachePutAll cacheParse cacheSerialize cachePut driveRevision driveCheck driveInside driveRoot driveParents driveTrash docsBody docsIndex responseSerialize docContent contentSearch contentHeaders contentVersion contentPayload contentAssemble pendingContent syncedContent cacheBenchSingle cacheBenchBulk cacheBenchAbsentSingle cacheBenchAbsentBulk'.split(' ');
 for(const phase of TRACE_PHASES)for(const suffix of ['Ms','Calls','SelfMs'])TRACE_NUMERIC_KEYS.add(phase+suffix);
-for(const key of 'unaccountedMs cacheNoRevision cacheReadErrors cacheAbsentUnknown cacheInvalid cacheOversize cacheWrites cachePutErrors cachePendingBypass cacheExplicitBypass cacheWriteRevisionChanged cacheWriteRevisionUnavailable contentMemoryHits contentRowsFound contentHeaderCells contentPayloadCells contentPayloadBytes docsBodyChildren pageIndex pagesCount benchmarkKeys benchmarkRounds benchmarkMismatches benchmarkErrors'.split(' '))TRACE_NUMERIC_KEYS.add(key);
+for(const key of 'unaccountedMs driveInsideMemoHits driveInsideNodes driveParentEdges cacheNoRevision cacheReadErrors cacheAbsentUnknown cacheInvalid cacheOversize cacheWrites cachePutErrors cachePendingBypass cacheExplicitBypass cacheWriteRevisionChanged cacheWriteRevisionUnavailable contentMemoryHits contentRowsFound contentHeaderCells contentPayloadCells contentPayloadBytes docsBodyChildren pageIndex pagesCount benchmarkKeys benchmarkRounds benchmarkMismatches benchmarkErrors'.split(' '))TRACE_NUMERIC_KEYS.add(key);
 for(const prefix of ['contentVersions','contentFragments'])for(const bucket of ['1','2to3','4to9','10plus'])TRACE_NUMERIC_KEYS.add(prefix+bucket);
 function traceBytes(value){try{return new TextEncoder().encode(JSON.stringify(value)??'').length;}catch(e){return 0;}}
 function traceResultOutcome(value){return Array.isArray(value?.errors)&&value.errors.length||Array.isArray(value?.entries)&&value.entries.some(e=>e.editorError||e.docQueueError)?'partial':value?.busy?'busy':'ok';}

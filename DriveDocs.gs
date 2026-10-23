@@ -63,17 +63,28 @@ function managed_(key) {
  const sheet=db_().getSheetByName('Registry'),row=ioIndex_(sheet,REG_HEADERS.length).get(key);return row?Object.fromEntries(REG_HEADERS.map((h,i)=>[h,row[i]])):null;
 }
 function register_(key,kind,id,parent) {append_(db_().getSheetByName('Registry'),[[key,kind,id,parent]]);}
-function root_() {
+function root_() {return traceMeasure_('driveRoot',()=>{
  if(IO.root)return IO.root;
  const id=PropertiesService.getScriptProperties().getProperty('ROOT_ID');
  if(!id)throw new Error('Configura ROOT_FOLDER_ID ed esegui setupDrive dall’editor.');
- const root=DriveApp.getFolderById(id);if(root.isTrashed())throw new Error('Cartella principale nel cestino.');return IO.root=root;
-}
-function inside_(item) {
- if(IO.inside.has(item.getId()))return;const rootId=root_().getId(),queue=[item],seen=new Set();
- while(queue.length){const x=queue.pop();if(x.getId()===rootId||IO.inside.has(x.getId())){IO.inside.add(item.getId());return;}if(seen.has(x.getId()))continue;seen.add(x.getId());const parents=x.getParents();while(parents.hasNext())queue.push(parents.next());}
+ const root=DriveApp.getFolderById(id);if(traceMeasure_('driveTrash',()=>root.isTrashed()))throw new Error('Cartella principale nel cestino.');return IO.root=root;
+});}
+function inside_(item) {return traceMeasure_('driveInside',()=>{
+ const itemId=item.getId();if(IO.inside.has(itemId)){traceCount_('driveInsideMemoHits');return;}
+ const rootId=root_().getId(),queue=[{item,path:[]}],seen=new Set();
+ while(queue.length){const current=queue.pop(),x=current.item,id=x.getId();
+  if(id===rootId||IO.inside.has(id)){
+   if(id!==rootId)traceCount_('driveInsideMemoHits');
+   // Only the successful ancestry path is proven inside this archive.
+   // Never cache unrelated branches, and never retain this proof across requests.
+   current.path.forEach(parentId=>IO.inside.add(parentId));IO.inside.add(id);return;
+  }
+  if(seen.has(id))continue;seen.add(id);traceCount_('driveInsideNodes');
+  const parents=traceMeasure_('driveParents',()=>{const iterator=x.getParents(),items=[];while(iterator.hasNext()){items.push(iterator.next());traceCount_('driveParentEdges');}return items;});
+  const path=current.path.concat(id);parents.forEach(parent=>queue.push({item:parent,path}));
+ }
  throw new Error('File o cartella spostato fuori dalla directory assegnata. Ripristina il percorso prima di proseguire.');
-}
+});}
 function folder_(key,parent,name) {
  if(IO.folders.has(key))return IO.folders.get(key);const record=managed_(key);if(record){const f=DriveApp.getFolderById(record.id);if(f.isTrashed())throw new Error('Cartella nel cestino: '+name);inside_(f);IO.folders.set(key,f);return f;}
  inside_(parent);const found=parent.getFoldersByName(name);let f;

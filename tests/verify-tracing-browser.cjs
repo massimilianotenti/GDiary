@@ -23,7 +23,8 @@ const assert=require('assert'),path=require('path'),fs=require('fs'),{pathToFile
   assert(report.events.some(e=>e.operation==='render'));
   assert(!JSON.stringify(report).includes('SECRET'));
   assert.equal(report.measurementVersion,2);
-  assert(report.events.some(e=>e.operation==='getJournalPage'&&e.cacheGetCalls>0&&e.unaccountedMs>=0));
+  assert(report.events.some(e=>e.operation==='getJournalPage'&&e.cacheGetAllCalls===1&&e.unaccountedMs>=0));
+  assert(report.events.some(e=>e.operation==='getJournalPage'&&e.driveInsideCalls>0&&e.driveParentsCalls>0&&e.driveTrashCalls>0&&e.driveInsideNodes>0));
   await page.evaluate(async()=>{rememberView();forceCommon=true;try{await run('getState');}finally{forceCommon=false;}});
   assert.equal(await page.evaluate(()=>timings.filter(e=>e.operation==='getState').length),2,'one synthetic privacy event plus one actual RPC');
   assert((await page.evaluate(()=>timings.filter(e=>e.operation==='getState'))).every(e=>!e.cache),'remote reread must not be marked as local cache');

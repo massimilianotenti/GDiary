@@ -19,9 +19,10 @@ vm.runInContext(`{
  const common=traceApi({operation:'getCommonState',traceId,arg:{context:{view:'journal',month:'2026-10'}}});
  check(common.ok&&common.value.entries.length===0&&common.value.performance.traceId===traceId,'common data preserves view semantics and correlation');
  check(read.diagnostics.docsOpenCalls>0&&read.diagnostics.sheetsCalls>0,'service measurements');
+ check(read.diagnostics.driveInsideCalls>0&&read.diagnostics.driveParentsCalls>0&&read.diagnostics.driveTrashCalls>0,'Drive detail measurements');
  const warm=traceApi({operation:'getJournalPage',traceId,arg:{month:'2026-10'}});
  check(warm.ok&&warm.value.performance.cacheHits>0,'warm cache');
- check(warm.diagnostics.cacheGetCalls>0&&warm.diagnostics.cacheParseCalls>0&&warm.diagnostics.cachePutCalls===undefined,'warm cache phases');
+ check(warm.diagnostics.cacheGetAllCalls===1&&warm.diagnostics.cacheParseCalls>0&&warm.diagnostics.cachePutAllCalls===undefined,'warm cache phases');
  check(read.diagnostics.syncedContentCalls>0&&read.diagnostics.docsIndexCalls>0,'cold phases');
  check(read.diagnostics.unaccountedMs>=0,'unaccounted timing');
  const cacheBefore=JSON.stringify([...demoScriptCache]);
@@ -51,9 +52,9 @@ vm.runInContext(`{
  check(refused,'diagnostics cannot invoke setup');
  const normal=getJournalPage({month:'2026-10'});check(normal.entries.length&&ACTIVE_TRACE===null,'normal API still works');
  ACTIVE_TRACE={metrics:{},depth:{},stack:[],accounted:0};
- journalCachePut_('test-key',{body:'x'.repeat(24001)});
+ journalCachePutAll_([{key:'test-key',value:{body:'x'.repeat(24001)}}]);
  check(ACTIVE_TRACE.metrics.cacheOversize===1&&!demoScriptCache.has('test-key'),'oversize exclusion visible');ACTIVE_TRACE=null;
- CacheService.getScriptCache=()=>({...cacheProvider(),get:()=>'{'});
+ CacheService.getScriptCache=()=>({...cacheProvider(),getAll:keys=>Object.fromEntries(keys.map(k=>[k,'{']))});
  const malformed=traceApi({operation:'getJournalPage',traceId,arg:{month:'2026-10'}});
  check(malformed.ok&&malformed.diagnostics.cacheInvalid>0,'malformed cache observed');CacheService.getScriptCache=cacheProvider;
  demoScriptCache.clear();let revision=2000;const savedOpen=DocumentApp.openById;

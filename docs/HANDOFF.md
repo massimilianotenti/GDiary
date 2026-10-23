@@ -45,3 +45,42 @@ versione Apps Script 64, mantenendo lo stesso URL; le ottimizzazioni applicative
 restano proposte in attesa delle nuove misure.
 
 IndexedDB, sincronizzazione offline bidirezionale, PWA ed Electron sono stati discussi, ma NON implementati. Non sostituire il salvataggio corrente basandosi soltanto sulla discussione. La prossima eventuale fase deve validare persistenza e identità dell'archivio nel contesto Apps Script.
+
+
+## Aggiornamento locale — 23 ottobre 2026
+
+Baseline measurementVersion 2 raccolta il 22–23 ottobre e aggregata nella
+SPEC-002, senza conservare export originali. Autorizzato e implementato
+l'esperimento E: getAll/putAll per pagina, controlli revisione e pending
+preservati; tracing additivo cacheGetAll/cachePutAll e Demo aggiornata.
+Pubblicazione esplicitamente richiesta ed eseguita il 23 ottobre 2026:
+versione Apps Script 65 sul deployment esistente, stesso URL e accesso privato.
+Backup dei sei sorgenti remoti fuori repository e confronto con la base
+prima del push; nessuna modifica remota divergente. Nessun accesso ai contenuti
+del diario né setupDrive.
+DocContent raggruppato, progressivo task e modifiche dei controlli Drive
+restano successivi. Risultati locali e limiti in docs/VERIFICA-CACHE-BULK.md.
+
+
+Collaudo reale successivo via Chrome dedicato autenticato dall'utente e
+Playwright: cinque letture pagina e cinque navigazioni Task riuscite, tutte
+hit; coda zero pending/errori prima e dopo. Pagina mediana 4,499 s client,
+cache 38 ms; Task mediana 16,680 s su 61 voci / tre pagine. Nessuna scrittura
+sui dati del diario. Dettagli e limiti in VERIFICA-CACHE-BULK.md.
+
+
+Seguito autorizzato sui controlli Drive: implementato localmente il riuso
+nella stessa richiesta degli antenati sul solo percorso verificato da
+inside_, con tracing di appartenenza/genitori/radice/cestino. Nessuna cache
+tra richieste. Build, npm test, test:tracing, test:release e test browser
+P82/P85 passati. Pubblicazione esplicitamente richiesta ed eseguita il 23 ottobre 2026:
+questo seguito è attivo nella versione Apps Script 66, stesso deployment e URL. Dettagli in docs/VERIFICA-CONTROLLI-DRIVE.md.
+
+
+Collaudo reale versione 66 completato su richiesta con Playwright/Chrome:
+cinque letture pagina e cinque navigazioni Task, tutte riuscite e tutte hit;
+coda zero pending/errori. Mediane pagina 5,629 s, Task 14,462 s, rispetto a
+4,499 / 16,680 s della versione 65: risultato misto, nessun miglioramento
+complessivo dimostrato. driveParents pagina mediana 1,785 s, cestino 6 ms;
+riuso antenati osservato. Dettagli in VERIFICA-CONTROLLI-DRIVE.md. Nessuna
+scrittura ai dati reali. Il confronto prestazionale non è un A/B alternato.
