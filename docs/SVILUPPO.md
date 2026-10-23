@@ -11,6 +11,7 @@ Comandi:
 - `npm test`: backend simulato, validazioni, conflitti, cache, ricerca e pipeline.
 - `npx playwright install chromium`: installa il browser locale per i test.
 - `npm run test:release`: regressioni recenti delle release precedenti alla 2.0.4.
+- `npm run test:incremental`: risposte di salvataggio limitate e merge browser senza riletture complete.
 - `npm run test:tracing`: diagnostica backend simulata e privacy/export browser.
 - `npm run test:e2e`: suite browser storica completa. Non ogni script di tests è incluso in questo comando.
 - `node tests/verify-p85-week.cjs`: checkup, salvataggio/riprova, tracker e layout.

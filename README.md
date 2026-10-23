@@ -1,6 +1,6 @@
 # GDiary
 
-Diario personale su Google Drive, con note e task nello stesso flusso, riflessioni giornaliere, checkup settimanale e abitudini. Release **v2.0.4** pubblicata nel deployment Apps Script 69. Repository inizialmente preparato il **17 ottobre 2026**.
+Diario personale su Google Drive, con note e task nello stesso flusso, riflessioni giornaliere, checkup settimanale e abitudini. Release **v2.0.4** pubblicata nel deployment Apps Script 70. Repository inizialmente preparato il **17 ottobre 2026**.
 
 ## Avvio su un nuovo PC
 

@@ -153,3 +153,35 @@ passato solo tramite variabile temporanea ricavata dal backup remoto, senza
 modificare i sorgenti o stampare l'identificativo. Build, test della procedura
 di deploy e test:release superati. Chrome autenticato conferma che l'interfaccia
 mostra v2.0.4. Nessun setupDrive o modifica ai dati del diario.
+
+
+## Risposte di salvataggio incrementali — sviluppo locale
+
+Implementato su richiesta il passo B della SPEC-002: Days, Weeks e HabitLogs
+restituiscono il solo record canonico salvato tramite `commonUpserts`.
+Frontend aggiornato nelle viste giorno, settimana, diario continuo e tracker.
+Nessuna rilettura completa compensativa; preservati versioni, campi e record
+estranei. Nessun deploy né accesso ai dati reali.
+Verifiche e limiti in VERIFICA-SALVATAGGI-INCREMENTALI.md.
+
+Deploy successivamente richiesto ed eseguito il 23 ottobre 2026: versione
+Apps Script 70 sul deployment esistente, stesso URL e accesso privato.
+Prima della pubblicazione rieseguiti build, npm test, test:incremental,
+test:release, test:tracing, test:progressive e P85/P80/P75: tutti positivi,
+come i controlli aggiuntivi della procedura di deploy. Backup remoto dei sei
+file fuori repository; HEAD remoto e versione 69 coincidenti con la base Git.
+Verifica successiva: deployment alla versione 70 e sei sorgenti pubblicati
+identici allo staging. ROOT_FOLDER_ID passato solo tramite ambiente allo
+staging, sorgente condiviso invariato. Nessun setupDrive o modifica ai dati
+del diario. Collaudo autenticato dei salvataggi reali non eseguito.
+
+Collaudo autenticato v70 successivamente completato su richiesta nel Chrome
+Windows dedicato. Due navigazioni Task con 64 identità distinte e due aperture
+settimana riuscite; diario caricato senza errori. Tre salvataggi reali con gli
+stessi valori (giorno, settimana, abitudine): solo updatedAt modificato,
+risposte con un record canonico, nessuna rilettura completa compensativa.
+Tre tentativi con versioni obsolete rifiutati. Rilettura finale conferma tutti
+i contenuti/formattazione e i record estranei invariati; coda zero pending,
+zero errori, 67 completate prima e dopo. Misure singole RPC 2,635/2,693/3,169 s,
+non un confronto A/B. Dettagli in VERIFICA-SALVATAGGI-INCREMENTALI.md.
+Nessun nuovo deploy o setupDrive durante il collaudo.

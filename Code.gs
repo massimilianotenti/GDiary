@@ -269,7 +269,7 @@ function setHabitLogImpl_(p) {
     const sheet=db.getSheetByName('HabitLogs'),key=p.habitId+'|'+p.date,records=rows_(sheet,LOG_HEADERS),i=records.findIndex(r=>r.key===key);
     if((i<0?'':records[i].updatedAt)!==(p.updatedAt||''))throw new Error('Azione modificata altrove. Aggiorna e riprova.');
     const now=new Date(Math.max(Date.now(),i<0?0:Date.parse(records[i].updatedAt)+1)).toISOString();
-    ensureHabitHeaders_(sheet,true);if(p.habitUpdatedAt&&p.habitUpdatedAt!==habit.updatedAt)throw new Error('Abitudine modificata: aggiorna i passaggi.');const previous=i<0?null:habitChecklist_(records[i].checklist),steps=previous?previous.steps:habitSteps_(habit.steps),checked=Array.isArray(p.checked)?Array.from(new Set(p.checked)):previous?previous.checked:[];if(checked.some(id=>!steps.some(s=>s.id===id)))throw new Error('Microazione non valida.');if(steps.length&&p.status==='done'&&!steps.every(s=>checked.includes(s.id)))throw new Error('Completa tutte le microazioni prima di completare la pratica.');const status=steps.length&&p.status!=='skipped'?(steps.every(s=>checked.includes(s.id))?'done':'pending'):p.status;const values=[key,p.habitId,p.date,status,now,JSON.stringify({steps,checked})];if(i<0)append_(sheet,[values]);else writeRow_(sheet,i+2,values);return {delta:true,entries:[],commonIncluded:false,commonPatch:{habitLogs:rows_(sheet,LOG_HEADERS)}};
+    ensureHabitHeaders_(sheet,true);if(p.habitUpdatedAt&&p.habitUpdatedAt!==habit.updatedAt)throw new Error('Abitudine modificata: aggiorna i passaggi.');const previous=i<0?null:habitChecklist_(records[i].checklist),steps=previous?previous.steps:habitSteps_(habit.steps),checked=Array.isArray(p.checked)?Array.from(new Set(p.checked)):previous?previous.checked:[];if(checked.some(id=>!steps.some(s=>s.id===id)))throw new Error('Microazione non valida.');if(steps.length&&p.status==='done'&&!steps.every(s=>checked.includes(s.id)))throw new Error('Completa tutte le microazioni prima di completare la pratica.');const status=steps.length&&p.status!=='skipped'?(steps.every(s=>checked.includes(s.id))?'done':'pending'):p.status;const values=[key,p.habitId,p.date,status,now,JSON.stringify({steps,checked})];if(i<0)append_(sheet,[values]);else writeRow_(sheet,i+2,values);return {delta:true,entries:[],commonIncluded:false,commonUpserts:{habitLogs:[Object.fromEntries(LOG_HEADERS.map((h,i)=>[h,values[i]]))]}};
   });
 }
 function addJournalImpl_(payload) {
@@ -399,7 +399,7 @@ function saveRecord_(name,headers,key,values,version) {
     if(name==='Days'){ensureDayHeaders_(sheet,true);values={...(existing||{}),...values};}
     values.updatedAt=new Date(Math.max(Date.now(),existing?Date.parse(existing.updatedAt)+1:0)).toISOString();
     if(index<0) append_(sheet,[headers.map(h=>values[h]||'')]);else writeRow_(sheet,index+2,headers.map(h=>values[h]||''));
-    if(name==='Days'||name==='Weeks'){const data=records.map(r=>({...r}));const updated=Object.fromEntries(headers.map(h=>[h,values[h]||'']));if(index<0)data.push(updated);else data[index]=updated;const k=name==='Days'?'days':'weeks';return {delta:true,entries:[],[k]:data,commonPatch:{[k]:data},commonIncluded:false};}
+    if(name==='Days'||name==='Weeks'){const updated=Object.fromEntries(headers.map(h=>[h,values[h]||''])),k=name==='Days'?'days':'weeks';return {delta:true,entries:[],commonUpserts:{[k]:[updated]},commonIncluded:false};}
     return state_();
   });
 }

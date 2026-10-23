@@ -2,7 +2,7 @@
 
 **Stato:** Fase 0 pubblicata nella versione Apps Script 64; E nella 65;
 controlli Drive nella 66; C nella 67; A nella 68. Verifiche locali e collaudo
-reale di A completati. B e snapshot restano proposte.
+reale di A completati. B pubblicato nella 70 e collaudato; snapshot resta una proposta.
 
 **Data:** 22 ottobre 2026
 
@@ -340,9 +340,9 @@ pagine 16,153 s, escluso l'eventuale getState precedente. Coda zero pending/erro
 prima e dopo; nessun salvataggio sul diario. Non è un A/B con il lettore
 individuale e non dimostra riduzione del tempo totale. Dettagli nel rapporto.
 
-## B. Risposte di salvataggio incrementali — intervento secondario
+## B. Risposte di salvataggio incrementali — pubblicato nella versione 70
 
-Per Days e Weeks, `saveRecord_` restituisce oggi l'intera tabella sia nel
+Prima di B, per Days e Weeks, `saveRecord_` restituiva l'intera tabella sia nel
 campo `days`/`weeks` sia in `commonPatch`. Per le abitudini, `setHabitLog`
 restituisce tutti i log nella patch.
 
@@ -361,7 +361,7 @@ Un salvataggio non deve essere seguito da una rilettura completa automatica
 per compensare una patch insufficiente. Raggruppare più giornate in una nuova
 API di scrittura non rientra in questa prima iterazione.
 
-Questo intervento resta nella proposta, ma segue gli esperimenti sulle
+Implementazione locale completata il 23 ottobre 2026, dopo gli esperimenti sulle
 letture: ridurre dati duplicati è utile alla crescita dell'archivio, senza
 presumere che risolva l'attesa delle letture da 20 secondi. È distinto da una
 migrazione delle API di scrittura Docs o dalla progettazione di una nuova coda.
@@ -538,3 +538,9 @@ concorrenza e fallimenti parziali tra servizi. La decisione sarà motivata da
 misure specifiche e costo/beneficio, senza richiedere necessariamente un timeout
 né dedurla dal solo tempo aggregato queueMs. Nessun fire-and-forget con sole
 mutazioni in memoria e nessuna nuova coda client previsti da questa spec.
+
+Implementazione B: protocollo `commonUpserts` per Days/Weeks/HabitLogs,
+merge condiviso nei consumatori e nessuna collezione duplicata.
+Pubblicato su richiesta nella versione Apps Script 70 e collaudato con
+salvataggi degli stessi valori esistenti, conflitti e rilettura finale.
+Verifiche e limiti in ../VERIFICA-SALVATAGGI-INCREMENTALI.md.

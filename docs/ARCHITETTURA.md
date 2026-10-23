@@ -47,3 +47,14 @@ payload contigui limitati. Lo snapshot vive nella richiesta; voci oltre budget
 bulk passano al lettore individuale preesistente. Nessun payload storico o di
 voci estranee preletto. Dettagli e caso peggiore in SPEC-002 e
 VERIFICA-DOCCONTENT-BATCH.md. Scritture e sincronizzazione restano invariate.
+
+## Risposte incrementali di salvataggio (Apps Script 70)
+
+`saveDay`, `saveWeek` e `setHabitLog` restituiscono `commonUpserts`, con
+una sola collezione e il solo record scritto, canonico e con `updatedAt`.
+Le chiavi sono rispettivamente `date`, `week` e `key`. `applyCommonChanges`
+effettua un upsert conservando gli altri record e i campi assenti.
+`commonPatch` mantiene invece il significato di sostituzione della collezione.
+Il diario continuo e le viste giorno, settimana e abitudini usano lo stesso
+merge, senza rilettura completa dopo il salvataggio. Conflitti e durabilità
+restano invariati; nessuna nuova API di scrittura multipla.
