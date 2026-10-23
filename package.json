@@ -6,6 +6,7 @@
     "build": "vite build && node tools/assemble-frontend.cjs && node tools/prepare-apps-script.cjs",
     "test:incremental": "node tests/verify-incremental-saves.cjs",
     "test:cycle": "node tests/verify-cycle-design.cjs",
+    "test:diary-goals": "node tests/verify-diary-cycle-memory.cjs",
     "test:progressive": "node tests/verify-progressive-tasks.cjs",
     "test:tracing": "node tests/verify-tracing.cjs && node tests/verify-tracing-browser.cjs",
     "test": "node tests/verify-p58-validation.cjs && node tests/verify-p55.cjs && node tests/verify-p55-edges.cjs && node tests/verify-p59-build.cjs && node tests/verify-p59-deploy.cjs && node tests/verify-p62-cache.cjs && node tests/verify-cache-bulk.cjs && node tests/verify-drive-checks.cjs && node tests/verify-doccontent-batch.cjs && node tests/verify-p68-rich.cjs && node tests/verify-p71-backend.cjs && node tests/verify-p72-search.cjs && node tests/verify-p76-tag-catalog.cjs && node tests/verify-p87-projects.cjs",

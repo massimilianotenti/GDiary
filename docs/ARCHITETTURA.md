@@ -70,3 +70,15 @@ a saveDay. `habitFormDrafts` mantiene in memoria della scheda i singoli form
 e la versione iniziale, ripristinandoli dopo il salvataggio di un altro form;
 non aggiunge persistenza locale né cache dell'archivio. Lo scarto confermato
 cancella le bozze del ciclo. Nessuna modifica a backend o protocollo RPC.
+
+## Promemoria trimestrale nel diario — Apps Script 72, icone nella 73
+
+`diaryCycleMemory` ricava trimestre e anno da `month` e seleziona da
+`state.goals` titoli e descrizioni. Il modello di DiaryPage lo espone come
+`cycleMemory`; Vue usa interpolazione testuale, descrizioni multilinea e
+chiavi stabili per obiettivo. Il fallback senza Vue usa lo stesso selettore.
+I dati comuni arrivano con il flusso già esistente, senza nuove RPC; un
+aggiornamento del promemoria non ricrea i nodi degli editor del diario.
+Il seguito con icone riusa `OUTLINE_ICONS` e la conversione `LEGACY_ICONS`:
+il modello espone solo il path SVG del catalogo, senza HTML arbitrario.
+Icone decorative accanto al titolo, omesse se assenti o impostate a `none`.

@@ -7,6 +7,15 @@ Un diario che rende semplice scrivere, ritrovare e portare avanti attività. Tip
 ## Diario e task
 
 - Diario continuo organizzato per giorno e mese; caricamento progressivo delle voci.
+- Dalla versione Apps Script 72: in cima al diario, prima delle
+  giornate, titoli e descrizioni complete degli obiettivi del trimestre del
+  mese visualizzato. Testo sempre aperto, conservando gli a capo; descrizione
+  facoltativa e nessun riquadro se il trimestre non contiene obiettivi.
+  Presente anche nel diario di progetto con tutti gli obiettivi del trimestre;
+  escluso dalla vista Task, che può riguardare l'intero archivio. Nessuna
+  copia dei dati o modifica automatica del diario.
+  Dalla versione 73 compare accanto al titolo l'icona scelta per ciascun
+  obiettivo, usando il catalogo esistente e rispettando «Nessuna icona».
 - Note con titolo facoltativo/automatico e task con titolo esplicito; descrizioni modificabili nello stesso editor.
 - Corpo con formattazione, checklist, link, elenchi, titoli e codice; preservare testo e struttura durante l'editing.
 - Progetti facoltativi e multipli; tag suggeriti dal catalogo già usato, con possibilità di crearne altri.

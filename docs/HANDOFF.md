@@ -210,3 +210,49 @@ Windows dedicato: quattro sezioni e superficie unica, tracker completo di
 nove colonne senza overflow desktop, apertura settimana e ritorno al ciclo
 riusciti. Nessuna bozza pendente; coda zero pending/errori e 67 completate
 prima e dopo. Nessun salvataggio reale durante questa verifica.
+
+## Promemoria obiettivi in cima al diario — sviluppo locale
+
+Su richiesta, aggiunti titoli e descrizioni degli obiettivi del trimestre
+del mese visualizzato, prima delle giornate. Nessun titolo/descrizione nuovo
+per il ciclo: si usano i record Goals esistenti. Riquadro sempre aperto,
+descrizioni complete e multilinea; senza obiettivi non compare. Presente
+anche nel diario di progetto, escluso dalla vista Task e coperto nel fallback
+senza Vue. Nessuna nuova RPC o scrittura. Build, npm test, test:diary-goals,
+test:release, test:progressive e test:incremental superati su Demo.html.
+Verificati confini trimestre/anno, HTML trattato come testo, arrivo ritardato
+dei dati comuni senza perdere bozza/nodo/focus/selezione e quattro palette a
+320/390/768/1440 px. Nessun deploy: online resta Apps Script 71.
+
+Deploy del promemoria successivamente richiesto ed eseguito il 23 ottobre
+2026: Apps Script 72 sul deployment esistente, stesso URL e accesso privato.
+Prima del push rieseguiti build, npm test, test:diary-goals, test:release,
+test:progressive e test:incremental, tutti positivi, come i controlli
+aggiuntivi della procedura. Backup dei sei sorgenti remoti fuori repository:
+HEAD e versione 71 coincidenti con la base Git, nessuna divergenza.
+ROOT_FOLDER_ID passato solo tramite ambiente allo staging. Verifica remota
+successiva: versione 72 attiva, sei file identici allo staging, manifest
+MYSELF/USER_DEPLOYING conservato. Nessun setupDrive o salvataggio reale.
+
+Verifica autenticata della versione 72 riuscita in sola lettura: un obiettivo
+del trimestre mostrato prima delle giornate, titolo e descrizione identici
+ai record in memoria, nessun overflow o bozza pendente. Coda zero pending,
+zero errori, 67 completate. Nessun contenuto esportato.
+
+Durante la pubblicazione richiesto anche il riporto dell'icona dell'obiettivo:
+aggiunto il path del catalogo condiviso accanto al titolo, con supporto delle
+icone storiche e rispetto della scelta «Nessuna icona», anche nel fallback.
+Build, npm test, test:diary-goals e test:release rieseguiti e superati.
+
+Seguito con icone pubblicato nella versione Apps Script 73, stesso deployment,
+URL e accesso privato. Backup remoto confrontato con la versione 72; Index
+confrontato con la copia verificata di quel deploy, gli altri cinque file
+con la base Git: nessuna divergenza. Superati tutti i controlli della procedura;
+verifica successiva dei sei file identici allo staging e del manifest privato.
+ROOT_FOLDER_ID passato solo tramite ambiente; nessun setupDrive o salvataggio
+reale durante la pubblicazione.
+
+Verifica autenticata della versione 73 superata in sola lettura: icona,
+titolo e descrizione del promemoria corrispondono al record dell'obiettivo;
+riquadro prima delle giornate, nessun overflow o bozza pendente. Coda zero
+pending/errori, 67 completate. Nessun contenuto esportato o salvataggio reale.
