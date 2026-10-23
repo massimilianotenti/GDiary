@@ -420,7 +420,7 @@ if(!dirtyDetail)renderDetail();decorateView();polishJournal();controls();privacy
 function reflectionPrompts(form,field,title,prompts){const box=node('details',undefined,'reflection-prompts'),summary=node('summary',title),body=node('div');body.id=field.id+'-prompts';body.append(node('p','Spunti facoltativi: scegli ciò che ti è utile e scrivi liberamente nel campo.','hint'));const items=node('ul');prompts.forEach(text=>items.append(node('li',text)));body.append(items);box.append(summary,body);field.setAttribute('aria-describedby',body.id);form.append(box);}
 
 const PALETTE_KEY='bulletJournal.palette.v1';
-const PALETTES=[['warm','Carta calda','#f8f7f3','#fffefa','#8c692f'],['sage','Salvia','#f3f6f1','#fcfdfb','#365b4c'],['slate','Blu ardesia','#f2f5f8','#fcfdfe','#375c7b'],['dark','Scuro','#192227','#202a2f','#a9c7d4']];
+const PALETTES=[['warm','Carta calda','#f8f7f3','#fffefa','#8c692f'],['sage','Salvia','#f3f6f1','#fcfdfb','#365b4c'],['slate','Blu ardesia','#f2f5f8','#fcfdfe','#375c7b'],['dark','Scuro','#192227','#202a2f','#a9c7d4'],['plum','Prugna','#f5f1f7','#fffaff','#704076']];
 function applyPalette(id){const palette=PALETTES.some(p=>p[0]===id)?id:'warm';document.body.classList.add('palette-switching');document.body.dataset.palette=palette;requestAnimationFrame(()=>requestAnimationFrame(()=>document.body.classList.remove('palette-switching')));return palette;}
 try{applyPalette(localStorage.getItem(PALETTE_KEY));}catch(e){applyPalette('warm');}
 function renderPaletteSettings(c){

@@ -11,11 +11,11 @@ const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[],
 page.on('pageerror',e=>errors.push(e.message));page.on('dialog',async d=>{dialogs.push(d.message());await d.dismiss();});
 await page.route('https://**/*',r=>r.abort());await page.goto(pathToFileURL(path.resolve(__dirname,'../Demo.html')).href);await page.waitForSelector('.vue-diary-page');
 const shots=path.join(__dirname,'screenshots');fs.mkdirSync(shots,{recursive:true});
-for(const[id,name]of [['warm','Carta calda'],['sage','Salvia'],['slate','Blu ardesia'],['dark','Scuro']]){
+for(const[id,name]of [['warm','Carta calda'],['sage','Salvia'],['slate','Blu ardesia'],['dark','Scuro'],['plum','Prugna']]){
  await page.getByRole('button',{name:'Impostazioni',exact:true}).click();await page.waitForFunction(()=>!busy);
  await page.getByRole('button',{name,exact:true}).click();await page.waitForTimeout(250);assert.equal(await page.getByRole('button',{name,exact:true}).getAttribute('aria-pressed'),'true');
  assert.equal(await page.evaluate(()=>dirtyMain),false);assert.equal(await page.evaluate(()=>localStorage.getItem(PALETTE_KEY)),id);
- if(id==='dark')await checkDarkText(page);
+ if(id==='dark'||id==='plum')await checkDarkText(page);
  await page.screenshot({path:path.join(shots,'P65-'+id+'-settings.png')});
  for(const view of ['Settimana e checkup','Obiettivi e abitudini','Task aperti','Progetti','Tag','File collegati','Archivio Drive','Diario continuo']){
   await page.getByRole('button',{name:view,exact:true}).click();await page.waitForFunction(()=>!busy);if(view==='Diario continuo')await page.waitForSelector('.vue-diary-page');
@@ -24,7 +24,7 @@ for(const[id,name]of [['warm','Carta calda'],['sage','Salvia'],['slate','Blu ard
    function lum(rgb){return rgb.match(/[\d.]+/g).slice(0,3).map(v=>{v=Number(v)/255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4);}).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0);}
    const a=lum(getComputedStyle(el).color),b=lum(getComputedStyle(el.closest('.sidebar')).backgroundColor);return(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
   });assert(contrast>=3,'icon contrast '+id+' '+contrast);
-  if(id==='dark')await checkDarkText(page);
+  if(id==='dark'||id==='plum')await checkDarkText(page);
  }
  await page.screenshot({path:path.join(shots,'P65-'+id+'-diary.png')});
  if(id==='dark'){
@@ -38,10 +38,10 @@ for(const[id,name]of [['warm','Carta calda'],['sage','Salvia'],['slate','Blu ard
  for(const width of [390,320]){await page.setViewportSize({width,height:1000});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.getByRole('button',{name:'Impostazioni',exact:true}).click();await page.waitForFunction(()=>!busy);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));if(width===390)await page.screenshot({path:path.join(shots,'P65-'+id+'-mobile.png')});}
  await page.setViewportSize({width:1440,height:1000});
 }
-await page.reload();await page.waitForSelector('.vue-diary-page');assert.equal(await page.locator('body').getAttribute('data-palette'),'dark');
+await page.reload();await page.waitForSelector('.vue-diary-page');assert.equal(await page.locator('body').getAttribute('data-palette'),'plum');
 await page.getByRole('button',{name:'Impostazioni',exact:true}).click();await page.waitForFunction(()=>!busy);await page.getByRole('button',{name:'Carta calda',exact:true}).click();
 await page.evaluate(()=>localStorage.setItem(PALETTE_KEY,'unknown'));await page.reload();await page.waitForSelector('.vue-diary-page');assert.equal(await page.locator('body').getAttribute('data-palette'),'warm');
 await page.evaluate(()=>{Storage.prototype.setItem=function(){throw new Error('Storage disabled for test');};});await page.getByRole('button',{name:'Impostazioni',exact:true}).click();await page.waitForFunction(()=>!busy);await page.getByRole('button',{name:'Scuro',exact:true}).click();await page.getByRole('status').filter({hasText:'non consente di conservare'}).waitFor();assert.equal(await page.locator('body').getAttribute('data-palette'),'dark');assert.equal(await page.evaluate(()=>dirtyMain),false);
-assert.deepEqual(dialogs,[]);assert.deepEqual(errors,[]);console.log('P65: four palettes, all primary views, icon contrast, persistence, clean navigation and 320/390px settings OK');
+assert.deepEqual(dialogs,[]);assert.deepEqual(errors,[]);console.log('P65: five palettes including Prugna, text/icon contrast, all primary views, persistence, clean navigation and 320/390px settings OK');
 }finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
 

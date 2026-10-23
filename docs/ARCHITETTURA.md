@@ -82,3 +82,13 @@ aggiornamento del promemoria non ricrea i nodi degli editor del diario.
 Il seguito con icone riusa `OUTLINE_ICONS` e la conversione `LEGACY_ICONS`:
 il modello espone solo il path SVG del catalogo, senza HTML arbitrario.
 Icone decorative accanto al titolo, omesse se assenti o impostate a `none`.
+
+## Palette Prugna — Apps Script 74
+
+`PALETTES` include `plum` / Prugna. `frontend/palettes.css` definisce tutti
+i token paint anche per questa palette e i token semantici `--diary-*`, con
+override dei pulsanti primari coerenti con il campione nelle Impostazioni.
+La griglia di scelta si adatta al quinto tema e mantiene due colonne mobile.
+Selezione, persistenza e fallback restano in `applyPalette` e nel gestore
+locale già esistente. Nessuna modifica alle API o ai colori formattati nel
+contenuto del diario.

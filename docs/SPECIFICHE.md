@@ -56,7 +56,11 @@ La versione 71 conserva URL e accesso privato del deployment esistente.
 
 Tag privati e modalità di visibilità devono essere rispettati in voci, conteggi, anteprime, filtri e recupero bozze. I salvataggi su più mesi possono riuscire parzialmente: conservare i blocchi falliti per ritentare. Non sovrascrivere silenziosamente modifiche concorrenti o formattazione Docs non supportata.
 
-Quattro palette e layout adattivo; verificare anche 320 e 390 px. Il catalogo utente corrente è in Changelog.html (32 funzionalità consolidate).
+Cinque palette pubblicate (Carta calda, Salvia, Blu ardesia, Scuro e Prugna).
+Prugna, aggiunta nella versione Apps Script 74: lavanda chiaro, carta quasi bianca e
+accento viola scuro. Scelta in Impostazioni → Aspetto, anteprima immediata e
+preferenza conservata solo nel browser. Il cambio palette non modifica testo,
+formattazione o bozze. Layout adattivo; verificare anche 320 e 390 px. Il catalogo utente corrente è in Changelog.html (32 funzionalità consolidate).
 
 ## Diagnostica prestazioni
 

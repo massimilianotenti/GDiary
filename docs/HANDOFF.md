@@ -256,3 +256,27 @@ Verifica autenticata della versione 73 superata in sola lettura: icona,
 titolo e descrizione del promemoria corrispondono al record dell'obiettivo;
 riquadro prima delle giornate, nessun overflow o bozza pendente. Coda zero
 pending/errori, 67 completate. Nessun contenuto esportato o salvataggio reale.
+
+## Palette Prugna — sviluppo locale
+
+Su richiesta aggiunto un quinto tema, Prugna (`plum`), selezionabile in
+Impostazioni → Aspetto: sfondo lavanda #f5f1f7, carta #fffaff, accento #704076.
+Copertura dei token condivisi e griglia palette adattiva; scelte precedenti e
+formattazione utente conservate. Build, npm test, P65 palette, test:cycle,
+test:diary-goals e test:release superati; le suite del ciclo e del promemoria
+ora includono anche Prugna. Dettagli in VERIFICA-PALETTE-PRUGNA.md.
+Nessun deploy o accesso ai dati reali; online resta Apps Script 73.
+
+Deploy successivamente richiesto ed eseguito: Apps Script 74, stesso deployment,
+URL e accesso privato. Build, npm test, P65 palette, test:cycle, test:diary-goals,
+test:release e controlli aggiuntivi della procedura superati. Backup remoto
+dei sei file fuori repository e confronto HEAD/versione 73/base Git senza
+divergenze. ROOT_FOLDER_ID passato solo tramite ambiente allo staging.
+Verifica remota successiva: sei sorgenti identici allo staging, versione 74
+attiva e manifest privato conservato. Nessun setupDrive o salvataggio reale.
+
+Verifica autenticata v74 riuscita: cinque palette disponibili, Prugna
+selezionabile con preferenza locale coerente, nessun overflow in impostazioni
+o diario desktop, nessuna bozza pendente. Coda zero pending/errori e 67
+completate invariata. Ripristinata la preferenza palette precedente al termine;
+nessun salvataggio dei dati del diario o esportazione di contenuti.
