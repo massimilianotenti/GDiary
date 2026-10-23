@@ -21,3 +21,4 @@ funzionali, l'architettura, il modello dati e il handoff pertinenti.
 |---|---|---|
 | [001 — Tracing delle prestazioni](001-tracing-prestazioni.md) | Implementata localmente | Diagnostica, export privato e baseline; collaudo Apps Script da eseguire. |
 | [002 — Primo intervento sulle prestazioni](002-primo-intervento-prestazioni.md) | Fase 0 pubblicata (Apps Script 64); ottimizzazioni proposte | Tracing dettagliato e nuova baseline prima di scegliere bulk cache, DocContent o snapshot. |
+| [003 — Design di Obiettivi e abitudini](003-design-obiettivi-abitudini.md) | Implementata, Apps Script 71 | Superficie unica, sezioni coerenti con la settimana, tracker ampio e giornata nel flusso. |

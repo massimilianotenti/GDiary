@@ -5,6 +5,7 @@ import './pleasant.css';
 import './app-theme.css';
 import './palettes.css';
 import './week.css';
+import './habits.css';
 document.body.classList.add('bullet-theme');
 let app, host, model;
 export function unmount(){if(app)app.unmount();app=null;host=null;document.body.classList.remove('vue-diary');}

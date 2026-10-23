@@ -1,0 +1,65 @@
+/* SPEC-003: the cycle shares the diary's paper, typography and section rhythm. */
+body.bullet-theme .workspace[data-view=habits] #content{color:var(--diary-ink);min-width:0}
+.cycle-page .cycle-eyebrow{font-size:10px;letter-spacing:2px;color:var(--diary-muted);margin:0 0 10px}
+body.bullet-theme .cycle-page>h1{font:400 34px/1.3 Georgia,serif;letter-spacing:-.8px;margin-bottom:8px;color:var(--diary-ink)}
+body.bullet-theme .cycle-page>.muted{font-size:12px;color:var(--diary-muted)}
+.cycle-page .cycle-navigation{display:flex;flex-wrap:wrap;align-items:end;gap:10px;padding-bottom:18px;border-bottom:1px solid var(--diary-line);margin:20px 0 26px}
+.cycle-navigation>label{width:100%;margin:0}
+body.bullet-theme .cycle-navigation input{width:90px;min-height:36px;background:transparent!important;border-color:var(--diary-line)}
+.cycle-quarters{display:flex;flex-wrap:wrap;gap:4px}
+body.bullet-theme .cycle-quarters button{border-color:transparent;background:transparent;font-size:12px}
+body.bullet-theme .cycle-quarters button[aria-pressed=true]{background:var(--diary-wash);border-color:var(--diary-line);color:var(--diary-accent);font-weight:600}
+.cycle-section{margin:0 0 30px;min-width:0}
+.cycle-section-heading{display:flex;align-items:center;gap:10px;padding:10px 12px;border-left:2px solid var(--diary-accent);border-radius:0 5px 5px 0;background:var(--diary-wash);margin-bottom:16px}
+.cycle-section-heading>.outline-icon{width:21px;height:21px;flex:0 0 21px;color:var(--diary-accent)}
+body.bullet-theme .cycle-section-heading h2{font:400 24px/1.3 Georgia,serif;letter-spacing:-.3px;margin:0;color:var(--diary-ink);overflow-wrap:anywhere}
+.cycle-goal,.cycle-action{padding:4px 12px 20px;margin-bottom:18px;border-bottom:1px solid var(--diary-line);min-width:0;overflow-wrap:anywhere}
+body.bullet-theme .cycle-page h3{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:500;margin:8px 0;color:var(--diary-ink)}
+.cycle-page h3>.outline-icon{width:20px;height:20px;flex:0 0 20px;color:var(--diary-accent)}
+.cycle-goal>p,.cycle-frequency,.cycle-meta{font-size:12px;line-height:1.6;color:var(--diary-muted);margin:5px 0}
+.cycle-goal progress{display:block;width:min(100%,320px);height:5px;margin:12px 0 16px;accent-color:var(--diary-accent)}
+body.bullet-theme .cycle-page details{font-size:12px;margin:12px 0;background:transparent;border:0;box-shadow:none;border-radius:0}
+body.bullet-theme .cycle-page details>summary{display:list-item;color:var(--diary-muted);font-size:12px;padding:3px 0;cursor:pointer}
+.cycle-page .entity-description{font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.cycle-page details form{padding:4px 0 14px;max-width:660px}
+body.bullet-theme .cycle-page :is(input,select,textarea){max-width:100%;min-width:0;background:transparent!important;border-color:var(--diary-line);color:var(--diary-ink)}
+.cycle-page label{display:block;margin:15px 0 7px}
+.cycle-page .habit-weekdays{display:flex;flex-wrap:wrap;gap:8px 14px}
+.cycle-page .habit-weekdays label{display:flex;align-items:center;gap:6px}
+.cycle-page .cycle-create{padding:0 12px}
+.cycle-page .cycle-create>summary{font-weight:600;color:var(--diary-accent)!important}
+.cycle-page .cycle-week-navigation,.cycle-page .cycle-day-navigation{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:16px 12px}
+.cycle-page .cycle-week-navigation span{font-size:12px;color:var(--diary-muted)}
+.cycle-day-navigation>label{width:100%;margin:0}
+body.bullet-theme .cycle-day-navigation input{width:160px}
+.cycle-table-wrap{max-width:100%;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--diary-line) transparent;margin-bottom:14px}
+body.bullet-theme .cycle-habit-table{table-layout:fixed;border-collapse:collapse;width:100%;min-width:650px}
+body.bullet-theme .cycle-habit-table :is(th,td){background:transparent;border-color:var(--diary-line);padding:10px 4px;font-size:12px;color:var(--diary-ink);text-align:center;overflow-wrap:anywhere}
+body.bullet-theme .cycle-habit-table :is(th,td):first-child{width:26%;text-align:left;padding-left:12px}
+body.bullet-theme .cycle-habit-table :is(th,td):last-child{width:13%}
+.cycle-habit-table th>span,.cycle-habit-table th>strong{display:block}
+.cycle-habit-table th>span{font-size:10px;text-transform:capitalize;color:var(--diary-muted);margin-bottom:4px}
+.cycle-habit-table th>strong{font:400 18px/1.2 Georgia,serif}
+body.bullet-theme .cycle-habit-table [aria-current=date],body.bullet-theme .cycle-habit-table td[data-today=true]{background:var(--diary-wash)}
+body.bullet-theme .cycle-habit-table button{width:28px;height:28px;padding:0;border:1px solid var(--diary-line);border-radius:50%;background:transparent;color:var(--diary-muted);font-size:16px}
+body.bullet-theme .cycle-habit-table button[data-status=done]{background:var(--diary-accent)!important;border-color:var(--diary-accent);color:var(--diary-paper)}
+.cycle-habit-table .outline-icon{width:17px;height:17px;vertical-align:middle;margin-right:6px;color:var(--diary-accent)}
+body.bullet-theme .cycle-page .cycle-table-wrap{border:0;border-radius:0}
+body.bullet-theme .cycle-page .cycle-table-wrap th{background:transparent;border-color:var(--diary-line);font-weight:400}
+.cycle-page .cycle-recap{margin:14px 12px}
+.cycle-recap p{font-size:12px;line-height:1.6;color:var(--diary-muted)}
+.cycle-tracker>.hint{font-size:11px;line-height:1.6}
+.cycle-daily-practices,.cycle-reflection{padding:0 12px}
+.cycle-page .entrybody{min-width:0}
+.cycle-page .habit-status-controls{flex-wrap:wrap;max-width:100%}
+.cycle-page .habit-step,.cycle-page .habit-completion{display:flex;gap:8px;align-items:center}
+.cycle-page .rich-editor{border:0;border-bottom:1px solid var(--diary-line);border-radius:0;background:transparent;margin-top:10px}
+.cycle-page .rich-area{background:transparent;min-height:110px;padding:10px 0;font:400 14px/1.7 'Segoe UI',system-ui,sans-serif;color:var(--diary-ink)}
+.cycle-page .rich-area:focus{box-shadow:none;outline:1px solid var(--diary-line);outline-offset:4px}
+.cycle-page .rich-toolbar{background:var(--diary-wash);border:0;border-radius:5px;padding:5px}
+.cycle-page .cycle-reflection:not(.editing) .rich-toolbar{display:none}
+.cycle-page .rich-toolbar :is(button,select){font-size:11px;padding:5px}
+.cycle-page .cycle-save-actions{display:flex;justify-content:flex-end;margin:16px 0}
+.cycle-page :is(button,input,select,textarea,summary):focus-visible{outline:2px solid var(--diary-accent);outline-offset:3px}
+@media(max-width:1000px){.cycle-page .cycle-table-wrap{border-bottom:1px solid var(--diary-line)}}
+@media(max-width:650px){body.bullet-theme .cycle-page>h1{font-size:28px}.cycle-section-heading{padding:10px}.cycle-section-heading h2{font-size:21px!important}.cycle-goal,.cycle-action,.cycle-daily-practices,.cycle-reflection{padding-left:0;padding-right:0}.cycle-page .cycle-create{padding:0}.cycle-page .cycle-week-navigation,.cycle-page .cycle-day-navigation{margin-left:0;margin-right:0}.cycle-quarters{gap:2px}.cycle-quarters button{padding:8px!important}.cycle-page .habit-status-controls button{font-size:11px}.cycle-page .rich-toolbar{gap:4px}.cycle-page .icon-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

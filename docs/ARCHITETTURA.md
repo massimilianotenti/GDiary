@@ -58,3 +58,15 @@ effettua un upsert conservando gli altri record e i campi assenti.
 Il diario continuo e le viste giorno, settimana e abitudini usano lo stesso
 merge, senza rilettura completa dopo il salvataggio. Conflitti e durabilità
 restano invariati; nessuna nuova API di scrittura multipla.
+
+## Pagina del ciclo — SPEC-003, Apps Script 71
+
+`renderHabits` costruisce esplicitamente obiettivi, azioni, tracker e giornata
+nel contenuto principale; rimossi `polishHabits` e gli adattamenti della vista
+in `decorateView`. `frontend/habits.css` riusa i token del diario. Tracker e
+registrazione usano ancora `habitTable`, `dailyHabits` e i record condivisi.
+`renderCycleDay` riusa l'editor rich e invia solo riflessione, rich e versione
+a saveDay. `habitFormDrafts` mantiene in memoria della scheda i singoli form
+e la versione iniziale, ripristinandoli dopo il salvataggio di un altro form;
+non aggiunge persistenza locale né cache dell'archivio. Lo scarto confermato
+cancella le bozze del ciclo. Nessuna modifica a backend o protocollo RPC.

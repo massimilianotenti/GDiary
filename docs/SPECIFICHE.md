@@ -37,6 +37,14 @@ Task in cinque gruppi compressi: scadenze della settimana, arretrati precedenti,
 
 Obiettivi e abitudini collegate, registrazioni giornaliere e microazioni. Completamento coerente con le microazioni previste. Preferenza locale indipendente per apertura compressa/estesa delle abitudini.
 
+SPEC-003 pubblicata nella versione Apps Script 71: «Il mio ciclo» usa una superficie unica,
+con sezioni per obiettivi, azioni, tracker settimanale e giornata selezionata.
+Stili coerenti con diario e settimana; form di creazione/modifica espandibili,
+un solo accesso per tipo e un solo collegamento al checkup. Le bozze dei form
+restano nella scheda con la versione iniziale anche salvando un altro form;
+la riflessione conserva la formattazione e non riscrive l'intenzione.
+La versione 71 conserva URL e accesso privato del deployment esistente.
+
 Tag privati e modalità di visibilità devono essere rispettati in voci, conteggi, anteprime, filtri e recupero bozze. I salvataggi su più mesi possono riuscire parzialmente: conservare i blocchi falliti per ritentare. Non sovrascrivere silenziosamente modifiche concorrenti o formattazione Docs non supportata.
 
 Quattro palette e layout adattivo; verificare anche 320 e 390 px. Il catalogo utente corrente è in Changelog.html (32 funzionalità consolidate).

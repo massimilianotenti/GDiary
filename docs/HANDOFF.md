@@ -185,3 +185,28 @@ i contenuti/formattazione e i record estranei invariati; coda zero pending,
 zero errori, 67 completate prima e dopo. Misure singole RPC 2,635/2,693/3,169 s,
 non un confronto A/B. Dettagli in VERIFICA-SALVATAGGI-INCREMENTALI.md.
 Nessun nuovo deploy o setupDrive durante il collaudo.
+
+## Design Obiettivi e abitudini — SPEC-003 locale
+
+Avviato su richiesta lo sviluppo della proposta completa: stile e gerarchia
+coerenti con diario/settimana, una superficie, tracker a tutta larghezza e
+giornata nel flusso. Rimossi i vecchi adattamenti DOM della vista. Funzioni
+di creazione, modifica, risultato, registrazione e archiviazione conservate;
+riflessione rich senza riscrivere l'intenzione. Bozze separate per form nella
+scheda e versione originaria preservata dopo altri salvataggi. Nuovo comando
+test:cycle e verifica in docs/VERIFICA-DESIGN-OBIETTIVI.md. Nessun nuovo deploy
+o accesso ai dati reali: Apps Script 70 mantiene il design precedente.
+
+Deploy del nuovo design successivamente richiesto ed eseguito il 23 ottobre
+2026: Apps Script 71, stesso deployment, URL e accesso privato. Build, npm test,
+test:cycle, test:release, test:incremental e controlli della procedura superati.
+Backup remoto dei sei file fuori repository: HEAD/versione 70 uguali alla
+base Git; nessuna divergenza. Sei sorgenti pubblicati verificati identici allo
+staging, manifest privato conservato e ROOT_FOLDER_ID passato solo tramite
+ambiente. Nessun setupDrive o modifica ai dati del diario.
+
+Verifica autenticata del design 71 completata in sola lettura nel Chrome
+Windows dedicato: quattro sezioni e superficie unica, tracker completo di
+nove colonne senza overflow desktop, apertura settimana e ritorno al ciclo
+riusciti. Nessuna bozza pendente; coda zero pending/errori e 67 completate
+prima e dopo. Nessun salvataggio reale durante questa verifica.
