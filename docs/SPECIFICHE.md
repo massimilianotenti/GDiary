@@ -16,6 +16,7 @@ Un diario che rende semplice scrivere, ritrovare e portare avanti attività. Tip
 - Stato task: open, doing, done, cancelled. Importanza: normal, urgent, emergency.
 - Data di annotazione, giorno pianificato, intervallo di lavorazione e deadline sono concetti distinti.
 - «Task aperti» è una scorciatoia facoltativa alla vista filtrata del diario, non un editor indipendente. Filtri: stato, periodo, progetto, tag, testo e ordinamento.
+- Dalla versione Apps Script 67: i task vengono mostrati pagina per pagina. Indicatore di caricamento e conteggi visibili segnalano risultati parziali; ricerca e ordinamento si aggiornano fino alla fine. Errori successivi conservano voci e bozze, con retry dal cursore fallito.
 - Limiti correnti del salvataggio diario: titolo massimo 2.000 caratteri; corpo massimo 100.000; batch massimo 25 blocchi. Non sono obiettivi editoriali per la lunghezza del testo.
 
 ## Riflessioni quotidiane

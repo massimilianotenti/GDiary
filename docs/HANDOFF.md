@@ -84,3 +84,26 @@ coda zero pending/errori. Mediane pagina 5,629 s, Task 14,462 s, rispetto a
 complessivo dimostrato. driveParents pagina mediana 1,785 s, cestino 6 ms;
 riuso antenati osservato. Dettagli in VERIFICA-CONTROLLI-DRIVE.md. Nessuna
 scrittura ai dati reali. Il confronto prestazionale non è un A/B alternato.
+
+
+## Task progressivi — pubblicati nella versione 67
+
+Autorizzata come prossima azione dopo il commit c1e2e72. Ogni pagina task è
+visibile prima delle successive, con risultati esplicitamente parziali,
+errori e retry conservativo. Editor/bozze/ricerca preservati, sessioni obsolete
+ignorate e una richiesta pagina in volo. firstResultMs misura prima patch DOM,
+non paint. Build e test locali passati; dettagli in VERIFICA-TASK-PROGRESSIVI.md.
+Deploy successivamente richiesto ed eseguito il 23 ottobre 2026: versione
+Apps Script 67 sul deployment esistente, stesso URL e accesso privato.
+Backup remoto fuori repository confrontato con la base 66, nessuna divergenza.
+Tutti i controlli della procedura passati; nessun setupDrive o modifica diretta
+dei dati del diario. Collaudo autenticato del progressivo successivamente completato (vedi sotto).
+
+
+Collaudo reale v67 richiesto dall'utente: cinque letture pagina e cinque
+navigazioni Task riuscite. Primo risultato DOM task mediana 5,067 s,
+completamento 16,058 s; primi risultati disponibili 10,129–14,486 s prima
+della fine delle rispettive navigazioni. Stato parziale e preservazione
+nodo editor/focus/selezione verificati senza modifiche. Coda zero pending/errori;
+contenuti finali equivalenti nelle ripetizioni. Nessun miglioramento del tempo
+totale dimostrato. Dettagli e limiti in VERIFICA-TASK-PROGRESSIVI.md.

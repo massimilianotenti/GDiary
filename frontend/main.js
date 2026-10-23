@@ -14,3 +14,6 @@ export function mount(target,data){
   document.body.classList.add('vue-diary');
   nextTick(()=>{try{data.fit();}finally{finishTrace?.();}});
 }
+
+// Resolve after Vue has patched the page; this does not measure browser paint.
+export function whenRendered(){return nextTick();}

@@ -310,7 +310,7 @@ letture: ridurre dati duplicati è utile alla crescita dell'archivio, senza
 presumere che risolva l'attesa delle letture da 20 secondi. È distinto da una
 migrazione delle API di scrittura Docs o dalla progettazione di una nuova coda.
 
-## C. Task visibili durante la paginazione
+## C. Task visibili durante la paginazione — pubblicato nella versione 67
 
 Aggiornare `loadContinuous` per mostrare i risultati di ogni pagina ricevuta,
 continuando il caricamento delle successive in background, con al massimo
@@ -333,6 +333,40 @@ una richiesta di pagina in volo per quella navigazione.
 Questa modifica anticipa la prima visualizzazione; non promette di ridurre
 il tempo necessario a leggere l'intero archivio e non rinuncia al recupero
 completo necessario ai filtri attuali.
+
+### Implementazione C — 23 ottobre 2026
+
+Autorizzata dall'utente come prossima azione dopo il commit c1e2e72.
+loadContinuous applica ogni risposta prima di richiedere la pagina successiva.
+loaded significa che una pagina è disponibile; complete indica assenza di
+cursore. loading/loadError e cursor appartengono alla sessione. I risultati
+parziali sono espliciti anche nella ricerca senza corrispondenze e nel riepilogo.
+Non viene mostrato il totale backend (può includere voci private); il conteggio
+nell'interfaccia include solo le voci visibili secondo le regole privacy.
+
+Retry dalla pagina fallita senza cancellare blocchi già ricevuti. Blocchi con
+identità esistente non sono sostituiti all'arrivo di altre pagine. Le bozze
+recuperate di record in pagine successive restano visibili e vengono riconciliate
+senza duplicare l'identità. Cursor loop protetto, risposte obsolete ignorate,
+una sola richiesta pagina in volo; dopo un cambio periodo si attende la vecchia
+RPC prima di avviare il nuovo caricamento. Il testo ricerca in attesa del debounce
+non viene resettato da un aggiornamento pagina. Focus/selezione e DOM editor
+preservati; ancoraggio viewport al blocco attivo quando possibile.
+
+Tracing additivo firstResultMs nella navigazione: tempo alla prima risposta
+applicata e patch DOM Vue completata (nextTick), non misura del paint. clientMs
+resta la durata della navigazione; esito partial per errore dopo pagine ricevute,
+error se non è disponibile alcuna pagina, cancelled per sessione abbandonata.
+In un retry firstResultMs si riferisce alla prima pagina ricevuta di quel retry.
+Nessun contenuto/identificativo persistente aggiunto all'export.
+
+Verifiche locali in docs/VERIFICA-TASK-PROGRESSIVI.md. Pubblicazione
+esplicitamente richiesta ed eseguita nella versione Apps Script 67, stesso
+deployment e URL. Collaudo reale completato: cinque navigazioni task riuscite, primo risultato
+DOM mediana 5,067 s e completamento 16,058 s, con 61 voci su tre pagine.
+Stato parziale e nodo editor/focus/selezione preservati. Coda zero pending/errori.
+Nessuna riduzione del tempo totale dimostrata; dettagli del confronto e limiti
+in docs/VERIFICA-TASK-PROGRESSIVI.md.
 
 ## D. Correzione e completamento del tracing
 

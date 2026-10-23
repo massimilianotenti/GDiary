@@ -18,6 +18,8 @@ prepare-apps-script.cjs crea uno staging con esattamente sei file; non autentica
 
 Sheets mantiene metadati, pianificazione, riflessioni, registrazioni e indice dell'archivio. Il corpo formattato viene conservato durevolmente anche in DocContent, in parti, prima della sincronizzazione; TaskDocQueue traccia pending/error e Docs raccoglie i testi in sezioni marcate e riferite da DocRefs. Non descrivere Sheets come un archivio dei soli titoli: contiene anche il materiale necessario a non perdere scritture in attesa.
 
+Dalla versione Apps Script 67: loadContinuous applica le pagine task progressivamente, con una sola richiesta di pagina in volo. Ogni risposta aggiorna la stessa sessione e gli stessi oggetti voce, senza sostituire editor/bozze esistenti. Cursore e stato completo/parziale/errore appartengono alla sessione; risposte tardive di una sessione o periodo non corrente vengono ignorate. I filtri locali si applicano ai dati disponibili, dichiarati parziali fino al termine.
+
 Lettura diario a pagine con cache dei contenuti verificata tramite revisione Drive; i contenuti pending prevalgono sul Docs non aggiornato. Ricerca deve trovare anche testo non ancora sincronizzato. Il salvataggio del diario valida prima delle scritture, controlla versioni e blocchi, conserva ID e posizione. I salvataggi su mesi diversi sono raggruppati e i fallimenti parziali restano recuperabili.
 
 Esistono cache/bozze locali e preferenze browser, ma non costituiscono un protocollo offline bidirezionale. Controllare le funzioni di draft e privacy prima di modificarne chiavi o durata.
