@@ -107,3 +107,33 @@ della fine delle rispettive navigazioni. Stato parziale e preservazione
 nodo editor/focus/selezione verificati senza modifiche. Coda zero pending/errori;
 contenuti finali equivalenti nelle ripetizioni. Nessun miglioramento del tempo
 totale dimostrato. Dettagli e limiti in VERIFICA-TASK-PROGRESSIVI.md.
+
+
+## DocContent raggruppato — seguito al commit 74f0a7f
+
+Implementato su autorizzazione il passo A: ricerca degli ID necessari alla
+pagina in finestre limitate, lettura dei soli frammenti correnti raggruppati,
+fallback individuale oltre budget bulk, errori localizzati e snapshot solo
+nella richiesta. Test locali passati, dettagli/limiti in VERIFICA-DOCCONTENT-BATCH.md.
+Deploy richiesto ed eseguito: versione Apps Script 68, stesso deployment/URL
+e accesso privato. Backup remoto confrontato con la base 67 senza divergenze,
+controlli superati. Collaudo reale richiesto ma non completato; nessun setupDrive.
+
+Ripresa dopo interruzione: rieseguiti build, npm test, test:tracing,
+test:release e test:progressive con esito positivo. Rafforzati i test A per
+input vuoti/duplicati, limite 25 ID, isolamento dello snapshot tra richieste,
+recupero dopo errori di ricerca/intestazioni e bypass esplicito della cache.
+La sessione Chrome precedente era inizialmente indisponibile. Nessun nuovo
+deploy durante la ripresa. B resta una proposta successiva.
+
+Collaudo reale v68 successivamente completato su richiesta dopo accesso Google
+dell'utente nel Chrome dedicato. Cinque letture warm e cinque con bypass cache:
+tutte riuscite, 25 voci e contenuti canonici equivalenti, zero errori. Mediane
+client warm 4,621 s, bypass 10,504 s; DocContent batch sul bypass 434 ms,
+una ricerca su 74 righe, zero fallback. Cinque navigazioni Task riuscite,
+61 voci/tre pagine tutte hit; primo risultato DOM mediano 5,198 s e
+completamento pagine 16,153 s, escluso l'eventuale getState precedente.
+Stato parziale, nodo editor/focus/selezione conservati senza modifiche.
+Coda prima/dopo zero pending/errori, 64 completate. Nessun salvataggio del
+diario, setupDrive o nuovo deploy. Nessun miglioramento temporale complessivo
+dimostrato; dettagli e limiti in VERIFICA-DOCCONTENT-BATCH.md.

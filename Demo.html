@@ -1093,7 +1093,75 @@ function attachPendingDocs_(entries){const sheet=taskDocQueue_();if(!sheet)retur
 // Durable content is split below Sheets' 50,000-character cell limit.
 const DOC_CONTENT_HEADERS=['key','entryId','part','payload'];
 function docContentSheet_(create=false){let s=db_().getSheetByName('DocContent');if(!s&&create){s=db_().insertSheet('DocContent');s.getRange(1,1,1,4).setValues([DOC_CONTENT_HEADERS]);s.setFrozenRows(1);}if(s)verify_(s,DOC_CONTENT_HEADERS);return s;}
+// Page-only prefetch. Limits bound bulk scratch data, never the durable format.
+const DOC_CONTENT_BATCH_SEARCH_ROWS=1024,DOC_CONTENT_BATCH_HEADER_ROWS=32,DOC_CONTENT_BATCH_PAYLOAD_ROWS=4;
+const DOC_CONTENT_BATCH_HEADER_BYTES=262144,DOC_CONTENT_BATCH_BYTES=2097152;
+function docContentsForPage_(ids){return traceMeasure_('docContentBatch',()=>{
+ const unique=[...new Set(ids)];if(!unique.length)return;if(unique.length>25)throw Error('Troppi contenuti richiesti nella pagina.');
+ if(!IO.docContents)IO.docContents=new Map();if(!IO.docContentErrors)IO.docContentErrors=new Map();
+ const wanted=unique.filter(id=>!IO.docContents.has(id)&&!IO.docContentErrors.has(id));if(!wanted.length)return;
+ traceCount_('contentBatchEntries',wanted.length);
+ const records=new Map(wanted.map(id=>[id,{heads:[],version:null,versions:new Set(),headerBytes:0}])),fallback=new Set();let headerBytes=0,bufferBytes=0,preparedBytes=0;
+ const fail=(id,error)=>{IO.docContentErrors.set(id,error);};
+ const defer=id=>{if(fallback.has(id))return;fallback.add(id);const r=records.get(id);headerBytes-=r.headerBytes;r.headerBytes=0;r.heads=[];if(r.parts){bufferBytes-=r.bytes||0;r.parts=null;r.bytes=0;}traceCount_('contentBatchFallbacks');};
+ const ranges=(rows,limit)=>{const groups=[];[...new Set(rows)].sort((a,b)=>a-b).forEach(row=>{const last=groups[groups.length-1];if(last&&last.start+last.size===row&&last.size<limit)last.size++;else groups.push({start:row,size:1});});return groups;};
+ let sheet;
+ try{
+  sheet=docContentSheet_();if(!sheet){wanted.forEach(id=>IO.docContents.set(id,null));return;}
+  // Escape IDs literally, including legacy identifiers containing regex syntax.
+  const escape=id=>Array.from(id).map(c=>'\\^$.*+?()[]{}|'.includes(c)?'\\'+c:c).join('');
+  const pattern='^('+wanted.map(escape).join('|')+')$',last=sheet.getLastRow();
+  for(let start=2;start<=last;start+=DOC_CONTENT_BATCH_SEARCH_ROWS){
+   const count=Math.min(DOC_CONTENT_BATCH_SEARCH_ROWS,last-start+1);
+   const found=traceMeasure_('contentSearch',()=>traceMeasure_('contentBatchSearch',()=>traceMeasure_('sheets',()=>sheet.getRange(start,2,count,1).createTextFinder(pattern).useRegularExpression(true).matchEntireCell(true).findAll().map(r=>r.getRow()))));
+   traceCount_('contentRowsFound',found.length);traceCount_('contentBatchSearchRows',count);
+   for(const group of ranges(found,DOC_CONTENT_BATCH_HEADER_ROWS)){
+    const values=traceMeasure_('contentHeaders',()=>traceMeasure_('contentBatchHeaders',()=>traceMeasure_('sheets',()=>sheet.getRange(group.start,1,group.size,3).getDisplayValues())));
+    traceCount_('contentHeaderCells',group.size*3);
+    for(let i=0;i<values.length;i++){
+     const [key,id,part]=values[i],r=records.get(id);if(!r||fallback.has(id)||IO.docContentErrors.has(id))continue;
+     if(!key.startsWith(id+':')){fail(id,Error('Intestazione del contenuto persistente non valida.'));continue;}
+     const version=key.slice(id.length+1,key.lastIndexOf(':'));
+     if(r.versions.size<10)r.versions.add(version);
+     if(r.version!==null&&version<r.version)continue;
+     if(r.version===null||version>r.version){headerBytes-=r.headerBytes;r.headerBytes=0;r.heads=[];r.version=version;}
+     const bytes=traceBytes_(String(key))+traceBytes_(String(id))+traceBytes_(String(part));
+     if(headerBytes+bytes>DOC_CONTENT_BATCH_HEADER_BYTES){defer(id);continue;}
+     r.heads.push({row:group.start+i,part:Number(part)});r.headerBytes+=bytes;headerBytes+=bytes;
+    }
+   }
+  }
+ }catch(error){wanted.forEach(id=>fail(id,error));return;}
+ const owners=new Map();
+ for(const [id,r] of records){
+  if(fallback.has(id)||IO.docContentErrors.has(id))continue;
+  if(!r.heads.length){IO.docContents.set(id,null);continue;}
+  try{
+   traceMeasure_('contentVersion',()=>{r.heads.sort((a,b)=>a.part-b.part);r.heads.forEach((h,i)=>{if(h.part!==i)throw Error('Contenuto persistente incompleto.');});});
+   if(ACTIVE_TRACE){traceDistribution_('contentVersions',r.versions.size);traceDistribution_('contentFragments',r.heads.length);}
+   r.parts=new Map();r.bytes=0;r.heads.forEach(h=>owners.set(h.row,{id,part:h.part}));
+  }catch(error){fail(id,error);}
+ }
+ for(const group of ranges([...owners.keys()],DOC_CONTENT_BATCH_PAYLOAD_ROWS)){
+  // Skip ranges belonging entirely to deferred or failed entries.
+  const active=[];for(let row=group.start;row<group.start+group.size;row++){const owner=owners.get(row);if(!fallback.has(owner.id)&&!IO.docContentErrors.has(owner.id))active.push(owner.id);}if(!active.length)continue;
+  let values;try{values=traceMeasure_('contentPayload',()=>traceMeasure_('contentBatchPayload',()=>traceMeasure_('sheets',()=>sheet.getRange(group.start,4,group.size,1).getDisplayValues())));traceCount_('contentPayloadCells',group.size);}
+  catch(error){active.forEach(id=>fail(id,error));continue;}
+  for(let i=0;i<values.length;i++){
+   const {id,part}=owners.get(group.start+i),r=records.get(id),raw=String(values[i][0]??''),bytes=traceBytes_(raw);traceCount_('contentPayloadBytes',bytes);
+   if(fallback.has(id)||IO.docContentErrors.has(id))continue;
+   if(bufferBytes+preparedBytes+bytes>DOC_CONTENT_BATCH_BYTES){defer(id);continue;}
+   r.parts.set(part,raw);r.bytes+=bytes;bufferBytes+=bytes;
+   if(r.parts.size===r.heads.length){
+    try{const content=traceMeasure_('contentAssemble',()=>JSON.parse(r.heads.map(h=>r.parts.get(h.part)).join('')));IO.docContents.set(id,content);preparedBytes+=r.bytes;}
+    catch(error){fail(id,error);}
+    bufferBytes-=r.bytes;r.parts=null;r.bytes=0;
+   }
+  }
+ }
+});}
 function docContent_(id){return traceMeasure_('docContent',()=>{
+ if(IO.docContentErrors?.has(id))throw IO.docContentErrors.get(id);
  if(!IO.docContents)IO.docContents=new Map();
  if(IO.docContents.has(id)){traceCount_('contentMemoryHits');return JSON.parse(JSON.stringify(IO.docContents.get(id)));}
  const s=docContentSheet_();if(!s)return null;
@@ -1175,10 +1243,13 @@ function getJournalPage(p){
    const key=source.stamp?'JP3:'+r.docId+':'+source.stamp+':'+e.id+':'+e.updatedAt:'';prepared.set(e,{r,source,key});
  }catch(error){prepared.set(e,{error});}}
  const cacheValues=p.refreshDocs===true?{}:journalCacheGetAll_([...prepared.values()].map(x=>x.key));
+ const contentIds=[];
+ for(const e of candidates){const item=prepared.get(e);if(e.docPending){contentIds.push(e.id);continue;}if(!item?.r||item.error)continue;item.cached=p.refreshDocs===true?(traceCount_('cacheExplicitBypass'),null):journalCacheParse_(item.key,cacheValues);if(!item.cached)contentIds.push(e.id);}
+ docContentsForPage_(contentIds);
  for(const e of candidates){try{
   if(e.docPending){traceCount_('cachePendingBypass');const c=traceMeasure_('pendingContent',()=>docContent_(e.id));e.editorAutoTitle=c?.editorAutoTitle===true;Object.assign(e,{body:c?c.body:'',rich:c?writtenRich_(c.rich):writtenRich_(plainRich_('')),richUnsupported:false});queuedContents++;}
   else{const {r,source,key,error}=prepared.get(e);if(error)throw error;if(r){
-   const cached=p.refreshDocs===true?(traceCount_('cacheExplicitBypass'),null):journalCacheParse_(key,cacheValues);
+   const cached=prepared.get(e).cached;
    if(cached){Object.assign(e,cached);cacheHits++;}
    else{cacheMisses++;const c=traceMeasure_('syncedContent',()=>docContent_(e.id));if(!source.body){source.body=traceMeasure_('docsBody',()=>traceMeasure_('docsOpen',()=>DocumentApp.openById(r.docId)).getBody());source.index=journalSectionIndex_(source.body);documentsOpened++;}
     const content=sectionRich_(r,source.body,source.index),value={body:content.rich.map(b=>b.runs.map(r=>r.text).join('')).join('\n').trim(),rich:content.rich,richUnsupported:content.richUnsupported,editorAutoTitle:c?.editorAutoTitle===true};Object.assign(e,value);
@@ -1400,9 +1471,9 @@ function rememberView(){const key=cacheKey();viewCache.delete(key);viewCache.set
 function initialiseView(){day=day||state.today;week=week||monday(state.today);month=month||state.month||state.today.slice(0,7);cycle=cycle||cycleFor(state.today);if(!$('captureDate').value)$('captureDate').value=state.today;}
 const TRACE_OPERATIONS=new Set(['journalNavigation','benchmarkJournalCache','saveContinuous',"savePrivacySettings","getCommonState","getState","getEntryDetail","setTaskStatus","deleteNote","saveReflectionSettings","saveDay","saveWeek","previewProjectAsTag","convertProjectToTag","saveProject","rebaseDocQueue","saveNoteText","addFileLink","setEntryProjects","setEntryTags","setHabitLog","saveHabit","deleteHabit","saveGoal","getDriveInventory","beginProjectExport","continueProjectExport","searchArchive","refreshNotePreviews","addJournal","getAppChangelog","processTaskDocQueue","getDocQueueState","getJournalPage","saveJournalPage"]);
 const TRACE_NUMERIC_KEYS=new Set('docsWriteMs docsWriteCalls batchIndex batchesCount completedBatches failedBatches docsOpenMs docsOpenCalls driveMs driveCalls totalMs entriesMs previewsMs filesMs commonMs metadataMs contentMs documentsOpened documentsChecked cacheHits cacheMisses queuedContents entriesCount validationMs lockWaitMs sheetsMs sectionMs responseMs finaliseMs sheetReadMs sheetWriteMs sheetsCalls docsMs docsCalls queueMs queueCalls lockMs lockCalls flushMs flushCalls blocksCount idsCount itemsCount requestBytes responseBytes processed pending errorCount renderMs'.split(' '));
-const TRACE_PHASES='sheets docs docsOpen docsWrite drive queue lock flush cacheGet cacheGetAll cachePutAll cacheParse cacheSerialize cachePut driveRevision driveCheck driveInside driveRoot driveParents driveTrash docsBody docsIndex responseSerialize docContent contentSearch contentHeaders contentVersion contentPayload contentAssemble pendingContent syncedContent cacheBenchSingle cacheBenchBulk cacheBenchAbsentSingle cacheBenchAbsentBulk'.split(' ');
+const TRACE_PHASES='sheets docs docsOpen docsWrite drive queue lock flush cacheGet cacheGetAll cachePutAll cacheParse cacheSerialize cachePut driveRevision driveCheck driveInside driveRoot driveParents driveTrash docsBody docsIndex responseSerialize docContent docContentBatch contentBatchSearch contentBatchHeaders contentBatchPayload contentSearch contentHeaders contentVersion contentPayload contentAssemble pendingContent syncedContent cacheBenchSingle cacheBenchBulk cacheBenchAbsentSingle cacheBenchAbsentBulk'.split(' ');
 for(const phase of TRACE_PHASES)for(const suffix of ['Ms','Calls','SelfMs'])TRACE_NUMERIC_KEYS.add(phase+suffix);
-for(const key of 'firstResultMs unaccountedMs driveInsideMemoHits driveInsideNodes driveParentEdges cacheNoRevision cacheReadErrors cacheAbsentUnknown cacheInvalid cacheOversize cacheWrites cachePutErrors cachePendingBypass cacheExplicitBypass cacheWriteRevisionChanged cacheWriteRevisionUnavailable contentMemoryHits contentRowsFound contentHeaderCells contentPayloadCells contentPayloadBytes docsBodyChildren pageIndex pagesCount benchmarkKeys benchmarkRounds benchmarkMismatches benchmarkErrors'.split(' '))TRACE_NUMERIC_KEYS.add(key);
+for(const key of 'contentBatchEntries contentBatchSearchRows contentBatchFallbacks firstResultMs unaccountedMs driveInsideMemoHits driveInsideNodes driveParentEdges cacheNoRevision cacheReadErrors cacheAbsentUnknown cacheInvalid cacheOversize cacheWrites cachePutErrors cachePendingBypass cacheExplicitBypass cacheWriteRevisionChanged cacheWriteRevisionUnavailable contentMemoryHits contentRowsFound contentHeaderCells contentPayloadCells contentPayloadBytes docsBodyChildren pageIndex pagesCount benchmarkKeys benchmarkRounds benchmarkMismatches benchmarkErrors'.split(' '))TRACE_NUMERIC_KEYS.add(key);
 for(const prefix of ['contentVersions','contentFragments'])for(const bucket of ['1','2to3','4to9','10plus'])TRACE_NUMERIC_KEYS.add(prefix+bucket);
 function traceBytes(value){try{return new TextEncoder().encode(JSON.stringify(value)??'').length;}catch(e){return 0;}}
 function traceResultOutcome(value){return Array.isArray(value?.errors)&&value.errors.length||Array.isArray(value?.entries)&&value.entries.some(e=>e.editorError||e.docQueueError)?'partial':value?.busy?'busy':'ok';}

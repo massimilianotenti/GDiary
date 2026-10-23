@@ -49,10 +49,13 @@ function getJournalPage(p){
    const key=source.stamp?'JP3:'+r.docId+':'+source.stamp+':'+e.id+':'+e.updatedAt:'';prepared.set(e,{r,source,key});
  }catch(error){prepared.set(e,{error});}}
  const cacheValues=p.refreshDocs===true?{}:journalCacheGetAll_([...prepared.values()].map(x=>x.key));
+ const contentIds=[];
+ for(const e of candidates){const item=prepared.get(e);if(e.docPending){contentIds.push(e.id);continue;}if(!item?.r||item.error)continue;item.cached=p.refreshDocs===true?(traceCount_('cacheExplicitBypass'),null):journalCacheParse_(item.key,cacheValues);if(!item.cached)contentIds.push(e.id);}
+ docContentsForPage_(contentIds);
  for(const e of candidates){try{
   if(e.docPending){traceCount_('cachePendingBypass');const c=traceMeasure_('pendingContent',()=>docContent_(e.id));e.editorAutoTitle=c?.editorAutoTitle===true;Object.assign(e,{body:c?c.body:'',rich:c?writtenRich_(c.rich):writtenRich_(plainRich_('')),richUnsupported:false});queuedContents++;}
   else{const {r,source,key,error}=prepared.get(e);if(error)throw error;if(r){
-   const cached=p.refreshDocs===true?(traceCount_('cacheExplicitBypass'),null):journalCacheParse_(key,cacheValues);
+   const cached=prepared.get(e).cached;
    if(cached){Object.assign(e,cached);cacheHits++;}
    else{cacheMisses++;const c=traceMeasure_('syncedContent',()=>docContent_(e.id));if(!source.body){source.body=traceMeasure_('docsBody',()=>traceMeasure_('docsOpen',()=>DocumentApp.openById(r.docId)).getBody());source.index=journalSectionIndex_(source.body);documentsOpened++;}
     const content=sectionRich_(r,source.body,source.index),value={body:content.rich.map(b=>b.runs.map(r=>r.text).join('')).join('\n').trim(),rich:content.rich,richUnsupported:content.richUnsupported,editorAutoTitle:c?.editorAutoTitle===true};Object.assign(e,value);

@@ -1,6 +1,8 @@
 # SPEC-002 — Primo intervento sulle prestazioni
 
-**Stato:** Fase 0 pubblicata nella versione Apps Script 64; baseline raccolta; esperimento E pubblicato nella versione Apps Script 65
+**Stato:** Fase 0 pubblicata nella versione Apps Script 64; E nella 65;
+controlli Drive nella 66; C nella 67; A nella 68. Verifiche locali e collaudo
+reale di A completati. B e snapshot restano proposte.
 
 **Data:** 22 ottobre 2026
 
@@ -10,9 +12,10 @@
 della variante snapshot documento/mese con paginazione locale, ancora da
 confrontare con il recupero per pagina proposto qui.
 
-**Aggiornamento del confronto:** fase 0 diagnostica prima di scegliere
-l'ottimizzazione. Bulk cache, DocContent e visualizzazione progressiva restano
-esperimenti candidati; snapshot documentale mantenuto come confronto esplorativo.
+**Aggiornamento del confronto:** bulk cache, riuso degli antenati Drive e
+visualizzazione progressiva e DocContent raggruppato hanno un collaudo reale
+documentato. Nessun beneficio temporale complessivo di A ancora dimostrato;
+snapshot documentale mantenuto come confronto esplorativo.
 
 ## Obiettivo e ambito
 
@@ -257,7 +260,7 @@ una lettura e una scrittura bulk per pagina, con output equivalente. Il
 beneficio temporale resta da misurare; «ottimale» o «sotto un secondo» non
 sono risultati già acquisiti.
 
-## A. Secondo esperimento: lettura raggruppata di DocContent
+## A. Lettura raggruppata di DocContent — pubblicata nella versione 68
 
 Nel percorso di `getJournalPage`, ogni cache miss recupera anche DocContent
 per la voce. `docContent_` può eseguire ricerca, lettura delle intestazioni
@@ -283,6 +286,59 @@ La strategia precisa di raggruppamento sarà scelta con fixture contenenti
 voci sparse, molte versioni e corpi lunghi. Misurare separatamente ricerca,
 lettura dei frammenti e ricostruzione: i 9–10 s osservati sono un indizio,
 non un'attribuzione già dimostrata interamente a DocContent.
+
+### Implementazione A — 23 ottobre 2026
+
+Pubblicazione richiesta ed eseguita nella versione Apps Script 68, stesso
+deployment, URL e accesso privato. Backup remoto confrontato con la base 67
+senza divergenze; controlli locali e procedura deploy superati.
+
+Autorizzata dopo il commit 74f0a7f. Prima vengono controllati pending e cache;
+la prelettura riguarda solo pending e miss con riferimenti validi, al massimo
+25 ID unici. docContentsForPage_ usa una ricerca regex letterale raggruppata
+per finestre di 1024 righe della colonna entryId; intestazioni contigue in
+blocchi di 32 righe, sola versione massima lessicografica come prima. Gli
+istogrammi delle versioni mantengono solo la distinzione fino a 10plus.
+Payload della versione scelta raggruppati per righe contigue, al massimo
+quattro celle per chiamata; ordine di ricomposizione dato dal numero parte.
+Nessun payload di altre voci o versioni storiche viene preletto.
+
+Budget di prelettura: 256 KiB delle stringhe UTF-8 delle intestazioni
+selezionate e 2 MiB dei payload UTF-8 in buffer o già preparati. Sono budget
+tecnici del bulk, non nuovi limiti del formato né misura esatta dell'heap JS.
+Una voce oltre budget passa al lettore individuale preesistente, solo quando
+richiesta dal ciclo pagina; contatore contentBatchFallbacks. Errori/corruzione
+sono conservati per voce, senza sostituire silenziosamente i dati.
+
+Snapshot, assenze ed errori sono riusati soltanto nella richiesta. Il percorso
+individuale delle scritture e sincronizzazione non cambia. I controlli Drive,
+revisioni iniziale/finale, cache e budget/cursore della risposta restano attivi.
+La prelettura può includere candidati poi esclusi dal budget risposta, sempre
+entro 25; il cursore resta basato sui risultati effettivamente restituiti.
+
+Tracing: docContentBatch/contentBatchSearch/contentBatchHeaders/
+contentBatchPayload, conteggi contentBatchEntries/contentBatchSearchRows/
+contentBatchFallbacks. Le fasi contentSearch/Headers/Payload/Version/Assemble
+restano e includono le nuove sottofasi; non sommare tempi inclusivi. I tempi
+pendingContent/syncedContent successivi riguardano ora principalmente il
+recupero dalla memoria: confrontare anche docContentBatch per valutare il costo
+persistente. Export additivo, measurementVersion 2, nessun testo o ID aggiunto.
+
+Caso peggiore documentato: ceil(righe DocContent / 1024) ricerche, payload
+sparsi fino a una chiamata per frammento e fallback individuale oltre budget.
+Su tabelle molto grandi il numero di finestre può superare le vecchie ricerche
+per voce; nessun miglioramento universale promesso. Test su 25 contenuti
+raggruppabili: una ricerca invece di 25, risultato equivalente. Dettagli in
+docs/VERIFICA-DOCCONTENT-BATCH.md.
+
+Collaudo reale A completato il 23 ottobre: cinque letture warm e cinque con
+bypass esplicito cache, 25 voci equivalenti e nessun errore. Mediane client
+4,621/10,504 s; batch sul bypass 434 ms (311–731), una ricerca su 74 righe,
+quattro letture intestazioni e 12 payload, zero fallback. Cinque navigazioni
+Task tutte hit e riuscite: primo risultato DOM mediano 5,198 s, completamento
+pagine 16,153 s, escluso l'eventuale getState precedente. Coda zero pending/errori
+prima e dopo; nessun salvataggio sul diario. Non è un A/B con il lettore
+individuale e non dimostra riduzione del tempo totale. Dettagli nel rapporto.
 
 ## B. Risposte di salvataggio incrementali — intervento secondario
 

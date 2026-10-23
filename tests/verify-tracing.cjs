@@ -24,6 +24,8 @@ vm.runInContext(`{
  check(warm.ok&&warm.value.performance.cacheHits>0,'warm cache');
  check(warm.diagnostics.cacheGetAllCalls===1&&warm.diagnostics.cacheParseCalls>0&&warm.diagnostics.cachePutAllCalls===undefined,'warm cache phases');
  check(read.diagnostics.syncedContentCalls>0&&read.diagnostics.docsIndexCalls>0,'cold phases');
+ check(read.diagnostics.docContentBatchCalls===1&&read.diagnostics.contentBatchSearchCalls===1,'batch content phases');
+ check(!warm.diagnostics.contentBatchSearchCalls&&!warm.diagnostics.contentPayloadCells,'warm avoids persistent payload');
  check(read.diagnostics.unaccountedMs>=0,'unaccounted timing');
  const cacheBefore=JSON.stringify([...demoScriptCache]);
  const benchmark=traceApi({operation:'benchmarkJournalCache',traceId,arg:{month:'2026-10'}});

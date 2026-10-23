@@ -39,3 +39,11 @@ Il caricamento del changelog mantiene il proprio percorso diretto.
 - Salvataggio diario backend: saveJournalPage in JournalEditor.gs.
 - Coda persistente: queueDocWrites_, docContent_ e sincronizzazione in DriveDocs.gs.
 - CSS importato: diary → pleasant → app-theme → palettes → week. Controllare anche le regole successive quando un override non agisce.
+
+
+Dalla versione Apps Script 68, getJournalPage prelegge DocContent soltanto
+per pending e miss: ricerca raggruppata a finestre, intestazioni correnti e
+payload contigui limitati. Lo snapshot vive nella richiesta; voci oltre budget
+bulk passano al lettore individuale preesistente. Nessun payload storico o di
+voci estranee preletto. Dettagli e caso peggiore in SPEC-002 e
+VERIFICA-DOCCONTENT-BATCH.md. Scritture e sincronizzazione restano invariate.
