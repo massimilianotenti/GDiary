@@ -159,3 +159,15 @@ proviene dalle cinque letture con bypass. Non eseguiti sul reale salvataggi,
 errori artificiali, pending creati per il test o archivi sintetici voluminosi:
 questi casi restano coperti localmente. Il confronto temporale con il lettore
 individuale precedente non è stato eseguito a parità di stato e dati.
+
+## Pubblicazione 2.0.4 — 23 ottobre 2026
+
+Su richiesta, backup fuori repository dei sei file remoti Apps Script 68 e
+confronto prima del push; Code.gs, DriveDocs.gs, JournalEditor.gs e manifest
+coincidono, le sole differenze previste sono Index.html e Changelog.html per
+2.0.4. Aggiornato il deployment privato esistente alla versione Apps Script
+69, stesso URL. L'ID root è passato alla build soltanto in ROOT_FOLDER_ID,
+senza modifiche al sorgente condiviso. La procedura ha preparato e caricato
+tutti e sei i file, mantenendo MYSELF/USER_DEPLOYING. Build, test incorporati
+nella procedura e npm run test:release superati. Verifica in Chrome autenticato:
+la web app mostra v2.0.4. Nessun setupDrive o intervento sui dati del diario.

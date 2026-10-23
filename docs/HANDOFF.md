@@ -139,11 +139,17 @@ diario, setupDrive o nuovo deploy. Nessun miglioramento temporale complessivo
 dimostrato; dettagli e limiti in VERIFICA-DOCCONTENT-BATCH.md.
 
 
-## Release 2.0.4 preparata nei sorgenti
+## Release 2.0.4 — Apps Script 69
 
 Versione funzionale aggiornata da 2.0.3 a 2.0.4 per documentare il recupero
 raggruppato di DocContent. Il changelog descrive il beneficio strutturale e
 specifica che non è dimostrata una riduzione del tempo totale. package.json,
 lockfile, Demo, sorgenti UI e Changelog sono aggiornati; Index.html rigenerato
-con la build. Il deployment Apps Script attivo resta alla versione 68 e
-continua a mostrare v2.0.3. Nessun nuovo deploy eseguito per questa release.
+con la build. Dopo il backup e il confronto dei sei file della versione 68
+(identici salvo Index.html e Changelog.html), il deployment esistente è stato
+aggiornato alla versione 69, stesso URL e accesso privato. Descrizione:
+«GDiary v2.0.4 - recupero DocContent raggruppato». ROOT_FOLDER_ID è stato
+passato solo tramite variabile temporanea ricavata dal backup remoto, senza
+modificare i sorgenti o stampare l'identificativo. Build, test della procedura
+di deploy e test:release superati. Chrome autenticato conferma che l'interfaccia
+mostra v2.0.4. Nessun setupDrive o modifica ai dati del diario.
