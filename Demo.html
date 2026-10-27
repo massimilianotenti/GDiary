@@ -403,7 +403,7 @@ function traceCount_(key,value=1){if(ACTIVE_TRACE)ACTIVE_TRACE.metrics[key]=(ACT
 function traceBytes_(value){let bytes=0;for(let i=0;i<value.length;i++){const c=value.charCodeAt(i);if(c<128)bytes++;else if(c<2048)bytes+=2;else if(c>=0xD800&&c<=0xDBFF&&i+1<value.length&&value.charCodeAt(i+1)>=0xDC00&&value.charCodeAt(i+1)<=0xDFFF){bytes+=4;i++;}else bytes+=3;}return bytes;}
 function traceDistribution_(prefix,count){traceCount_(prefix+(count===1?'1':count<=3?'2to3':count<=9?'4to9':'10plus'));}
 function traceApi(p){
- const handlers={benchmarkJournalCache,getState,getCommonState,getJournalPage,getJournalContents,getEntryDetail,saveJournalPage,saveDay,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
+ const handlers={benchmarkJournalCache,getState,getCommonState,getJournalPage,getJournalContents,getEntryDetail,saveJournalPage,saveDay,saveDays,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
  if(!p||!Object.prototype.hasOwnProperty.call(handlers,p.operation)||!/^[-a-zA-Z0-9]{10,80}$/.test(p.traceId||''))throw Error('Richiesta diagnostica non valida.');
  const previous=ACTIVE_TRACE,start=Date.now(),trace={metrics:{},depth:{},stack:[],accounted:0};
  const diagnostics=()=>{const totalMs=Date.now()-start;return {traceId:p.traceId,totalMs,unaccountedMs:Math.max(0,totalMs-trace.accounted),...trace.metrics};};
@@ -465,9 +465,9 @@ function convertProjectToTag(p){
   ensureEntryTagHeader_(sheet,true);const rows=changes.map(e=>{const found=findRows_(sheet,1,e.id,false);if(found.length!==1)throw new Error('Indice voce non valido.');return {row:found[0],entry:e};}).sort((a,b)=>a.row-b.row),groups=[];
   rows.forEach(item=>{const last=groups[groups.length-1];if(last&&last[last.length-1].row+1===item.row)last.push(item);else groups.push([item]);});
   if(changes.length)taskIndexTouch_(sheet);
-  groups.forEach(group=>{const range=sheet.getRange(group[0].row,5,group.length,10),values=range.getDisplayValues();group.forEach((item,i)=>{const e=item.entry;values[i][0]=e.projects;values[i][4]=new Date(Math.max(Date.now(),Date.parse(e.updatedAt)+1)).toISOString();values[i][6]=e.projects?'project':'personal';values[i][9]=e.tags;});range.setNumberFormat('@').setValues(values.map(r=>r.map(v=>/^[=+\-@']/.test(String(v))?"'"+v:String(v))));});
+  groups.forEach(group=>{const range=sheet.getRange(group[0].row,5,group.length,10),values=range.getDisplayValues();group.forEach((item,i)=>{const e=item.entry;values[i][0]=e.projects;e.updatedAt=new Date(Math.max(Date.now(),Date.parse(e.updatedAt)+1)).toISOString();e.scope=e.projects?'project':'personal';values[i][4]=e.updatedAt;values[i][6]=e.scope;values[i][9]=e.tags;});range.setNumberFormat('@').setValues(values.map(r=>r.map(v=>/^[=+\-@']/.test(String(v))?"'"+v:String(v))));});
   if(plan.project){const projects=db.getSheetByName('Projects'),found=findRows_(projects,1,slug,false);found.sort((a,b)=>b-a).forEach(row=>projects.deleteRow(row));ioInvalidate_(projects);}
-  ENTRY_SMALL_CACHE=null;const result=state_();result.convertedCount=changes.length;return result;
+  ENTRY_SMALL_CACHE=null;if(ACTIVE_CONTEXT.incrementalCommon===true)return {delta:true,entries:[],commonIncluded:false,entryPatches:changes.map(e=>({id:e.id,projects:e.projects,tags:e.tags,updatedAt:e.updatedAt,scope:e.scope})),commonRemovals:{projects:[slug]},addedTags:changes.length?[tag]:[],convertedCount:changes.length};const result=state_();result.convertedCount=changes.length;return result;
  });
 }
 function ensureDayHeaders_(sheet,write=false){verify_(sheet,DAY_HEADERS.slice(0,4));const extra=sheet.getRange(1,5,1,DAY_EXTRA_HEADERS.length).getDisplayValues()[0];for(let i=0;i<extra.length;i++)if(extra[i]!==''&&extra[i]!==DAY_EXTRA_HEADERS[i])throw Error('Colonne di riflessione non valide in Days. Nessun dato modificato.');const present=extra.filter(Boolean).length;if(present!==0&&!(extra.slice(0,7).every((v,i)=>v===DAY_EXTRA_HEADERS[i])&&extra.slice(7).every(v=>v===''))&&!(extra.every((v,i)=>v===DAY_EXTRA_HEADERS[i])))throw Error('Colonne di riflessione parziali in Days. Nessun dato modificato.');if(write&&present!==9)sheet.getRange(1,5,1,DAY_EXTRA_HEADERS.length).setValues([DAY_EXTRA_HEADERS]);}
@@ -478,7 +478,7 @@ function saveReflectionSettings(p){
   if(!p||!['essential','detailed'].includes(p.dailyReflectionMode))throw new Error('Modalità di riflessione non valida.');
   ACTIVE_CONTEXT=p.context||{};
   return locked_(function(){const current=reflectionSettings_();if((p.version||'')!==current.version)throw new Error('Impostazioni modificate altrove. Aggiorna e riprova.');
-    const props=PropertiesService.getScriptProperties();props.setProperty('DAILY_REFLECTION_MODE',p.dailyReflectionMode);props.setProperty('REFLECTION_SETTINGS_VERSION',Utilities.getUuid());return state_();});
+    const props=PropertiesService.getScriptProperties();props.setProperty('DAILY_REFLECTION_MODE',p.dailyReflectionMode);props.setProperty('REFLECTION_SETTINGS_VERSION',Utilities.getUuid());return ACTIVE_CONTEXT.incrementalCommon===true?{delta:true,entries:[],commonIncluded:false,settingsPatch:reflectionSettings_()}:state_();});
 }
 function rows_(sheet, headers) {
   if(sheet.getName()==='Days')ensureDayHeaders_(sheet);else verify_(sheet,headers);
@@ -601,7 +601,7 @@ function state_() {
  const started=Date.now(),db=db_(),today=Utilities.formatDate(new Date(),'Europe/Rome','yyyy-MM-dd');
  const context=ACTIVE_CONTEXT||{}, month=context.month||today.slice(0,7);
  if(!/^\d{4}-\d{2}$/.test(month)||!validDate_(month+'-01'))throw new Error('Mese non valido.');
- let entries=[];if(!['habits','archive','projects','tasks','day','week','tags'].includes(context.view))entries=entrySearch_('date','^'+month+'-');
+ let entries=[];if(!['habits','archive','projects','tasks','day','week','tags','settings','sync'].includes(context.view))entries=entrySearch_('date','^'+month+'-');
  if(context.view==='projects'&&context.project)entries=entrySearch_('projects','(^|,)'+slug_(context.project)+'(,|$)');
  if(context.view==='tasks')entries=entrySearch_('status','^(open|doing)$');
  if(context.view==='day'&&validDate_(context.date||''))entries=entrySearch_('date','^'+context.date+'$');
@@ -618,7 +618,7 @@ function state_() {
  const previewsMs=Date.now()-previewStarted,fileStarted=Date.now(),files=ids.size?objectsSearch_(db.getSheetByName('Files'),FILE_HEADERS,2,pattern):[],filesMs=Date.now()-fileStarted;
  const commonStarted=Date.now();
  const common=(context.commonFresh||context.deferCommon)?{}:{
-    ...(context.commonWindow==='journal'?{commonScope:{kind:'journal',month,today},commonSlices:commonJournalSlices_(db,month,today)}:['week','habits'].includes(context.commonWindow)?commonPeriodState_(db,context,today):{commonScope:{kind:'full'},weeks:rows_(db.getSheetByName('Weeks'),WEEK_HEADERS),days:rows_(db.getSheetByName('Days'),DAY_HEADERS),habitLogs:rows_(db.getSheetByName('HabitLogs'),LOG_HEADERS)}),
+    ...(context.commonWindow==='catalogs'?{commonScope:{kind:'catalogs'}}:context.commonWindow==='journal'?{commonScope:{kind:'journal',month,today},commonSlices:commonJournalSlices_(db,month,today)}:['week','habits'].includes(context.commonWindow)?commonPeriodState_(db,context,today):{commonScope:{kind:'full'},weeks:rows_(db.getSheetByName('Weeks'),WEEK_HEADERS),days:rows_(db.getSheetByName('Days'),DAY_HEADERS),habitLogs:rows_(db.getSheetByName('HabitLogs'),LOG_HEADERS)}),
     ...(context.catalogFresh?{}:{
     projects:cachedRows_(db.getSheetByName('Projects'),PROJECT_HEADERS),
     goals:cachedRows_(db.getSheetByName('Goals'),GOAL_HEADERS),
@@ -628,6 +628,9 @@ function state_() {
  return {today,month,entries,files,...common,settings:reflectionSettings_(),...(allTags?{allTags}:{}),commonIncluded:!(context.commonFresh||context.deferCommon),driveConfigured:!!PropertiesService.getScriptProperties().getProperty('ROOT_ID'),performance:{traceId:context.traceId||'',entriesMs,previewsMs,filesMs,commonMs:Date.now()-commonStarted,totalMs:Date.now()-started}};
 }
 
+function commonRecordResponse_(collection,record){
+ return ACTIVE_CONTEXT.incrementalCommon===true?{delta:true,entries:[],commonIncluded:false,commonUpserts:{[collection]:[record]}}:state_();
+}
 function saveGoalImpl_(p) {
   const title=text_(p.title,200), target=Number(p.target), progress=Number(p.progress);
   if(!title || !/^\d{4}-Q[1-4]$/.test(p.cycle) || !Number.isFinite(target)||target<=0||!Number.isFinite(progress)||progress<0) throw new Error('Obiettivo: titolo, trimestre e valori numerici validi richiesti.');
@@ -642,7 +645,7 @@ function saveHabitImpl_(p) {
     const q=Number(goal.cycle.slice(-1)),year=goal.cycle.slice(0,4),start=year+'-'+String((q-1)*3+1).padStart(2,'0')+'-01';
     const end=new Date(Date.UTC(Number(year),q*3,0,12)).toISOString().slice(0,10);
     if(p.start<start||p.start>end)throw new Error('Inizio azione fuori dal ciclo.');
-    const sheet=db.getSheetByName('Habits');ensureHabitHeaders_(sheet,true);const records=rows_(sheet,HABIT_HEADERS),index=records.findIndex(h=>h.id===p.id),old=index<0?null:records[index];if(p.id&&(!old||old.archived==='yes'||old.updatedAt!==p.updatedAt))throw new Error('Abitudine modificata altrove. Aggiorna e riprova.');const previous=old?habitSteps_(old.steps):[],titles=String(p.steps===undefined?previous.map(s=>s.title).join('\n'):p.steps).split(/\r?\n/).map(s=>s.trim()).filter(Boolean);if(titles.length>30||titles.some(t=>t.length>500))throw new Error('Massimo 30 microazioni, ciascuna di 500 caratteri.');const used=new Set(),steps=titles.map((title,index)=>{const match=previous.find(s=>s.title===title&&!used.has(s.id))||previous[index];const id=match&&!used.has(match.id)?match.id:Utilities.getUuid();used.add(id);return {id,title};});const now=new Date(Math.max(Date.now(),old?Date.parse(old.updatedAt)+1:0)).toISOString(),values=[old?old.id:Utilities.getUuid(),p.goalId,title,days.join(','),p.start,now,JSON.stringify(steps),'',p.icon===undefined?(old?old.icon||'':''):iconValue_(p.icon),p.description===undefined?(old?old.description||'':''):text_(p.description,6000)];if(old)writeRow_(sheet,index+2,values);else append_(sheet,[values]);return state_();
+    const sheet=db.getSheetByName('Habits');ensureHabitHeaders_(sheet,true);const records=rows_(sheet,HABIT_HEADERS),index=records.findIndex(h=>h.id===p.id),old=index<0?null:records[index];if(p.id&&(!old||old.archived==='yes'||old.updatedAt!==p.updatedAt))throw new Error('Abitudine modificata altrove. Aggiorna e riprova.');const previous=old?habitSteps_(old.steps):[],titles=String(p.steps===undefined?previous.map(s=>s.title).join('\n'):p.steps).split(/\r?\n/).map(s=>s.trim()).filter(Boolean);if(titles.length>30||titles.some(t=>t.length>500))throw new Error('Massimo 30 microazioni, ciascuna di 500 caratteri.');const used=new Set(),steps=titles.map((title,index)=>{const match=previous.find(s=>s.title===title&&!used.has(s.id))||previous[index];const id=match&&!used.has(match.id)?match.id:Utilities.getUuid();used.add(id);return {id,title};});const now=new Date(Math.max(Date.now(),old?Date.parse(old.updatedAt)+1:0)).toISOString(),values=[old?old.id:Utilities.getUuid(),p.goalId,title,days.join(','),p.start,now,JSON.stringify(steps),'',p.icon===undefined?(old?old.icon||'':''):iconValue_(p.icon),p.description===undefined?(old?old.description||'':''):text_(p.description,6000)];if(old)writeRow_(sheet,index+2,values);else append_(sheet,[values]);return commonRecordResponse_('habits',Object.fromEntries(HABIT_HEADERS.map((h,i)=>[h,values[i]])));
   });
 }
 function setHabitLogImpl_(p) {
@@ -695,8 +698,12 @@ function saveProjectImpl_(payload) {
   if (description.length>4000) throw new Error('Descrizione troppo lunga.');
   return locked_(function() {
     const sheet=db_().getSheetByName('Projects');
-    const records=rows_(sheet,PROJECT_HEADERS),existing=records.find(p=>p.slug===slug);if(records.some(p=>p.slug!==slug&&p.name.toLowerCase()===name.toLowerCase()))throw new Error('Un altro progetto ha già questo nome.');if(existing){if(!payload.slug)throw new Error('Questo progetto esiste già.');if(existing.updatedAt!==payload.updatedAt)throw new Error('Progetto modificato altrove. Aggiorna e riprova.');writeRow_(sheet,records.indexOf(existing)+2,[slug,name,description,new Date(Math.max(Date.now(),Date.parse(existing.updatedAt)+1)).toISOString()]);}else append_(sheet,[[slug,name,description,new Date().toISOString()]]);
-    return state_();
+    const records=rows_(sheet,PROJECT_HEADERS),existing=records.find(p=>p.slug===slug);
+    if(records.some(p=>p.slug!==slug&&p.name.toLowerCase()===name.toLowerCase()))throw new Error('Un altro progetto ha già questo nome.');
+    if(existing){if(!payload.slug)throw new Error('Questo progetto esiste già.');if(existing.updatedAt!==payload.updatedAt)throw new Error('Progetto modificato altrove. Aggiorna e riprova.');}
+    const updatedAt=new Date(Math.max(Date.now(),existing?Date.parse(existing.updatedAt)+1:0)).toISOString(),values=[slug,name,description,updatedAt];
+    if(existing)writeRow_(sheet,records.indexOf(existing)+2,values);else append_(sheet,[values]);
+    return commonRecordResponse_('projects',{slug,name,description,updatedAt});
   });
 }
 function setTaskStatusImpl_(payload) {
@@ -739,7 +746,7 @@ function updateEntryImpl_(payload) {
     if(text!==e.text||projects!==e.projects||payload.date!==e.date||payload.scope!==e.scope)throw new Error('In questa versione data, titolo e collocazione della sezione sono fissi. Crea una nuova voce per cambiare.');
     if(body)throw new Error('Scrivi gli appunti nel Google Doc originale.');
     Object.assign(e,{text,body:'',projects,date:payload.date,due:payload.due||'',scope:payload.scope,updatedAt:new Date(Math.max(Date.now(),Date.parse(e.updatedAt)+1)).toISOString()});
-    writeRow_(sheet,index+2,ENTRY_HEADERS.map(h=>e[h]||''));return state_();
+    writeRow_(sheet,index+2,ENTRY_HEADERS.map(h=>e[h]||''));if(ACTIVE_CONTEXT.incrementalCommon===true){attachSchedules_([e]);return {delta:true,metadataOnly:true,preserveDetailId:e.id,entries:[e],commonIncluded:false};}return state_();
   });
 }
 function addFileLinkImpl_(payload) {
@@ -752,9 +759,10 @@ function addFileLinkImpl_(payload) {
     const db=db_();
     if(!findRows_(db.getSheetByName('Entries'),1,payload.entryId,false).length) throw new Error('Voce non trovata.');
     const sheet=db.getSheetByName('Files');
-    if(!rows_(sheet,FILE_HEADERS).some(f=>f.entryId===payload.entryId&&f.fileId===match[1]))
-      append_(sheet,[[Utilities.getUuid(),payload.entryId,match[1],title,url,new Date().toISOString()]]);
-    return state_();
+    const existing=rows_(sheet,FILE_HEADERS).find(f=>f.entryId===payload.entryId&&f.fileId===match[1]);
+    const file=existing||{id:Utilities.getUuid(),entryId:payload.entryId,fileId:match[1],title,url,addedAt:new Date().toISOString()};
+    if(!existing)append_(sheet,[FILE_HEADERS.map(h=>file[h])]);
+    return ACTIVE_CONTEXT.incrementalCommon===true?{delta:true,entries:[],commonIncluded:false,fileUpserts:[file]}:state_();
   });
 }
 function monday_(date) {
@@ -770,12 +778,43 @@ function saveWeekImpl_(payload) {
   Object.assign(values,{energy:payload.energy,closed:payload.closed});
   return saveRecord_('Weeks',WEEK_HEADERS,'week',values,payload.updatedAt);
 }
-function saveDayImpl_(payload) {
+function dayValues_(payload) {
   if (!payload || !validDate_(payload.date)) throw new Error('Data non valida.');
   const values={date:payload.date};
   ['intention','reflection',...DAY_EXTRA_HEADERS.filter(k=>!k.endsWith('Rich'))].forEach(k=>{if(Object.prototype.hasOwnProperty.call(payload,k))values[k]=text_(payload[k],6000);});
   for(const field of ['intention','reflection'])if(Object.prototype.hasOwnProperty.call(payload,field)){const key=field+'Rich';values[key]='';if(payload[key]!==undefined){const raw=String(payload[field]||'').replace(/\r\n?/g,'\n'),rich=validateRich_(payload[key],raw);const serial=JSON.stringify(rich);if(serial.length>45000)throw Error('Formattazione della riflessione troppo estesa.');values[key]=serial;}}
-  return saveRecord_('Days',DAY_HEADERS,'date',values,payload.updatedAt);
+  return values;
+}
+function saveDayImpl_(payload){return saveRecord_('Days',DAY_HEADERS,'date',dayValues_(payload),payload.updatedAt);}
+// Bounded, best-effort batch. Only an explicit saved result acknowledges a day.
+function saveDays(p){
+ ACTIVE_CONTEXT=p&&p.context||{};
+ if(!p||!Array.isArray(p.days)||!p.days.length||p.days.length>10||traceBytes_(JSON.stringify(p.days))>500000)throw Error('Lotto giornate non valido o troppo grande.');
+ const dates=p.days.map(item=>item&&item.date);
+ if(dates.some(date=>!validDate_(date))||new Set(dates).size!==dates.length)throw Error('Date delle giornate non valide o duplicate.');
+ const prepared=p.days.map(item=>{try{return {date:item.date,version:item.updatedAt||'',values:dayValues_(item)};}catch(error){return {date:item.date,status:'invalid',error:'Campi della giornata non validi.'};}});
+ return locked_(function(){
+  const sheet=db_().getSheetByName('Days');ensureDayHeaders_(sheet);
+  const found=findRows_(sheet,1,'^('+dates.join('|')+')$',true).sort((a,b)=>a-b),groups=[],records=new Map();
+  found.forEach(row=>{const last=groups[groups.length-1];if(last&&row===last.end+1&&last.end-last.start<255)last.end=row;else groups.push({start:row,end:row});});
+  groups.forEach(group=>readSheetValues_(sheet.getRange(group.start,1,group.end-group.start+1,DAY_HEADERS.length)).forEach((values,i)=>{const record=Object.fromEntries(DAY_HEADERS.map((h,j)=>[h,values[j]])),old=records.get(record.date);records.set(record.date,old?{duplicate:true}:{row:group.start+i,record});}));
+  const results=[],saved=[];let stopped=false,headersReady=false;
+  prepared.forEach(item=>{
+   if(item.status){results.push({date:item.date,status:item.status,error:item.error});return;}
+   if(stopped){results.push({date:item.date,status:'notAttempted',error:'Invio interrotto. Riprova.'});return;}
+   const existing=records.get(item.date);
+   if(existing?.duplicate||(existing?.record.updatedAt||'')!==item.version){results.push({date:item.date,status:'conflict',error:'Giornata modificata altrove. Conserva la bozza e aggiorna.'});return;}
+   try{
+    const record={...(existing?.record||Object.fromEntries(DAY_HEADERS.map(h=>[h,'']))),...item.values};
+    record.updatedAt=new Date(Math.max(Date.now(),existing?Date.parse(existing.record.updatedAt)+1:0)).toISOString();
+    if(!headersReady){ensureDayHeaders_(sheet,true);headersReady=true;}
+    const values=DAY_HEADERS.map(h=>record[h]||'');
+    if(existing)writeRow_(sheet,existing.row,values);else append_(sheet,[values]);
+    saved.push(record);results.push({date:item.date,status:'saved'});
+   }catch(error){stopped=true;results.push({date:item.date,status:'error',error:'Salvataggio non confermato. La bozza deve essere conservata.'});}
+  });
+  return {delta:true,entries:[],commonIncluded:false,commonUpserts:{days:saved},results,errors:results.filter(r=>r.status!=='saved').map(r=>({date:r.date,status:r.status,error:r.error}))};
+ });
 }
 function saveRecord_(name,headers,key,values,version) {
   return locked_(function(){
@@ -786,6 +825,7 @@ function saveRecord_(name,headers,key,values,version) {
     if(name==='Days'){ensureDayHeaders_(sheet,true);values={...(existing||{}),...values};}
     values.updatedAt=new Date(Math.max(Date.now(),existing?Date.parse(existing.updatedAt)+1:0)).toISOString();
     if(index<0) append_(sheet,[headers.map(h=>values[h]||'')]);else writeRow_(sheet,index+2,headers.map(h=>values[h]||''));
+    if(name==='Goals')return commonRecordResponse_('goals',Object.fromEntries(headers.map(h=>[h,values[h]||''])));
     if(name==='Days'||name==='Weeks'){const updated=Object.fromEntries(headers.map(h=>[h,values[h]||''])),k=name==='Days'?'days':'weeks';return {delta:true,entries:[],commonUpserts:{[k]:[updated]},commonIncluded:false};}
     return state_();
   });
@@ -820,7 +860,7 @@ function getAppChangelog(){return {text:HtmlService.createHtmlOutputFromFile('Ch
 function ensureHabitHeaders_(sheet,write=false){const headers=sheet.getName()==='Habits'?HABIT_HEADERS:LOG_HEADERS,base=sheet.getName()==='Habits'?6:5,h=sheet.getRange(1,1,1,headers.length).getDisplayValues()[0];if(JSON.stringify(h.slice(0,base))!==JSON.stringify(headers.slice(0,base)))throw new Error('Intestazioni abitudini non valide.');for(let k=base;k<headers.length;k++)if(h[k]&&h[k]!==headers[k])throw new Error('Colonne abitudini occupate. Nessun dato modificato.');if(write&&h.slice(base).some(v=>!v))sheet.getRange(1,base+1,1,headers.length-base).setValues([headers.slice(base)]);}
 function habitSteps_(value){if(!value)return [];const steps=JSON.parse(value);if(!Array.isArray(steps))throw new Error('Microazioni non valide.');return steps;}
 function habitChecklist_(value){return value?JSON.parse(value):null;}
-function deleteHabit(p){ACTIVE_CONTEXT=p.context||{};return locked_(function(){const sheet=db_().getSheetByName('Habits'),records=rows_(sheet,HABIT_HEADERS),i=records.findIndex(h=>h.id===p.id);if(i<0||records[i].updatedAt!==p.updatedAt)throw new Error('Abitudine modificata altrove.');ensureHabitHeaders_(sheet,true);const h=records[i];h.archived='yes';h.updatedAt=new Date(Math.max(Date.now(),Date.parse(h.updatedAt)+1)).toISOString();writeRow_(sheet,i+2,HABIT_HEADERS.map(k=>h[k]||''));return state_();});}
+function deleteHabit(p){ACTIVE_CONTEXT=p.context||{};return locked_(function(){const sheet=db_().getSheetByName('Habits'),records=rows_(sheet,HABIT_HEADERS),i=records.findIndex(h=>h.id===p.id);if(i<0||records[i].updatedAt!==p.updatedAt)throw new Error('Abitudine modificata altrove.');ensureHabitHeaders_(sheet,true);const h=records[i];h.archived='yes';h.updatedAt=new Date(Math.max(Date.now(),Date.parse(h.updatedAt)+1)).toISOString();writeRow_(sheet,i+2,HABIT_HEADERS.map(k=>h[k]||''));return commonRecordResponse_('habits',h);});}
 
 const APP_ICONS=['🎯','🌱','❤️','🧠','💪','📚','💼','🧘','☀️','⭐','🏠','🤝','💰','🛡️','🔥'];
 function iconValue_(value){if(value!==''&&value!=='none'&&!APP_ICONS.includes(value)&&!OUTLINE_ICON_IDS.includes(value))throw new Error('Icona non valida.');return value;}
@@ -1604,20 +1644,21 @@ function files(e){return state.files.filter(f=>f.entryId===e.id);}
 function message(s,error=false){if(error&&!privacyShown){const hidden=[...state.entries,...(window.privacyAllBlocks||[])].filter(e=>privateEntry(e)&&!privacyEditing.has(e.clientId));if(hidden.some(e=>{const title=e.text||e.title||String(e.body||'').split('\n')[0];return title?.length>2&&s.includes(title.slice(0,40));}))s='Operazione non completata. Mostra private per controllare la bozza.';}$('message').textContent=s;$('message').className=error?'error':'';const dialog=document.querySelector('dialog[open]');if(dialog){let notice=dialog.querySelector('.dialog-error');if(!notice){notice=node('p','','form-error dialog-error');notice.setAttribute('role','alert');dialog.prepend(notice);}notice.textContent=error?s:'';notice.hidden=!error;if(error)notice.scrollIntoView({block:'nearest'});}}
 function api(name,arg,traceContext={}){
  const enabled=performanceTracingEnabled()&&name!=='getAppChangelog',generation=traceGeneration,traceId=enabled?newTraceId():'',started=enabled?performance.now():0;
- arg={...(arg||{}),context:{view,month,project,date:day,week,query,tag:selectedTag,catalogFresh:['getState','getCommonState'].includes(name)&&!forceCommon&&catalogReadAt>0&&Date.now()-catalogReadAt<60000,commonWindow:['journal','week','habits'].includes(view)?view:'',deferCommon:name==='getState'&&view==='journal'&&!state.today,commonFresh:name==='getState'&&!forceCommon&&commonCoversView()}};
- const action=enabled&&activeTraceAction&&['saveJournalPage','saveDay'].includes(name)?activeTraceAction:null;
+ arg={...(arg||{}),context:{view,month,project,date:day,week,query,tag:selectedTag,catalogFresh:['getState','getCommonState'].includes(name)&&!forceCommon&&catalogReadAt>0&&Date.now()-catalogReadAt<60000,incrementalCommon:true,commonWindow:['journal','week','habits'].includes(view)?view:view==='day'?'':'catalogs',deferCommon:name==='getState'&&view==='journal'&&!state.today,commonFresh:name==='getState'&&!forceCommon&&commonCoversView()}};
+ const action=enabled&&activeTraceAction&&['saveJournalPage','saveDay','saveDays'].includes(name)?activeTraceAction:null;
  const summary=enabled?{...traceRequestSummary(arg),...traceContext,requestBytes:traceBytes(arg),...(action?{actionId:action.id,batchIndex:++action.started}: {})}:null;
  return new Promise((resolve,reject)=>{
   const finish=(value,error,diagnostics)=>{if(action){if(error)action.failed++;else action.completed++;}if(enabled&&generation===traceGeneration){const metrics={...summary,...diagnostics,traceId,outcome:error?'error':traceResultOutcome(value)};if(error)metrics.errorCategory=traceErrorCategory(error);metrics.responseBytes=traceBytes(value);recordTiming(name,started,value,false,metrics);}if(error)reject(error);else resolve(value);};
   try{const runner=google.script.run.withSuccessHandler(response=>{if(enabled){if(!response||typeof response.ok!=='boolean'){finish(null,new Error('Risposta diagnostica non valida.'));return;}finish(response.value,response.ok?null:new Error(response.error||'Operazione non completata.'),response.diagnostics);}else finish(response);}).withFailureHandler(error=>finish(null,error));if(enabled)runner.traceApi({operation:name,arg,traceId});else runner[name](arg);}catch(error){finish(null,error);}
  });
 }
-function traceRequestSummary(arg){const value=arg||{},summary={};if(['journal','week','habits'].includes(value.context?.commonWindow))summary.commonWindowRequested=1;if(value.context?.catalogFresh)summary.catalogReuseRequested=1;if(Array.isArray(value.blocks))summary.blocksCount=value.blocks.length;if(Array.isArray(value.ids))summary.idsCount=value.ids.length;if(Array.isArray(value.items))summary.itemsCount=value.items.length;if(value.cursor!==undefined)summary.hasCursor=!!value.cursor;return summary;}
+function traceRequestSummary(arg){const value=arg||{},summary={};if(['journal','week','habits'].includes(value.context?.commonWindow))summary.commonWindowRequested=1;if(value.context?.commonWindow==='catalogs')summary.commonCatalogOnlyRequested=1;if(value.context?.catalogFresh)summary.catalogReuseRequested=1;if(Array.isArray(value.days))summary.daysCount=value.days.length;if(Array.isArray(value.blocks))summary.blocksCount=value.blocks.length;if(Array.isArray(value.ids))summary.idsCount=value.ids.length;if(Array.isArray(value.items))summary.itemsCount=value.items.length;if(value.cursor!==undefined)summary.hasCursor=!!value.cursor;return summary;}
 function traceErrorCategory(error){const message=String(error?.message||error||'').toLowerCase();if(message.includes('conflitto')||message.includes('modificat'))return 'conflict';if(message.includes('timeout')||message.includes('tempor'))return 'temporary';if(message.includes('non valida')||message.includes('richiesto'))return 'validation';return 'other';}
 function controls(){enhanceTagInput($('captureTags'));document.querySelectorAll('.rich-area').forEach(n=>n.contentEditable=String(!busy&&n.dataset.fixed!=='true')); document.querySelectorAll('button,input,select,textarea').forEach(n=>n.disabled=busy||n.dataset.fixed==='true');if($('privacyToggle'))$('privacyToggle').disabled=false;}
 function commonCoversView(){return catalogReadAt>0&&Date.now()-catalogReadAt<60000&&commonReadAt>0&&Date.now()-commonReadAt<60000&&commonScopeMatchesView();}
 function commonScopeMatchesView(){
  if(commonScope?.kind==='full')return true;
+ if(commonScope?.kind==='catalogs')return !['journal','week','habits','day'].includes(view);
  if(commonScope?.kind!==view)return false;
  if(view==='journal')return commonScope.month===month&&commonScope.today===state.today;
  if(view==='week')return commonScope.week===week;
@@ -1653,14 +1694,14 @@ function deriveCachedView(){
 function mergeState(incoming){if(incoming.commonIncluded!==false){commonGeneration++;commonReadAt=Date.now();commonScope=incoming.commonScope||{kind:'full'};}const previous=incoming.preserveDetailId?state.entries.find(e=>e.id===incoming.preserveDetailId):null;if(previous&&incoming.entries){const next=incoming.entries.find(e=>e.id===previous.id);if(next)['body','rich','richUnsupported','docUrl','docName'].forEach(k=>{if(previous[k]!==undefined)next[k]=previous[k];});}const {commonSlices,...data}=incoming;return {...state,...data};}
 function rememberView(){const key=cacheKey();viewCache.delete(key);viewCache.set(key,{data:structuredClone(state),at:state.loadedAt||Date.now()});if(viewCache.size>16)viewCache.delete(viewCache.keys().next().value);}
 function initialiseView(){day=day||state.today;week=week||monday(state.today);month=month||state.month||state.today.slice(0,7);cycle=cycle||cycleFor(state.today);if(!$('captureDate').value)$('captureDate').value=state.today;}
-const TRACE_OPERATIONS=new Set(['journalNavigation','benchmarkJournalCache','saveContinuous',"savePrivacySettings","getCommonState","getState","getEntryDetail","setTaskStatus","deleteNote","saveReflectionSettings","saveDay","saveWeek","previewProjectAsTag","convertProjectToTag","saveProject","rebaseDocQueue","saveNoteText","addFileLink","setEntryProjects","setEntryTags","setHabitLog","saveHabit","deleteHabit","saveGoal","getDriveInventory","beginProjectExport","continueProjectExport","searchArchive","refreshNotePreviews","addJournal","getAppChangelog","processTaskDocQueue","getDocQueueState","getJournalPage","getJournalContents","saveJournalPage"]);
+const TRACE_OPERATIONS=new Set(['journalNavigation','benchmarkJournalCache','saveContinuous',"savePrivacySettings","getCommonState","getState","getEntryDetail","setTaskStatus","deleteNote","saveReflectionSettings","saveDay","saveDays","saveWeek","previewProjectAsTag","convertProjectToTag","saveProject","rebaseDocQueue","saveNoteText","addFileLink","setEntryProjects","setEntryTags","setHabitLog","saveHabit","deleteHabit","saveGoal","getDriveInventory","beginProjectExport","continueProjectExport","searchArchive","refreshNotePreviews","addJournal","getAppChangelog","processTaskDocQueue","getDocQueueState","getJournalPage","getJournalContents","saveJournalPage"]);
 const TRACE_NUMERIC_KEYS=new Set('docsWriteMs docsWriteCalls batchIndex batchesCount completedBatches failedBatches docsOpenMs docsOpenCalls driveMs driveCalls totalMs entriesMs previewsMs filesMs commonMs metadataMs contentMs documentsOpened documentsChecked cacheHits cacheMisses queuedContents entriesCount validationMs lockWaitMs sheetsMs sectionMs responseMs finaliseMs sheetReadMs sheetWriteMs sheetsCalls docsMs docsCalls queueMs queueCalls lockMs lockCalls flushMs flushCalls blocksCount idsCount itemsCount requestBytes responseBytes processed pending errorCount renderMs'.split(' '));
 const TRACE_PHASES='taskIndexCheck taskIndexBuild taskIndexPut taskIndexGet taskIndexRead taskIndexRevision sheets sheetRead docs docsOpen docsWrite drive queue lock lockWait lockHeld flush cacheGet cacheGetAll cachePutAll cacheParse cacheSerialize cachePut driveRevision driveCheck driveInside driveRoot driveParents driveTrash docsBody docsIndex responseSerialize docContent docContentBatch contentBatchSearch contentBatchHeaders contentBatchPayload contentSearch contentHeaders contentVersion contentPayload contentAssemble pendingContent syncedContent cacheBenchSingle cacheBenchBulk cacheBenchAbsentSingle cacheBenchAbsentBulk'.split(' ');
 for(const phase of TRACE_PHASES)for(const suffix of ['Ms','Calls','SelfMs'])TRACE_NUMERIC_KEYS.add(phase+suffix);
 for(const key of 'contentBatchEntries contentBatchSearchRows contentBatchFallbacks firstResultMs unaccountedMs driveInsideMemoHits driveInsideNodes driveParentEdges cacheNoRevision cacheReadErrors cacheAbsentUnknown cacheInvalid cacheOversize cacheWrites cachePutErrors cachePendingBypass cacheExplicitBypass cacheWriteRevisionChanged cacheWriteRevisionUnavailable contentMemoryHits contentRowsFound contentHeaderCells contentPayloadCells contentPayloadBytes docsBodyChildren pageIndex pagesCount benchmarkKeys benchmarkRounds benchmarkMismatches benchmarkErrors'.split(' '))TRACE_NUMERIC_KEYS.add(key);
 for(const prefix of ['contentVersions','contentFragments'])for(const bucket of ['1','2to3','4to9','10plus'])TRACE_NUMERIC_KEYS.add(prefix+bucket);
 for(const key of 'lockAttempts lockForegroundAttempts lockBackgroundAttempts lockAcquired lockBusy lockAcquireErrors sheetReadRequests sheetReadRows sheetReadCells'.split(' '))TRACE_NUMERIC_KEYS.add(key);
-for(const key of 'commonWindowRequested catalogReuseRequested taskIndexHits taskIndexResets taskIndexBusy taskIndexCheckErrors taskIndexBuildChanged taskIndexOversize taskIndexWriteErrors taskIndexReadErrors taskIndexStoredBytes taskIndexStoredParts taskIndexInvalidations metadataOnly entryReadRanges entryRequestedRows entryReadRows entryOverreadRows'.split(' '))TRACE_NUMERIC_KEYS.add(key);
+for(const key of 'daysCount commonWindowRequested commonCatalogOnlyRequested catalogReuseRequested taskIndexHits taskIndexResets taskIndexBusy taskIndexCheckErrors taskIndexBuildChanged taskIndexOversize taskIndexWriteErrors taskIndexReadErrors taskIndexStoredBytes taskIndexStoredParts taskIndexInvalidations metadataOnly entryReadRanges entryRequestedRows entryReadRows entryOverreadRows'.split(' '))TRACE_NUMERIC_KEYS.add(key);
 function traceBytes(value){try{return new TextEncoder().encode(JSON.stringify(value)??'').length;}catch(e){return 0;}}
 function traceResultOutcome(value){if(value?.snapshotReset)return 'partial';return Array.isArray(value?.errors)&&value.errors.length||Array.isArray(value?.entries)&&value.entries.some(e=>e.editorError||e.docQueueError)?'partial':value?.busy?'busy':'ok';}
 function traceMetrics(value){const clean={};for(const key of TRACE_NUMERIC_KEYS){if(typeof value?.[key]==='number'&&Number.isFinite(value[key])&&value[key]>=0)clean[key]=value[key];}return clean;}
@@ -1692,7 +1733,7 @@ function exportPerformanceTrace(){const payload=performanceTraceReport();const b
 function laterPreviews(epoch){}
 async function run(name,arg,after){if(busy)return;const reading=name==='getState',readRevision=commonWriteRevision,epoch=++navigationEpoch,start=performance.now(),key=cacheKey(),cached=reading&&commonCoversView()?(viewCache.get(key)||deriveCachedView()):null;clearTimeout(previewTimer);window.lastCacheReason=forceCommon?'Aggiorna forzato':cached?'cache età '+Math.round((Date.now()-cached.at)/1000)+' s':'prima visita o cache invalidata';
  if(cached){const commonKeys=['projects','weeks','days','goals','habits','taskPlans','habitLogs','settings'];const currentCommon=Object.fromEntries(commonKeys.filter(k=>state[k]!==undefined).map(k=>[k,state[k]]));state={...structuredClone(cached.data),...currentCommon};initialiseView();render();if(!forceCommon&&Date.now()-cached.at<60000){recordTiming(cached.derived?'Vista dai dati disponibili':'Vista locale',start,null,true);rememberView();message('Vista recente · dati riutilizzati · Aggiorna per rileggere');laterPreviews(epoch);return true;}message('Vista disponibile · aggiornamento in background…');}else{busy=true;controls();message(reading?'Caricamento…':'Salvataggio in corso…');}
- try{const result=await api(name,arg);if(epoch!==navigationEpoch)return false;if(reading&&readRevision!==commonWriteRevision){['projects','weeks','days','goals','habits','taskPlans','habitLogs','allTags','commonSlices','commonScope'].forEach(k=>delete result[k]);result.commonIncluded=false;}if(reading&&cached&&(dirtyMain||dirtyDetail||query)){message('Aggiornamento rinviato: conserva le modifiche e premi Aggiorna dopo il salvataggio.');return true;}applyCommonChanges(result);if(result.delta){const incoming=result.entries||[],map=new Map(state.entries.map(e=>[e.id,e]));incoming.forEach(e=>{const visible=view==='journal'?journalTaskDates(e).length>0:view==='day'?taskVisibleOn(e,day):view==='projects'?entryProjects(e).includes(project):view==='tags'?entryTags(e).includes(selectedTag):view==='tasks'?e.type==='task'&&['open','doing'].includes(e.status):view==='week'?(e.date>=week&&e.date<=dateAdd(week,6))||(e.type==='task'&&['open','doing'].includes(e.status)):false;if(view==='tasks'&&!visible)map.delete(e.id);else if(visible||map.has(e.id))map.set(e.id,result.metadataOnly?{...map.get(e.id),...e,body:map.get(e.id)?.body||e.body}:e);});state.entries=[...map.values()];state.allTags=Array.from(new Set([...(state.allTags||[]),...incoming.flatMap(entryTags)])).sort();}else state=mergeState(result);state.loadedAt=Date.now();state.entries.forEach(e=>{const p=previewCache.get(e.id);if(e.excerpt===undefined&&p&&p.updatedAt===e.updatedAt&&Date.now()-p.at<60000)e.excerpt=p.excerpt;});initialiseView();if(!reading){if(name==='deleteNote')continuousSession=null;viewCache.clear();previewCache.clear();if(!result.delta)commonReadAt=result.commonIncluded!==false?Date.now():0;}else if(forceCommon)previewCache.clear();if(after)after();render();rememberView();message((reading?'Aggiornato alle ':window.DEMO?'Salvato nella demo alle ':'Salvato su Drive alle ')+new Date().toLocaleTimeString('it-IT'));if(reading){laterPreviews(epoch);if(result.commonIncluded===false&&commonReadAt===0)ensureCommon().catch(e=>message('Diario caricato · dati comuni non disponibili. Riprova cambiando vista.',true));}return true;
+ try{const result=await api(name,arg);if(epoch!==navigationEpoch)return false;if(reading&&readRevision!==commonWriteRevision){['projects','weeks','days','goals','habits','taskPlans','habitLogs','allTags','commonSlices','commonScope','settings'].forEach(k=>delete result[k]);result.commonIncluded=false;}if(reading&&cached&&(dirtyMain||dirtyDetail||query)){message('Aggiornamento rinviato: conserva le modifiche e premi Aggiorna dopo il salvataggio.');return true;}applyCommonChanges(result);if(result.delta){const incoming=result.entries||[],map=new Map(state.entries.map(e=>[e.id,e]));incoming.forEach(e=>{const visible=view==='journal'?journalTaskDates(e).length>0:view==='day'?taskVisibleOn(e,day):view==='projects'?entryProjects(e).includes(project):view==='tags'?entryTags(e).includes(selectedTag):view==='tasks'?e.type==='task'&&['open','doing'].includes(e.status):view==='week'?(e.date>=week&&e.date<=dateAdd(week,6))||(e.type==='task'&&['open','doing'].includes(e.status)):false;if(view==='tasks'&&!visible)map.delete(e.id);else if(visible||map.has(e.id))map.set(e.id,result.metadataOnly?{...map.get(e.id),...e,body:map.get(e.id)?.body||e.body}:e);});state.entries=[...map.values()];state.allTags=Array.from(new Set([...(state.allTags||[]),...incoming.flatMap(entryTags)])).sort();}else state=mergeState(result);state.loadedAt=Date.now();state.entries.forEach(e=>{const p=previewCache.get(e.id);if(e.excerpt===undefined&&p&&p.updatedAt===e.updatedAt&&Date.now()-p.at<60000)e.excerpt=p.excerpt;});initialiseView();if(!reading){if(name==='deleteNote')continuousSession=null;viewCache.clear();previewCache.clear();if(!result.delta)commonReadAt=result.commonIncluded!==false?Date.now():0;}else if(forceCommon)previewCache.clear();if(after)after();render();rememberView();message((reading?'Aggiornato alle ':window.DEMO?'Salvato nella demo alle ':'Salvato su Drive alle ')+new Date().toLocaleTimeString('it-IT'));if(reading){laterPreviews(epoch);if(result.commonIncluded===false&&commonReadAt===0)ensureCommon().catch(e=>message('Diario caricato · dati comuni non disponibili. Riprova cambiando vista.',true));}return true;
  }catch(e){if(epoch===navigationEpoch)message((reading?'Aggiornamento non completato. ':'Salvataggio non completato. ')+(e.message||String(e)),true);return false;}finally{if(epoch===navigationEpoch&&!cached){busy=false;controls();}}}
 
 function discard(){continuousReconcileDirty();if(!(dirtyMain||dirtyDetail))return true;if(!confirm('Ci sono modifiche nei dettagli o nella pagina non salvate. Vuoi abbandonarle?'))return false;if(view==='journal'&&continuousMode&&continuousSession?.blocks.some(b=>b.dirty||!b.id))resetContinuous();if(view==='habits')habitFormDrafts.clear();dirtyMain=dirtyDetail=false;return true;}
@@ -2257,16 +2298,30 @@ function diaryHabitNode(b){const box=node('details','','diary-habits'),summary=n
 function applyCommonChanges(result){
  if(result.projects!==undefined)catalogReadAt=Date.now();
  if(result.commonPatch)Object.entries(result.commonPatch).forEach(([k,v])=>state[k]=v);
- const keys={days:'date',weeks:'week',habitLogs:'key'};
+ const keys={days:'date',weeks:'week',habitLogs:'key',goals:'id',habits:'id',projects:'slug'};
  Object.entries(result.commonSlices||{}).forEach(([collection,slice])=>{
   const key=keys[collection],dateKey=collection==='weeks'?'week':'date';
-  if(!key)throw Error('Periodo comune non riconosciuto.');
+  if(!['days','weeks','habitLogs'].includes(collection))throw Error('Periodo comune non riconosciuto.');
   const ranges=slice.ranges||[{from:slice.from,to:slice.to}];
   const records=new Map((state[collection]||[]).filter(row=>!ranges.some(r=>row[dateKey]>=r.from&&row[dateKey]<=r.to)).map(row=>[row[key],row]));
   slice.rows.forEach(row=>records.set(row[key],row));
   state[collection]=[...records.values()];
  });
- if(result.commonUpserts||result.commonPatch)commonWriteRevision++;
+ if(result.fileUpserts){const files=new Map(state.files.map(f=>[f.id,f]));result.fileUpserts.forEach(f=>files.set(f.id,f));state.files=[...files.values()];}
+ if(result.entryPatches){
+  const patches=new Map(result.entryPatches.map(p=>[p.id,p]));state.entries=state.entries.map(e=>patches.has(e.id)?{...e,...patches.get(e.id)}:e);
+  // Clean sessions can be reloaded; dirty sessions keep their original versions
+  // so that a later save detects the concurrent conversion without losing text.
+  if(!continuousSession?.blocks.some(b=>b.dirty||!b.id))continuousSession=null;
+  else continuousSession.blocks.forEach(b=>{if(b.id&&!b.dirty&&patches.has(b.id)){Object.assign(b,patches.get(b.id));b.savedSnapshot=continuousComparable(b);}});
+ }
+ Object.entries(result.commonRemovals||{}).forEach(([collection,ids])=>{
+  if(collection!=='projects')throw Error('Rimozione comune non riconosciuta.');
+  const removed=new Set(ids);state.projects=state.projects.filter(p=>!removed.has(p.slug));
+ });
+ if(result.addedTags)state.allTags=Array.from(new Set([...(state.allTags||[]),...result.addedTags])).sort();
+ if(result.settingsPatch)state.settings={...state.settings,...result.settingsPatch};
+ if(result.commonUpserts||result.commonPatch||result.settingsPatch||result.commonRemovals||result.entryPatches||result.fileUpserts)commonWriteRevision++;
  Object.entries(result.commonUpserts||{}).forEach(([collection,rows])=>{
   const key=keys[collection];if(!key)throw Error('Aggiornamento comune non riconosciuto.');
   const records=new Map((state[collection]||[]).map(row=>[row[key],row]));
@@ -2301,7 +2356,48 @@ function dailyReflectionDates(){return[...new Set([...state.days.filter(d=>d.dat
 function dailyDirty(b){b.rich=b.editor.blocks();b.body=continuousPlain(b.rich);b.dirty=dailyKey(b)!==b.savedSnapshot;if(b.dirty)draftWrite('daily:'+b.date+':'+b.field,{...b,editor:undefined});else draftRemove('daily:'+b.date+':'+b.field);dirtyMain=!!continuousSession?.blocks.some(b=>b.dirty)||[...dailyDrafts.values()].some(b=>b.dirty&&b.date.startsWith(month+'-'));}
 function dailyReflectionNode(b){const box=node('section','','diary-reflection day-reflection-block'),header=node('div','','day-reflection-heading'),title=node('h3',b.title),format=button('Aa',()=>{box.classList.toggle('editing');format.setAttribute('aria-expanded',String(box.classList.contains('editing')));}),collapse=button(b.collapsed?'Espandi':'Comprimi',()=>{b.collapsed=!b.collapsed;editor.wrapper.hidden=b.collapsed;format.hidden=b.collapsed||!['intention','reflection'].includes(b.field);collapse.textContent=b.collapsed?'Espandi':'Comprimi';collapse.setAttribute('aria-label',(b.collapsed?'Espandi ':'Comprimi ')+b.title.toLowerCase());collapse.setAttribute('aria-expanded',String(!b.collapsed));if(!b.collapsed)showDailyCarry(b,box);});format.setAttribute('aria-label','Formattazione '+b.title.toLowerCase());format.setAttribute('aria-expanded','false');collapse.setAttribute('aria-label',(b.collapsed?'Espandi ':'Comprimi ')+b.title.toLowerCase());collapse.setAttribute('aria-expanded',String(!b.collapsed));format.hidden=b.collapsed||!['intention','reflection'].includes(b.field);if(b.field==='intention')header.append(button('Riporta checklist',()=>showDailyCarry(b,box,true),'daily-carry-trigger'));header.prepend(title);header.append(format,collapse);box.append(header);const backing=node('textarea');backing.value=b.body;backing.setAttribute('aria-label','Testo '+b.title.toLowerCase());box.append(backing);const editor=['intention','reflection'].includes(b.field)?makeRichEditor(backing,b.rich,()=>dailyDirty(b)):{area:backing,wrapper:backing,blocks:()=>plainRich(backing.value),set:(rich,text)=>{backing.value=rich?continuousPlain(rich):text||'';}};if(!['intention','reflection'].includes(b.field))backing.oninput=()=>dailyDirty(b);b.editor=editor;editor.wrapper.hidden=b.collapsed;if(!b.collapsed&&!b.body.trim())showDailyCarry(b,box);return box;}
 function addDailyReflection(date){['intention','reflection'].forEach(main=>dailySectionOpen.set('section:'+date+':'+main,true));['intention','reflection'].forEach(field=>{dailyBlock(date,field).collapsed=false;});renderContinuous($('content'));}
-async function saveDailyReflections(){const rows=[...dailyDrafts.values()].filter(b=>b.dirty&&b.date.startsWith(month+'-'));if(!rows.length)return;for(const b of rows){if(b.editor){b.rich=b.editor.blocks();b.body=continuousPlain(b.rich);}if(b.body.length>6000)throw Error(b.title+': massimo 6000 caratteri.');}const days=[...new Set(rows.map(b=>b.date))];busy=true;controls();try{for(const date of days){const dirty=rows.filter(b=>b.date===date),versions=new Set(dirty.map(b=>b.updatedAt));if(versions.size!==1)throw Error('La giornata è cambiata: conserva la bozza e aggiorna.');const payload={date,updatedAt:dirty[0].updatedAt};dirty.forEach(b=>{payload[b.field]=b.body;payload[b.field+'Rich']=b.rich;});const result=await api('saveDay',payload);applyCommonChanges(result);const row=state.days.find(d=>d.date===date);dirty.forEach(b=>{b.updatedAt=row.updatedAt;b.dirty=false;b.savedSnapshot=dailyKey(b);draftRemove('daily:'+b.date+':'+b.field);});dailyDrafts.forEach(b=>{if(b.date===date&&!b.dirty)b.updatedAt=row.updatedAt;});}viewCache.clear();}finally{busy=false;controls();}dirtyMain=!!continuousSession?.blocks.some(b=>b.dirty)||[...dailyDrafts.values()].some(b=>b.dirty&&b.date.startsWith(month+'-'));renderContinuous($('content'));message(dirtyMain?'Resta una bozza da salvare.':'Pagina e riflessioni salvate.');}
+async function saveDailyReflections(){
+ const rows=[...dailyDrafts.values()].filter(b=>b.dirty&&b.date.startsWith(month+'-'));if(!rows.length)return;
+ rows.forEach(b=>{if(b.editor){b.rich=b.editor.blocks();b.body=continuousPlain(b.rich);}if(b.body.length>6000)throw Error(b.title+': massimo 6000 caratteri.');});
+ const requests=[],sent=new Map();
+ for(const date of new Set(rows.map(b=>b.date))){
+  const dirty=rows.filter(b=>b.date===date);if(new Set(dirty.map(b=>b.updatedAt)).size!==1)throw Error('La giornata è cambiata: conserva la bozza e aggiorna.');
+  const payload={date,updatedAt:dirty[0].updatedAt};
+  dirty.forEach(b=>{payload[b.field]=b.body;payload[b.field+'Rich']=structuredClone(b.rich);sent.set(b.clientId,{block:b,key:dailyKey(b)});});requests.push(payload);
+ }
+ const batches=[];let batch=[];
+ for(const payload of requests){
+  if(traceBytes([payload])>500000)throw Error('La giornata supera il limite di invio. Riduci il testo prima di riprovare.');
+  if(batch.length&&(batch.length===10||traceBytes([...batch,payload])>500000)){batches.push(batch);batch=[];}batch.push(payload);
+ }if(batch.length)batches.push(batch);
+ let saved=0,failed=0;const failures=[];
+ busy=true;controls();
+ try{
+  for(const days of batches){
+   const result=await api('saveDays',{days});
+   // Verify the complete acknowledgement before clearing any local draft.
+   if(!Array.isArray(result.results)||result.results.length!==days.length||new Set(result.results.map(r=>r.date)).size!==days.length||days.some(p=>!result.results.some(r=>r.date===p.date)))throw Error('Risposta del lotto non valida. Le bozze sono conservate.');
+   for(const r of result.results)if(r.status==='saved'&&!result.commonUpserts?.days?.some(row=>row.date===r.date&&row.updatedAt))throw Error('Conferma della giornata incompleta. Le bozze sono conservate.');
+   const acknowledged=result.results.filter(r=>r.status==='saved').map(r=>result.commonUpserts.days.find(row=>row.date===r.date));
+   applyCommonChanges({commonUpserts:{days:acknowledged}});
+   for(const payload of days){
+    const outcome=result.results.find(r=>r.date===payload.date);if(outcome.status!=='saved'){failed++;failures.push({date:payload.date,status:outcome.status});continue;}
+    saved++;const canonical=acknowledged.find(row=>row.date===payload.date);
+    dailyDrafts.forEach(b=>{
+     if(b.date!==payload.date||b.updatedAt!==payload.updatedAt)return;
+     const snapshot=sent.get(b.clientId);b.updatedAt=canonical.updatedAt;
+     if(snapshot?.block===b){if(b.editor){b.rich=b.editor.blocks();b.body=continuousPlain(b.rich);}b.savedSnapshot=snapshot.key;b.dirty=dailyKey(b)!==snapshot.key;}
+     if(b.dirty)draftWrite('daily:'+b.date+':'+b.field,{...b,editor:undefined});else draftRemove('daily:'+b.date+':'+b.field);
+    });
+   }
+   viewCache.clear();
+  }
+ }finally{
+  busy=false;dirtyMain=!!continuousSession?.blocks.some(b=>b.dirty)||[...dailyDrafts.values()].some(b=>b.dirty&&b.date.startsWith(month+'-'));controls();renderContinuous($('content'));
+ }
+ message(failed?saved+' giornate salvate · '+failed+' non salvate: '+failures.slice(0,4).map(r=>dateLabel(r.date,false)+(r.status==='conflict'?' (conflitto)':' (errore)')).join(', ')+(failures.length>4?' e altre '+(failures.length-4):'')+'. Le bozze restano conservate.':dirtyMain?'Salvataggio completato; restano nuove modifiche da salvare.':'Pagina e riflessioni salvate.',failed>0);
+}
+
 async function saveContinuous(){return traceSaveAction_(async()=>{if(busy)return;const daily=[...dailyDrafts.values()].filter(b=>b.dirty&&b.date.startsWith(month+'-'));if(daily.some(b=>b.body.length>6000)){message('Riflessione troppo lunga: massimo 6000 caratteri per campo.',true);return;}await saveNotesContinuous();if(continuousSession?.blocks.some(b=>b.dirty))return;try{await saveDailyReflections();}catch(e){dirtyMain=true;message('Riflessioni non salvate: '+e.message+' La bozza è conservata.',true);}});}
 
 function continuousFitTitle(n){if(n.closest('[hidden]'))return;const css=getComputedStyle(n),border=(parseFloat(css.borderTopWidth)||0)+(parseFloat(css.borderBottomWidth)||0);n.style.height='auto';n.style.height=(n.scrollHeight+border)+'px';}

@@ -1,6 +1,6 @@
 # SPEC-004 — Usabilità, dati locali e sincronizzazione incrementale
 
-**Stato:** Approvata per avvio sviluppo — fase 0 parziale, Entries raggruppate, Task con corpi differiti e fotografia delle continuazioni e dati comuni di Diario/Settimana/Abitudini per periodo implementati localmente; resto del piano da realizzare.
+**Stato:** Approvata per avvio sviluppo — fase 0 parziale, Entries raggruppate, Task con corpi differiti e fotografia delle continuazioni e dati comuni per periodo, scope cataloghi, delta comuni/legacy e lotto delle riflessioni implementati localmente; resto del piano da realizzare.
 
 **Data:** 27 ottobre 2026.
 
@@ -162,7 +162,8 @@ persistente/incrementale per stato/periodo. Risultati in
 Seguito locale: elenco Task fino a 200 metadati per pagina e descrizioni
 versionate a lotti da 25 all'apertura, per ricerca o prima del salvataggio.
 Completata questa separazione, preservando ricerca parziale e bozze. Indici
-dei candidati e limitazione delle collezioni comuni rimangono successivi.
+persistenti dei candidati restano successivi; finestre comuni e scope cataloghi
+sono implementati nei seguiti documentati in fondo.
 Risultati in [VERIFICA-TASK-CONTENUTI-DIFFERITI](../VERIFICA-TASK-CONTENUTI-DIFFERITI.md).
 
 Primo intervento locale completato il 27 ottobre: raggruppamento limitato
@@ -453,3 +454,7 @@ La parte restante descrive funzionalità proposte, non disponibili. Nessun
 accesso ai dati del diario, migrazione o nuovo deployment durante questa tranche.
 
 Letture temporali limitate al diario e contratto di copertura: [verifica locale](../VERIFICA-DATI-COMUNI-PERIODO.md). Finestre estese a Settimana/Abitudini: [verifica del seguito](../VERIFICA-SETTIMANA-ABITUDINI-PERIODO.md).
+
+Cataloghi senza storico e delta canonici di obiettivi, abitudini, progetti e impostazioni: [verifica locale](../VERIFICA-CATALOGHI-DELTA.md). Altri percorsi legacy restano da implementare. Lotto riflessioni completato nel seguito: [verifica](../VERIFICA-RIFLESSIONI-LOTTO.md).
+
+Allegati, aggiornamento legacy e conversione progetto/tag ora rispondono con delta: [verifica](../VERIFICA-DELTA-LEGACY.md). deleteNote e contesa Docs restano invariati.

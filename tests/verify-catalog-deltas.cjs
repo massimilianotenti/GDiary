@@ -1,0 +1,41 @@
+const fs=require('fs'),vm=require('vm'),path=require('path');
+const ctx={window:{},document:{addEventListener(){}},setTimeout,console};vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(path.resolve(__dirname,'../Demo.html'),'utf8').match(/<script>([\s\S]*?)<\/script>/)[1],ctx);
+vm.runInContext(`{
+ const check=(v,m)=>{if(!v)throw Error(m);},fails=(fn,m)=>{let failed=false;try{fn();}catch{failed=true;}check(failed,m);};
+ const context={incrementalCommon:true,view:'habits',month:'2026-10',commonWindow:'habits',week:'2026-09-28',date:'2026-10-03'};
+ const trace=(operation,arg)=>{const r=traceApi({operation,traceId:'catalog-delta-trace-00001',arg:{...arg,context}});check(r.ok,operation+' succeeds');return r;};
+ const one=(r,key)=>{const value=r.value||r;check(value.delta&&value.commonIncluded===false&&value.entries.length===0&&value.commonUpserts[key].length===1&&!value[key]&&!value.days&&!value.commonSlices,'single canonical '+key);return value.commonUpserts[key][0];};
+ const catalogs=()=>traceApi({operation:'getState',traceId:'catalog-delta-trace-00002',arg:{context:{view:'settings',month:'2026-10',commonWindow:'catalogs'}}});
+ const small=catalogs();check(small.ok&&small.value.commonScope.kind==='catalogs'&&!small.value.commonSlices&&!small.value.days&&!small.value.weeks&&!small.value.habitLogs&&small.value.entries.length===0,'catalog-only settings contract');
+ for(let i=0;i<50000;i++)for(const [name,headers,dateKey]of [['Days',DAY_HEADERS,'date'],['Weeks',WEEK_HEADERS,'week'],['HabitLogs',LOG_HEADERS,'date']])mockSheets[name].data.push(headers.map(h=>h===dateKey?'2020-01-06':h==='reflection'?'Unrelated private historical text':h==='key'?'old-'+i:''));
+ const large=catalogs();check(large.ok&&large.diagnostics.sheetReadCells===small.diagnostics.sheetReadCells&&large.diagnostics.sheetReadRequests===small.diagnostics.sheetReadRequests,'50k historical rows per table do not grow catalog-only reads');
+ const originalState=state_;state_=()=>{throw Error('Full state must not be rebuilt during incremental save');};
+ const originalRows=rows_;rows_=(sheet,headers)=>{check(!['Entries','Days','Weeks','HabitLogs'].includes(sheet.getName()),'no unrelated archive scan during catalog save');return originalRows(sheet,headers);};
+ let goal,habit,project;
+ try{
+  goal=one(trace('saveGoal',{title:'Obiettivo delta',cycle:'2026-Q4',target:10,progress:0,icon:'book',description:'Descrizione conservata',updatedAt:''}),'goals');
+  const firstGoal=goal;goal=one(trace('saveGoal',{id:goal.id,title:goal.title,cycle:goal.cycle,target:10,progress:1,updatedAt:goal.updatedAt}),'goals');
+  check(goal.icon==='book'&&goal.description==='Descrizione conservata'&&goal.updatedAt>firstGoal.updatedAt,'goal optional fields/version retained');
+  fails(()=>saveGoal({...goal,progress:2,updatedAt:firstGoal.updatedAt,context}),'stale goal rejected');
+  habit=one(trace('saveHabit',{goalId:goal.id,title:'Abitudine delta',days:'0,1,2,3,4,5,6',start:'2026-10-01',steps:'Prima microazione\\nSeconda microazione',description:'Indicazioni conservate',icon:'book',updatedAt:''}),'habits');
+  const firstHabit=habit;habit=one(trace('saveHabit',{id:habit.id,goalId:goal.id,title:habit.title,days:habit.days,start:habit.start,updatedAt:habit.updatedAt}),'habits');
+  check(habit.steps===firstHabit.steps&&habit.description===firstHabit.description&&habit.icon==='book'&&habit.updatedAt>firstHabit.updatedAt,'habit step identity/optional fields/version');
+  fails(()=>saveHabit({...habit,updatedAt:firstHabit.updatedAt,context}),'stale habit rejected');
+  const logBefore=JSON.stringify(mockSheets.HabitLogs.data);
+  const archived=one(trace('deleteHabit',{id:habit.id,updatedAt:habit.updatedAt}),'habits');
+  check(archived.archived==='yes'&&archived.steps===habit.steps&&JSON.stringify(mockSheets.HabitLogs.data)===logBefore,'archive keeps canonical record and logs');
+  fails(()=>deleteHabit({id:habit.id,updatedAt:habit.updatedAt,context}),'stale archive rejected');
+  project=one(trace('saveProject',{name:'Progetto delta',description:'Contesto'}),'projects');
+  const firstProject=project;project=one(trace('saveProject',{slug:project.slug,name:'Progetto rinominato',description:'Contesto aggiornato',updatedAt:project.updatedAt}),'projects');
+  check(project.slug===firstProject.slug&&project.updatedAt>firstProject.updatedAt,'stable slug and new version');
+  fails(()=>saveProject({...project,updatedAt:firstProject.updatedAt,context}),'stale project rejected');
+  fails(()=>saveProject({name:project.name,description:'',context}),'duplicate project rejected');
+  const oldSettings=reflectionSettings_(),settings=trace('saveReflectionSettings',{dailyReflectionMode:'detailed',version:oldSettings.version}).value;
+  check(settings.delta&&settings.commonIncluded===false&&!settings.settings&&settings.settingsPatch.dailyReflectionMode==='detailed'&&settings.settingsPatch.version!==oldSettings.version,'versioned settings patch');
+  check(JSON.stringify(settings.settingsPatch.privateTags)===JSON.stringify(oldSettings.privateTags)&&settings.settingsPatch.privacyVersion===oldSettings.privacyVersion,'privacy settings preserved');
+  fails(()=>saveReflectionSettings({dailyReflectionMode:'essential',version:oldSettings.version,context}),'stale settings rejected');
+ }finally{state_=originalState;rows_=originalRows;}
+ const legacy=saveGoal({...goal,progress:2,updatedAt:goal.updatedAt});check(legacy.goals.some(g=>g.id===goal.id)&&!legacy.commonUpserts,'legacy complete response retained without opt-in');
+ console.log('Catalog deltas: single canonical goal/habit/project/settings, field/step identity, archiving/logs, versions/conflicts, no state rebuild/history reads, legacy and 50k catalog-only scope OK; cells '+large.diagnostics.sheetReadCells);
+}`,ctx);

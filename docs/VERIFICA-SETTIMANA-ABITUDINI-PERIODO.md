@@ -98,7 +98,8 @@ non un indice riutilizzabile di tutti gli intervalli già letti: tornarci può
 richiedere una nuova lettura limitata. I dati degli altri periodi restano in
 memoria nella scheda, senza persistenza applicativa in IndexedDB.
 
-Le viste senza finestra esplicita mantengono il vecchio caricamento completo;
-separare i loro soli cataloghi è un'ottimizzazione ancora possibile. Restano
+Il seguito [cataloghi e delta](VERIFICA-CATALOGHI-DELTA.md) separa ora i
+cataloghi delle viste senza periodo. Il contratto completo resta per i client
+senza opt-in. Restano
 futuri feed, ricerca locale, outbox e coordinamento del worker Docs previsti
 dalla SPEC-004. Nessun server aggiuntivo richiesto.

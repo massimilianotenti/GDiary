@@ -135,3 +135,15 @@ contenuto del diario.
 ## Letture comuni del diario per periodo — sviluppo locale
 
 Il client richiede finestre temporali esplicite e conserva i dati fuori intervallo. Cataloghi e copertura hanno freschezza distinta. Il seguito estende gli scope a Settimana e Abitudini: tracker e giornata hanno copertura indipendente. Il vecchio modulo resta montato e disabilitato fino al completamento della lettura; le risposte precedenti vengono invalidate. Le altre viste conservano il contratto completo. [Verifica del seguito](VERIFICA-SETTIMANA-ABITUDINI-PERIODO.md). Dettagli e limiti nella [verifica dedicata](VERIFICA-DATI-COMUNI-PERIODO.md).
+
+## Cataloghi e delta delle mutazioni comuni — sviluppo locale
+
+Il client usa commonWindow:catalogs nelle viste senza periodo e incrementalCommon:true per ricevere record canonici da saveGoal/saveHabit/deleteHabit/saveProject e settingsPatch da saveReflectionSettings. I delta non rendono fresco un intero catalogo. I client senza opt-in mantengono la risposta completa. [Contratti, verifiche e limiti](VERIFICA-CATALOGHI-DELTA.md).
+
+## Lotto delle riflessioni — sviluppo locale
+
+saveDays condivide dayValues_ con saveDay, legge solo le date richieste e distingue gli esiti per record sotto un solo lock. Il frontend conferma snapshot e conserva le bozze non confermate o successive. [Contratti, verifiche e limiti](VERIFICA-RIFLESSIONI-LOTTO.md).
+
+## Delta di allegati e percorsi legacy — sviluppo locale
+
+addFileLink espone fileUpserts canonici; updateEntry metadataOnly; convertProjectToTag patch dei metadati, rimozione progetto e aggiunta tag. Il client aggiorna solo le voci note, preserva contenuti e bozze e invalida le cache. Opt-in incrementalCommon, fallback completo per chiamanti legacy. [Verifica e limiti](VERIFICA-DELTA-LEGACY.md).

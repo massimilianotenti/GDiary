@@ -1,5 +1,52 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Delta dei percorsi legacy — SPEC-004, solo locale
+
+Con incrementalCommon:true, addFileLink restituisce il solo allegato canonico
+(anche se duplicato), updateEntry i metadati versionati, convertProjectToTag
+le patch dei soli campi mutati con rimozione progetto e tag aggiunti. Nessuna
+ricostruzione state_() dopo queste scritture. Client: merge per identità,
+contenuti/privacy conservati, niente record incompleti per voci non caricate,
+cache invalidate e bozze mantenute con versioni originali. I client senza
+opt-in restano compatibili. Conversione ancora proporzionale ai record coinvolti;
+deleteNote e contesa dei writer Docs non modificati. [Verifica e limiti](VERIFICA-DELTA-LEGACY.md).
+Build, npm test, test:legacy-deltas, test:release, test:tracing e
+test:incremental superati. Index/Demo e sei file di staging rigenerati.
+Nessun deploy o dato reale; ultimo online documentato resta Apps Script 75.
+
+## Riflessioni multigiornata in lotto — SPEC-004, solo locale
+
+Nuova saveDays: fino a 10 date/500.000 byte, una RPC e un lock/flush, letture
+solo delle giornate richieste. Esito per data e upsert dei soli record
+confermati; conflitti e campi invalidi non bloccano le altre giornate.
+Un errore di scrittura inatteso interrompe le successive, senza falsa conferma.
+Salva pagina raggruppa ora le riflessioni: tre giorni una RPC, ventuno 10/10/1.
+Bozze mantenute su errore, conflitto, risposta persa o malformata; nuove modifiche
+durante ACK restano sporche con baseline aggiornata. saveDay singolo invariato.
+Niente atomicità del lotto o idempotenza operationId: un commit senza risposta
+può dare conflitto al retry, conservando la bozza. Dettagli e verifiche in
+[VERIFICA-RIFLESSIONI-LOTTO.md](VERIFICA-RIFLESSIONI-LOTTO.md).
+Build, npm test, test:day-batch, test:release, test:cycle, test:progressive,
+test:tracing, test:incremental e P75 superati. Index/Demo e sei file di staging
+rigenerati. Nessun deploy o accesso ai dati reali; ultimo online resta v75.
+
+## Cataloghi e risposte incrementali — SPEC-004, solo locale
+
+Il frontend richiede delta canonici per obiettivi, abitudini (anche archivio),
+progetti e impostazioni delle riflessioni. Niente state_() dopo queste scritture;
+merge per identità e settingsPatch senza perdere bozze o versioni. Compatibilità
+completa per client senza opt-in. Le viste senza periodo richiedono lo scope
+catalogs senza storico temporale; Impostazioni/Sync omettono anche le voci del
+mese. Restano completi i cataloghi scaduti e altri percorsi legacy; il lotto
+multigiornata delle riflessioni è implementato nel seguito sopra.
+Fixture con 50.000 record storici per tabella: lettura cataloghi invariata a
+28 celle, non una misura della latenza Google. Dettagli e verifiche in
+[VERIFICA-CATALOGHI-DELTA.md](VERIFICA-CATALOGHI-DELTA.md).
+Build, npm test, test:catalog-deltas, test:cycle, test:release,
+test:common-periods, test:common-window, test:incremental, test:tracing e P87
+browser superati. Index/Demo e sei file di staging rigenerati.
+Nessun deploy o dato reale; ultimo online documentato resta Apps Script 75.
+
 ## Settimana e Abitudini per periodo — SPEC-004, solo locale
 
 Estese le finestre alle due viste: Settimana legge il periodo visibile e il
@@ -9,8 +56,8 @@ separate, scope week/date e merge limitato agli intervalli. Durante la lettura
 il vecchio modulo rimane montato e disabilitato; errori ripristinano selezione,
 bozze rich e versioni. Le risposte della vista precedente vengono invalidate.
 Fixture con 50.000 righe storiche per tabella: 126/124 celle contro 1.450.283
-della lettura completa, non una misura della latenza Google. Le viste senza
-finestra esplicita mantengono la compatibilità completa.
+della lettura completa, non una misura della latenza Google. In questa tranche le viste senza
+finestra mantenevano la lettura completa; il seguito sopra introduce catalogs.
 Build, npm test, test:common-periods, test:common-window, test:release,
 test:cycle, test:incremental, test:diary-goals, test:tracing, P85 e P88 superati.
 Dettagli e limiti in

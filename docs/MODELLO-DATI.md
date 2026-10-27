@@ -128,3 +128,15 @@ prima delle mutazioni di Entries/TaskPlans/JournalLayout/TaskDocQueue.
 Nessuna modifica ai fogli. commonSlices espone days/weeks/habitLogs come {from,to,rows}; intervalli inclusivi autorevoli, identità date/week/key. commonScope distingue journal (month,today) da full; commonIncluded:false omette le collezioni. Non interpretare una slice come una collezione completa. Dettagli e limiti nella [verifica dedicata](VERIFICA-DATI-COMUNI-PERIODO.md).
 
 Nel seguito Settimana/Abitudini, le slice accettano `ranges:[{from,to},...]` per unioni di periodi; il merge è autorevole solo nell’unione. Scope aggiunti `{kind:"week",week}` e `{kind:"habits",week,date}`. Nessuno schema nuovo. [Verifica](VERIFICA-SETTIMANA-ABITUDINI-PERIODO.md).
+
+## Delta cataloghi — sviluppo locale
+
+commonUpserts supporta anche goals:id, habits:id e projects:slug. deleteHabit restituisce il record con archived:yes; nessun tombstone o nuovo schema. settingsPatch aggiorna le impostazioni versionate. commonScope:{kind:"catalogs"} non dichiara copertura temporale. [Verifica](VERIFICA-CATALOGHI-DELTA.md).
+
+## saveDays — sviluppo locale
+
+Nessuno schema nuovo. Array days fino a 10 date/500.000 byte; results per data con stati saved/conflict/invalid/error/notAttempted e commonUpserts.days per le sole conferme. Non è un commit atomico né un protocollo operationId. [Verifica](VERIFICA-RIFLESSIONI-LOTTO.md).
+
+## Delta legacy — sviluppo locale
+
+fileUpserts contiene record FILE_HEADERS canonici per ID. entryPatches contiene id/projects/tags/scope/updatedAt delle voci convertite; commonRemovals.projects rimuove slug e addedTags aggiorna il catalogo. Nessuna modifica agli schemi persistiti. [Verifica](VERIFICA-DELTA-LEGACY.md).

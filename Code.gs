@@ -65,7 +65,7 @@ function traceCount_(key,value=1){if(ACTIVE_TRACE)ACTIVE_TRACE.metrics[key]=(ACT
 function traceBytes_(value){let bytes=0;for(let i=0;i<value.length;i++){const c=value.charCodeAt(i);if(c<128)bytes++;else if(c<2048)bytes+=2;else if(c>=0xD800&&c<=0xDBFF&&i+1<value.length&&value.charCodeAt(i+1)>=0xDC00&&value.charCodeAt(i+1)<=0xDFFF){bytes+=4;i++;}else bytes+=3;}return bytes;}
 function traceDistribution_(prefix,count){traceCount_(prefix+(count===1?'1':count<=3?'2to3':count<=9?'4to9':'10plus'));}
 function traceApi(p){
- const handlers={benchmarkJournalCache,getState,getCommonState,getJournalPage,getJournalContents,getEntryDetail,saveJournalPage,saveDay,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
+ const handlers={benchmarkJournalCache,getState,getCommonState,getJournalPage,getJournalContents,getEntryDetail,saveJournalPage,saveDay,saveDays,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
  if(!p||!Object.prototype.hasOwnProperty.call(handlers,p.operation)||!/^[-a-zA-Z0-9]{10,80}$/.test(p.traceId||''))throw Error('Richiesta diagnostica non valida.');
  const previous=ACTIVE_TRACE,start=Date.now(),trace={metrics:{},depth:{},stack:[],accounted:0};
  const diagnostics=()=>{const totalMs=Date.now()-start;return {traceId:p.traceId,totalMs,unaccountedMs:Math.max(0,totalMs-trace.accounted),...trace.metrics};};
@@ -127,9 +127,9 @@ function convertProjectToTag(p){
   ensureEntryTagHeader_(sheet,true);const rows=changes.map(e=>{const found=findRows_(sheet,1,e.id,false);if(found.length!==1)throw new Error('Indice voce non valido.');return {row:found[0],entry:e};}).sort((a,b)=>a.row-b.row),groups=[];
   rows.forEach(item=>{const last=groups[groups.length-1];if(last&&last[last.length-1].row+1===item.row)last.push(item);else groups.push([item]);});
   if(changes.length)taskIndexTouch_(sheet);
-  groups.forEach(group=>{const range=sheet.getRange(group[0].row,5,group.length,10),values=range.getDisplayValues();group.forEach((item,i)=>{const e=item.entry;values[i][0]=e.projects;values[i][4]=new Date(Math.max(Date.now(),Date.parse(e.updatedAt)+1)).toISOString();values[i][6]=e.projects?'project':'personal';values[i][9]=e.tags;});range.setNumberFormat('@').setValues(values.map(r=>r.map(v=>/^[=+\-@']/.test(String(v))?"'"+v:String(v))));});
+  groups.forEach(group=>{const range=sheet.getRange(group[0].row,5,group.length,10),values=range.getDisplayValues();group.forEach((item,i)=>{const e=item.entry;values[i][0]=e.projects;e.updatedAt=new Date(Math.max(Date.now(),Date.parse(e.updatedAt)+1)).toISOString();e.scope=e.projects?'project':'personal';values[i][4]=e.updatedAt;values[i][6]=e.scope;values[i][9]=e.tags;});range.setNumberFormat('@').setValues(values.map(r=>r.map(v=>/^[=+\-@']/.test(String(v))?"'"+v:String(v))));});
   if(plan.project){const projects=db.getSheetByName('Projects'),found=findRows_(projects,1,slug,false);found.sort((a,b)=>b-a).forEach(row=>projects.deleteRow(row));ioInvalidate_(projects);}
-  ENTRY_SMALL_CACHE=null;const result=state_();result.convertedCount=changes.length;return result;
+  ENTRY_SMALL_CACHE=null;if(ACTIVE_CONTEXT.incrementalCommon===true)return {delta:true,entries:[],commonIncluded:false,entryPatches:changes.map(e=>({id:e.id,projects:e.projects,tags:e.tags,updatedAt:e.updatedAt,scope:e.scope})),commonRemovals:{projects:[slug]},addedTags:changes.length?[tag]:[],convertedCount:changes.length};const result=state_();result.convertedCount=changes.length;return result;
  });
 }
 function ensureDayHeaders_(sheet,write=false){verify_(sheet,DAY_HEADERS.slice(0,4));const extra=sheet.getRange(1,5,1,DAY_EXTRA_HEADERS.length).getDisplayValues()[0];for(let i=0;i<extra.length;i++)if(extra[i]!==''&&extra[i]!==DAY_EXTRA_HEADERS[i])throw Error('Colonne di riflessione non valide in Days. Nessun dato modificato.');const present=extra.filter(Boolean).length;if(present!==0&&!(extra.slice(0,7).every((v,i)=>v===DAY_EXTRA_HEADERS[i])&&extra.slice(7).every(v=>v===''))&&!(extra.every((v,i)=>v===DAY_EXTRA_HEADERS[i])))throw Error('Colonne di riflessione parziali in Days. Nessun dato modificato.');if(write&&present!==9)sheet.getRange(1,5,1,DAY_EXTRA_HEADERS.length).setValues([DAY_EXTRA_HEADERS]);}
@@ -140,7 +140,7 @@ function saveReflectionSettings(p){
   if(!p||!['essential','detailed'].includes(p.dailyReflectionMode))throw new Error('Modalità di riflessione non valida.');
   ACTIVE_CONTEXT=p.context||{};
   return locked_(function(){const current=reflectionSettings_();if((p.version||'')!==current.version)throw new Error('Impostazioni modificate altrove. Aggiorna e riprova.');
-    const props=PropertiesService.getScriptProperties();props.setProperty('DAILY_REFLECTION_MODE',p.dailyReflectionMode);props.setProperty('REFLECTION_SETTINGS_VERSION',Utilities.getUuid());return state_();});
+    const props=PropertiesService.getScriptProperties();props.setProperty('DAILY_REFLECTION_MODE',p.dailyReflectionMode);props.setProperty('REFLECTION_SETTINGS_VERSION',Utilities.getUuid());return ACTIVE_CONTEXT.incrementalCommon===true?{delta:true,entries:[],commonIncluded:false,settingsPatch:reflectionSettings_()}:state_();});
 }
 function rows_(sheet, headers) {
   if(sheet.getName()==='Days')ensureDayHeaders_(sheet);else verify_(sheet,headers);
@@ -263,7 +263,7 @@ function state_() {
  const started=Date.now(),db=db_(),today=Utilities.formatDate(new Date(),'Europe/Rome','yyyy-MM-dd');
  const context=ACTIVE_CONTEXT||{}, month=context.month||today.slice(0,7);
  if(!/^\d{4}-\d{2}$/.test(month)||!validDate_(month+'-01'))throw new Error('Mese non valido.');
- let entries=[];if(!['habits','archive','projects','tasks','day','week','tags'].includes(context.view))entries=entrySearch_('date','^'+month+'-');
+ let entries=[];if(!['habits','archive','projects','tasks','day','week','tags','settings','sync'].includes(context.view))entries=entrySearch_('date','^'+month+'-');
  if(context.view==='projects'&&context.project)entries=entrySearch_('projects','(^|,)'+slug_(context.project)+'(,|$)');
  if(context.view==='tasks')entries=entrySearch_('status','^(open|doing)$');
  if(context.view==='day'&&validDate_(context.date||''))entries=entrySearch_('date','^'+context.date+'$');
@@ -280,7 +280,7 @@ function state_() {
  const previewsMs=Date.now()-previewStarted,fileStarted=Date.now(),files=ids.size?objectsSearch_(db.getSheetByName('Files'),FILE_HEADERS,2,pattern):[],filesMs=Date.now()-fileStarted;
  const commonStarted=Date.now();
  const common=(context.commonFresh||context.deferCommon)?{}:{
-    ...(context.commonWindow==='journal'?{commonScope:{kind:'journal',month,today},commonSlices:commonJournalSlices_(db,month,today)}:['week','habits'].includes(context.commonWindow)?commonPeriodState_(db,context,today):{commonScope:{kind:'full'},weeks:rows_(db.getSheetByName('Weeks'),WEEK_HEADERS),days:rows_(db.getSheetByName('Days'),DAY_HEADERS),habitLogs:rows_(db.getSheetByName('HabitLogs'),LOG_HEADERS)}),
+    ...(context.commonWindow==='catalogs'?{commonScope:{kind:'catalogs'}}:context.commonWindow==='journal'?{commonScope:{kind:'journal',month,today},commonSlices:commonJournalSlices_(db,month,today)}:['week','habits'].includes(context.commonWindow)?commonPeriodState_(db,context,today):{commonScope:{kind:'full'},weeks:rows_(db.getSheetByName('Weeks'),WEEK_HEADERS),days:rows_(db.getSheetByName('Days'),DAY_HEADERS),habitLogs:rows_(db.getSheetByName('HabitLogs'),LOG_HEADERS)}),
     ...(context.catalogFresh?{}:{
     projects:cachedRows_(db.getSheetByName('Projects'),PROJECT_HEADERS),
     goals:cachedRows_(db.getSheetByName('Goals'),GOAL_HEADERS),
@@ -290,6 +290,9 @@ function state_() {
  return {today,month,entries,files,...common,settings:reflectionSettings_(),...(allTags?{allTags}:{}),commonIncluded:!(context.commonFresh||context.deferCommon),driveConfigured:!!PropertiesService.getScriptProperties().getProperty('ROOT_ID'),performance:{traceId:context.traceId||'',entriesMs,previewsMs,filesMs,commonMs:Date.now()-commonStarted,totalMs:Date.now()-started}};
 }
 
+function commonRecordResponse_(collection,record){
+ return ACTIVE_CONTEXT.incrementalCommon===true?{delta:true,entries:[],commonIncluded:false,commonUpserts:{[collection]:[record]}}:state_();
+}
 function saveGoalImpl_(p) {
   const title=text_(p.title,200), target=Number(p.target), progress=Number(p.progress);
   if(!title || !/^\d{4}-Q[1-4]$/.test(p.cycle) || !Number.isFinite(target)||target<=0||!Number.isFinite(progress)||progress<0) throw new Error('Obiettivo: titolo, trimestre e valori numerici validi richiesti.');
@@ -304,7 +307,7 @@ function saveHabitImpl_(p) {
     const q=Number(goal.cycle.slice(-1)),year=goal.cycle.slice(0,4),start=year+'-'+String((q-1)*3+1).padStart(2,'0')+'-01';
     const end=new Date(Date.UTC(Number(year),q*3,0,12)).toISOString().slice(0,10);
     if(p.start<start||p.start>end)throw new Error('Inizio azione fuori dal ciclo.');
-    const sheet=db.getSheetByName('Habits');ensureHabitHeaders_(sheet,true);const records=rows_(sheet,HABIT_HEADERS),index=records.findIndex(h=>h.id===p.id),old=index<0?null:records[index];if(p.id&&(!old||old.archived==='yes'||old.updatedAt!==p.updatedAt))throw new Error('Abitudine modificata altrove. Aggiorna e riprova.');const previous=old?habitSteps_(old.steps):[],titles=String(p.steps===undefined?previous.map(s=>s.title).join('\n'):p.steps).split(/\r?\n/).map(s=>s.trim()).filter(Boolean);if(titles.length>30||titles.some(t=>t.length>500))throw new Error('Massimo 30 microazioni, ciascuna di 500 caratteri.');const used=new Set(),steps=titles.map((title,index)=>{const match=previous.find(s=>s.title===title&&!used.has(s.id))||previous[index];const id=match&&!used.has(match.id)?match.id:Utilities.getUuid();used.add(id);return {id,title};});const now=new Date(Math.max(Date.now(),old?Date.parse(old.updatedAt)+1:0)).toISOString(),values=[old?old.id:Utilities.getUuid(),p.goalId,title,days.join(','),p.start,now,JSON.stringify(steps),'',p.icon===undefined?(old?old.icon||'':''):iconValue_(p.icon),p.description===undefined?(old?old.description||'':''):text_(p.description,6000)];if(old)writeRow_(sheet,index+2,values);else append_(sheet,[values]);return state_();
+    const sheet=db.getSheetByName('Habits');ensureHabitHeaders_(sheet,true);const records=rows_(sheet,HABIT_HEADERS),index=records.findIndex(h=>h.id===p.id),old=index<0?null:records[index];if(p.id&&(!old||old.archived==='yes'||old.updatedAt!==p.updatedAt))throw new Error('Abitudine modificata altrove. Aggiorna e riprova.');const previous=old?habitSteps_(old.steps):[],titles=String(p.steps===undefined?previous.map(s=>s.title).join('\n'):p.steps).split(/\r?\n/).map(s=>s.trim()).filter(Boolean);if(titles.length>30||titles.some(t=>t.length>500))throw new Error('Massimo 30 microazioni, ciascuna di 500 caratteri.');const used=new Set(),steps=titles.map((title,index)=>{const match=previous.find(s=>s.title===title&&!used.has(s.id))||previous[index];const id=match&&!used.has(match.id)?match.id:Utilities.getUuid();used.add(id);return {id,title};});const now=new Date(Math.max(Date.now(),old?Date.parse(old.updatedAt)+1:0)).toISOString(),values=[old?old.id:Utilities.getUuid(),p.goalId,title,days.join(','),p.start,now,JSON.stringify(steps),'',p.icon===undefined?(old?old.icon||'':''):iconValue_(p.icon),p.description===undefined?(old?old.description||'':''):text_(p.description,6000)];if(old)writeRow_(sheet,index+2,values);else append_(sheet,[values]);return commonRecordResponse_('habits',Object.fromEntries(HABIT_HEADERS.map((h,i)=>[h,values[i]])));
   });
 }
 function setHabitLogImpl_(p) {
@@ -357,8 +360,12 @@ function saveProjectImpl_(payload) {
   if (description.length>4000) throw new Error('Descrizione troppo lunga.');
   return locked_(function() {
     const sheet=db_().getSheetByName('Projects');
-    const records=rows_(sheet,PROJECT_HEADERS),existing=records.find(p=>p.slug===slug);if(records.some(p=>p.slug!==slug&&p.name.toLowerCase()===name.toLowerCase()))throw new Error('Un altro progetto ha già questo nome.');if(existing){if(!payload.slug)throw new Error('Questo progetto esiste già.');if(existing.updatedAt!==payload.updatedAt)throw new Error('Progetto modificato altrove. Aggiorna e riprova.');writeRow_(sheet,records.indexOf(existing)+2,[slug,name,description,new Date(Math.max(Date.now(),Date.parse(existing.updatedAt)+1)).toISOString()]);}else append_(sheet,[[slug,name,description,new Date().toISOString()]]);
-    return state_();
+    const records=rows_(sheet,PROJECT_HEADERS),existing=records.find(p=>p.slug===slug);
+    if(records.some(p=>p.slug!==slug&&p.name.toLowerCase()===name.toLowerCase()))throw new Error('Un altro progetto ha già questo nome.');
+    if(existing){if(!payload.slug)throw new Error('Questo progetto esiste già.');if(existing.updatedAt!==payload.updatedAt)throw new Error('Progetto modificato altrove. Aggiorna e riprova.');}
+    const updatedAt=new Date(Math.max(Date.now(),existing?Date.parse(existing.updatedAt)+1:0)).toISOString(),values=[slug,name,description,updatedAt];
+    if(existing)writeRow_(sheet,records.indexOf(existing)+2,values);else append_(sheet,[values]);
+    return commonRecordResponse_('projects',{slug,name,description,updatedAt});
   });
 }
 function setTaskStatusImpl_(payload) {
@@ -401,7 +408,7 @@ function updateEntryImpl_(payload) {
     if(text!==e.text||projects!==e.projects||payload.date!==e.date||payload.scope!==e.scope)throw new Error('In questa versione data, titolo e collocazione della sezione sono fissi. Crea una nuova voce per cambiare.');
     if(body)throw new Error('Scrivi gli appunti nel Google Doc originale.');
     Object.assign(e,{text,body:'',projects,date:payload.date,due:payload.due||'',scope:payload.scope,updatedAt:new Date(Math.max(Date.now(),Date.parse(e.updatedAt)+1)).toISOString()});
-    writeRow_(sheet,index+2,ENTRY_HEADERS.map(h=>e[h]||''));return state_();
+    writeRow_(sheet,index+2,ENTRY_HEADERS.map(h=>e[h]||''));if(ACTIVE_CONTEXT.incrementalCommon===true){attachSchedules_([e]);return {delta:true,metadataOnly:true,preserveDetailId:e.id,entries:[e],commonIncluded:false};}return state_();
   });
 }
 function addFileLinkImpl_(payload) {
@@ -414,9 +421,10 @@ function addFileLinkImpl_(payload) {
     const db=db_();
     if(!findRows_(db.getSheetByName('Entries'),1,payload.entryId,false).length) throw new Error('Voce non trovata.');
     const sheet=db.getSheetByName('Files');
-    if(!rows_(sheet,FILE_HEADERS).some(f=>f.entryId===payload.entryId&&f.fileId===match[1]))
-      append_(sheet,[[Utilities.getUuid(),payload.entryId,match[1],title,url,new Date().toISOString()]]);
-    return state_();
+    const existing=rows_(sheet,FILE_HEADERS).find(f=>f.entryId===payload.entryId&&f.fileId===match[1]);
+    const file=existing||{id:Utilities.getUuid(),entryId:payload.entryId,fileId:match[1],title,url,addedAt:new Date().toISOString()};
+    if(!existing)append_(sheet,[FILE_HEADERS.map(h=>file[h])]);
+    return ACTIVE_CONTEXT.incrementalCommon===true?{delta:true,entries:[],commonIncluded:false,fileUpserts:[file]}:state_();
   });
 }
 function monday_(date) {
@@ -432,12 +440,43 @@ function saveWeekImpl_(payload) {
   Object.assign(values,{energy:payload.energy,closed:payload.closed});
   return saveRecord_('Weeks',WEEK_HEADERS,'week',values,payload.updatedAt);
 }
-function saveDayImpl_(payload) {
+function dayValues_(payload) {
   if (!payload || !validDate_(payload.date)) throw new Error('Data non valida.');
   const values={date:payload.date};
   ['intention','reflection',...DAY_EXTRA_HEADERS.filter(k=>!k.endsWith('Rich'))].forEach(k=>{if(Object.prototype.hasOwnProperty.call(payload,k))values[k]=text_(payload[k],6000);});
   for(const field of ['intention','reflection'])if(Object.prototype.hasOwnProperty.call(payload,field)){const key=field+'Rich';values[key]='';if(payload[key]!==undefined){const raw=String(payload[field]||'').replace(/\r\n?/g,'\n'),rich=validateRich_(payload[key],raw);const serial=JSON.stringify(rich);if(serial.length>45000)throw Error('Formattazione della riflessione troppo estesa.');values[key]=serial;}}
-  return saveRecord_('Days',DAY_HEADERS,'date',values,payload.updatedAt);
+  return values;
+}
+function saveDayImpl_(payload){return saveRecord_('Days',DAY_HEADERS,'date',dayValues_(payload),payload.updatedAt);}
+// Bounded, best-effort batch. Only an explicit saved result acknowledges a day.
+function saveDays(p){
+ ACTIVE_CONTEXT=p&&p.context||{};
+ if(!p||!Array.isArray(p.days)||!p.days.length||p.days.length>10||traceBytes_(JSON.stringify(p.days))>500000)throw Error('Lotto giornate non valido o troppo grande.');
+ const dates=p.days.map(item=>item&&item.date);
+ if(dates.some(date=>!validDate_(date))||new Set(dates).size!==dates.length)throw Error('Date delle giornate non valide o duplicate.');
+ const prepared=p.days.map(item=>{try{return {date:item.date,version:item.updatedAt||'',values:dayValues_(item)};}catch(error){return {date:item.date,status:'invalid',error:'Campi della giornata non validi.'};}});
+ return locked_(function(){
+  const sheet=db_().getSheetByName('Days');ensureDayHeaders_(sheet);
+  const found=findRows_(sheet,1,'^('+dates.join('|')+')$',true).sort((a,b)=>a-b),groups=[],records=new Map();
+  found.forEach(row=>{const last=groups[groups.length-1];if(last&&row===last.end+1&&last.end-last.start<255)last.end=row;else groups.push({start:row,end:row});});
+  groups.forEach(group=>readSheetValues_(sheet.getRange(group.start,1,group.end-group.start+1,DAY_HEADERS.length)).forEach((values,i)=>{const record=Object.fromEntries(DAY_HEADERS.map((h,j)=>[h,values[j]])),old=records.get(record.date);records.set(record.date,old?{duplicate:true}:{row:group.start+i,record});}));
+  const results=[],saved=[];let stopped=false,headersReady=false;
+  prepared.forEach(item=>{
+   if(item.status){results.push({date:item.date,status:item.status,error:item.error});return;}
+   if(stopped){results.push({date:item.date,status:'notAttempted',error:'Invio interrotto. Riprova.'});return;}
+   const existing=records.get(item.date);
+   if(existing?.duplicate||(existing?.record.updatedAt||'')!==item.version){results.push({date:item.date,status:'conflict',error:'Giornata modificata altrove. Conserva la bozza e aggiorna.'});return;}
+   try{
+    const record={...(existing?.record||Object.fromEntries(DAY_HEADERS.map(h=>[h,'']))),...item.values};
+    record.updatedAt=new Date(Math.max(Date.now(),existing?Date.parse(existing.record.updatedAt)+1:0)).toISOString();
+    if(!headersReady){ensureDayHeaders_(sheet,true);headersReady=true;}
+    const values=DAY_HEADERS.map(h=>record[h]||'');
+    if(existing)writeRow_(sheet,existing.row,values);else append_(sheet,[values]);
+    saved.push(record);results.push({date:item.date,status:'saved'});
+   }catch(error){stopped=true;results.push({date:item.date,status:'error',error:'Salvataggio non confermato. La bozza deve essere conservata.'});}
+  });
+  return {delta:true,entries:[],commonIncluded:false,commonUpserts:{days:saved},results,errors:results.filter(r=>r.status!=='saved').map(r=>({date:r.date,status:r.status,error:r.error}))};
+ });
 }
 function saveRecord_(name,headers,key,values,version) {
   return locked_(function(){
@@ -448,6 +487,7 @@ function saveRecord_(name,headers,key,values,version) {
     if(name==='Days'){ensureDayHeaders_(sheet,true);values={...(existing||{}),...values};}
     values.updatedAt=new Date(Math.max(Date.now(),existing?Date.parse(existing.updatedAt)+1:0)).toISOString();
     if(index<0) append_(sheet,[headers.map(h=>values[h]||'')]);else writeRow_(sheet,index+2,headers.map(h=>values[h]||''));
+    if(name==='Goals')return commonRecordResponse_('goals',Object.fromEntries(headers.map(h=>[h,values[h]||''])));
     if(name==='Days'||name==='Weeks'){const updated=Object.fromEntries(headers.map(h=>[h,values[h]||''])),k=name==='Days'?'days':'weeks';return {delta:true,entries:[],commonUpserts:{[k]:[updated]},commonIncluded:false};}
     return state_();
   });
@@ -482,7 +522,7 @@ function getAppChangelog(){return {text:HtmlService.createHtmlOutputFromFile('Ch
 function ensureHabitHeaders_(sheet,write=false){const headers=sheet.getName()==='Habits'?HABIT_HEADERS:LOG_HEADERS,base=sheet.getName()==='Habits'?6:5,h=sheet.getRange(1,1,1,headers.length).getDisplayValues()[0];if(JSON.stringify(h.slice(0,base))!==JSON.stringify(headers.slice(0,base)))throw new Error('Intestazioni abitudini non valide.');for(let k=base;k<headers.length;k++)if(h[k]&&h[k]!==headers[k])throw new Error('Colonne abitudini occupate. Nessun dato modificato.');if(write&&h.slice(base).some(v=>!v))sheet.getRange(1,base+1,1,headers.length-base).setValues([headers.slice(base)]);}
 function habitSteps_(value){if(!value)return [];const steps=JSON.parse(value);if(!Array.isArray(steps))throw new Error('Microazioni non valide.');return steps;}
 function habitChecklist_(value){return value?JSON.parse(value):null;}
-function deleteHabit(p){ACTIVE_CONTEXT=p.context||{};return locked_(function(){const sheet=db_().getSheetByName('Habits'),records=rows_(sheet,HABIT_HEADERS),i=records.findIndex(h=>h.id===p.id);if(i<0||records[i].updatedAt!==p.updatedAt)throw new Error('Abitudine modificata altrove.');ensureHabitHeaders_(sheet,true);const h=records[i];h.archived='yes';h.updatedAt=new Date(Math.max(Date.now(),Date.parse(h.updatedAt)+1)).toISOString();writeRow_(sheet,i+2,HABIT_HEADERS.map(k=>h[k]||''));return state_();});}
+function deleteHabit(p){ACTIVE_CONTEXT=p.context||{};return locked_(function(){const sheet=db_().getSheetByName('Habits'),records=rows_(sheet,HABIT_HEADERS),i=records.findIndex(h=>h.id===p.id);if(i<0||records[i].updatedAt!==p.updatedAt)throw new Error('Abitudine modificata altrove.');ensureHabitHeaders_(sheet,true);const h=records[i];h.archived='yes';h.updatedAt=new Date(Math.max(Date.now(),Date.parse(h.updatedAt)+1)).toISOString();writeRow_(sheet,i+2,HABIT_HEADERS.map(k=>h[k]||''));return commonRecordResponse_('habits',h);});}
 
 const APP_ICONS=['🎯','🌱','❤️','🧠','💪','📚','💼','🧘','☀️','⭐','🏠','🤝','💰','🛡️','🔥'];
 function iconValue_(value){if(value!==''&&value!=='none'&&!APP_ICONS.includes(value)&&!OUTLINE_ICON_IDS.includes(value))throw new Error('Icona non valida.');return value;}

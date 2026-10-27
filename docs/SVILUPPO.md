@@ -60,3 +60,9 @@ tempi delle normali operazioni. L'export conserva solo le ultime 200 misure.
 Eseguire npm run test:common-window e test:release. Il primo confronta payload con 50.000 record fuori periodo e controlla copertura, fallback e risposte obsolete nel browser. Dettagli e limiti nella [verifica dedicata](VERIFICA-DATI-COMUNI-PERIODO.md).
 
 Per le finestre di Settimana e Abitudini eseguire anche `npm run test:common-periods`, `test:cycle`, P85 e P88: attese, errori, bozze e versioni sono descritti nella [verifica del seguito](VERIFICA-SETTIMANA-ABITUDINI-PERIODO.md).
+
+Per cataloghi e salvataggi incrementali eseguire `npm run test:catalog-deltas`, `test:cycle`, `test:release` e P87 browser. [Rapporto e contratti](VERIFICA-CATALOGHI-DELTA.md).
+
+Per i lotti delle riflessioni eseguire `npm run test:day-batch`, `test:release` e P75. [Contratto, fault injection e limiti](VERIFICA-RIFLESSIONI-LOTTO.md).
+
+Per allegati, conversione e aggiornamento legacy: `npm run test:legacy-deltas`, `test:release`, `test:tracing` e `test:incremental`. [Rapporto](VERIFICA-DELTA-LEGACY.md).
