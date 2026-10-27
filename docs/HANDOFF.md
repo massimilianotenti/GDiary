@@ -1,5 +1,22 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Ricerca senza lock lungo — SPEC-004 fase 1A, solo locale
+
+searchArchive ora legge fuori dal lock globale, con tre controlli brevi
+tryLock(0) di configurazione/revisione e senza flush. Nuova SEARCH_REVISION
+prima delle mutazioni pertinenti, una volta per richiesta IO; mappe di refs,
+allegati e pending. Precedenza del pending mantenuta. Controlli live di
+revisione/archivio/cestino prima e dopo i Docs. Writer concorrenti invalidano
+il lotto; continuazioni legate a scope/query/revisione. UI scarta tutte le
+pagine al reset e propone retry, senza pubblicare pagine incomplete nello
+stato canonico. Errori Docs segnalati come ricerca parziale.
+[Contratti, prove e limiti](VERIFICA-RICERCA-SENZA-LOCK-LUNGO.md).
+Build, npm test, test:search-concurrency, test:release, test:tracing,
+test:delete-delta, test:progressive, test:task-index, test:locks e test:scale superati.
+Index/Demo e sei file di staging rigenerati; mock con revisioni file.
+Il worker mantiene il proprio lock lungo; il browser attende ancora la ricerca.
+Nessun deploy o dato reale; ultimo online documentato resta Apps Script 75.
+
 ## Cancellazione con delta — SPEC-004, solo locale
 
 Con incrementalCommon:true, deleteNote risponde con deletedEntryIds e

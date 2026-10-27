@@ -91,3 +91,7 @@ esportabile, pulizia e richiesta di conservazione separata. La prova non
 memorizza contenuti del diario e non cambia il salvataggio applicativo.
 Il flag numerico `metadataOnly` distingue letture/navigazione dell'elenco
 Task da quelle complete; `getJournalContents` misura le letture differite.
+
+## Ricerca archivio concorrente — sviluppo locale SPEC-004
+
+La ricerca verifica la revisione dei lotti e delle fonti Docs senza mantenere il lock globale durante le letture remote. Se l’archivio cambia o non è verificabile, i risultati accumulati vengono scartati e compare «Riprova ricerca». Documenti non verificati producono risultati esplicitamente parziali. Il browser continua ad attendere il ciclo di ricerca; non è ricerca locale. [Verifica e limiti](VERIFICA-RICERCA-SENZA-LOCK-LUNGO.md).

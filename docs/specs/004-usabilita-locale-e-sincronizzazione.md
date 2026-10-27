@@ -1,6 +1,6 @@
 # SPEC-004 — Usabilità, dati locali e sincronizzazione incrementale
 
-**Stato:** Approvata per avvio sviluppo — fase 0 parziale, Entries raggruppate, Task con corpi differiti e fotografia delle continuazioni e dati comuni per periodo, scope cataloghi, delta comuni/legacy/cancellazione e lotto delle riflessioni implementati localmente; resto del piano da realizzare.
+**Stato:** Approvata per avvio sviluppo — fase 0 parziale, fase 1A locale, Entries raggruppate, Task con corpi differiti e fotografia delle continuazioni e dati comuni per periodo, scope cataloghi, delta comuni/legacy/cancellazione e lotto delle riflessioni implementati localmente; resto del piano da realizzare.
 
 **Data:** 27 ottobre 2026.
 
@@ -113,6 +113,8 @@ La prova autenticata resta distinta dai test locali e dal deploy applicativo.
 ## 6. Fase 1 — Contesa e worker Docs
 
 ### 1A. Ricerca senza lock lungo
+
+Implementata localmente con revisione, controlli live Docs e reset delle continuazioni: [verifica](../VERIFICA-RICERCA-SENZA-LOCK-LUNGO.md). Restano i limiti di scansione e dei writer precedenti descritti nel rapporto.
 
 Separare le letture della ricerca dalla sezione critica. Non basta togliere
 `locked_`: acquisire una fotografia versionata e rilevare modifiche concorrenti

@@ -126,9 +126,9 @@ function convertProjectToTag(p){
   const db=db_(),sheet=db.getSheetByName('Entries'),changes=plan.entries.map(e=>({...e,projects:e.projects.split(',').filter(s=>s!==slug).join(','),tags:normaliseTags_((e.tags?e.tags+',':'')+tag)}));
   ensureEntryTagHeader_(sheet,true);const rows=changes.map(e=>{const found=findRows_(sheet,1,e.id,false);if(found.length!==1)throw new Error('Indice voce non valido.');return {row:found[0],entry:e};}).sort((a,b)=>a.row-b.row),groups=[];
   rows.forEach(item=>{const last=groups[groups.length-1];if(last&&last[last.length-1].row+1===item.row)last.push(item);else groups.push([item]);});
-  if(changes.length)taskIndexTouch_(sheet);
+  if(changes.length){searchTouch_(sheet);taskIndexTouch_(sheet);}
   groups.forEach(group=>{const range=sheet.getRange(group[0].row,5,group.length,10),values=range.getDisplayValues();group.forEach((item,i)=>{const e=item.entry;values[i][0]=e.projects;e.updatedAt=new Date(Math.max(Date.now(),Date.parse(e.updatedAt)+1)).toISOString();e.scope=e.projects?'project':'personal';values[i][4]=e.updatedAt;values[i][6]=e.scope;values[i][9]=e.tags;});range.setNumberFormat('@').setValues(values.map(r=>r.map(v=>/^[=+\-@']/.test(String(v))?"'"+v:String(v))));});
-  if(plan.project){const projects=db.getSheetByName('Projects'),found=findRows_(projects,1,slug,false);found.sort((a,b)=>b-a).forEach(row=>projects.deleteRow(row));ioInvalidate_(projects);}
+  if(plan.project){const projects=db.getSheetByName('Projects');searchTouch_(projects);const found=findRows_(projects,1,slug,false);found.sort((a,b)=>b-a).forEach(row=>projects.deleteRow(row));ioInvalidate_(projects);}
   ENTRY_SMALL_CACHE=null;if(ACTIVE_CONTEXT.incrementalCommon===true)return {delta:true,entries:[],commonIncluded:false,entryPatches:changes.map(e=>({id:e.id,projects:e.projects,tags:e.tags,updatedAt:e.updatedAt,scope:e.scope})),commonRemovals:{projects:[slug]},addedTags:changes.length?[tag]:[],convertedCount:changes.length};const result=state_();result.convertedCount=changes.length;return result;
  });
 }
@@ -175,7 +175,7 @@ function cachedRows_(sheet, headers) {
 function append_(sheet, rows) {return traceMeasure_('sheets',()=>{
   const cached=IO.tables&&IO.tables.get(sheet.getName());
   if (!rows.length) return;
-  taskIndexTouch_(sheet);
+  searchTouch_(sheet);taskIndexTouch_(sheet);
   if(sheet.getName()==='Entries')ensureEntryTagHeader_(sheet,true);
   const range = sheet.getRange(sheet.getLastRow()+1,1,rows.length,rows[0].length);
   range.setNumberFormat('@');

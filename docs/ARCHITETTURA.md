@@ -151,3 +151,7 @@ addFileLink espone fileUpserts canonici; updateEntry metadataOnly; convertProjec
 ## Cancellazione con delta — sviluppo locale
 
 deleteNote espone deletedEntryIds e alreadyAbsent con incrementalCommon; il client rimuove riferimenti in memoria e invalida sessioni/cursori, preservando gli oggetti bozza. Controlli e lock Docs restano invariati. [Verifica e limiti](VERIFICA-CANCELLAZIONE-DELTA.md).
+
+## Ricerca con revisione applicativa — sviluppo locale
+
+searchArchive legge metadati e Docs fuori dal lock, verificando SEARCH_REVISION con sonde brevi tryLock(0). I writer pertinenti avanzano la revisione prima delle mutazioni. searchVersion lega le continuazioni a archivio/query/revisione; reset e fonti Docs non verificate non sono ricerche complete. [Contratti e limiti](VERIFICA-RICERCA-SENZA-LOCK-LUNGO.md).

@@ -144,3 +144,7 @@ fileUpserts contiene record FILE_HEADERS canonici per ID. entryPatches contiene 
 ## Delta di cancellazione — sviluppo locale
 
 deletedEntryIds indica le identità assenti dopo deleteNote; alreadyAbsent distingue il ramo già assente. Nessuna tabella tombstone o ricevuta operationId aggiunta. Contratto completo legacy preservato. [Verifica](VERIFICA-CANCELLAZIONE-DELTA.md).
+
+## Revisione della ricerca — sviluppo locale
+
+Nuova ScriptProperty runtime SEARCH_REVISION, avanzata una volta per richiesta per Entries/DocRefs/Files/Projects/TaskDocQueue/DocContent. Nessun foglio nuovo. searchVersion è uno scope interno con query/revisione/configurazione; searchReset richiede ripartenza e partial indica fonti non verificate. Non è un feed né un namespace IndexedDB. [Verifica](VERIFICA-RICERCA-SENZA-LOCK-LUNGO.md).

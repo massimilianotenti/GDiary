@@ -68,3 +68,5 @@ Per i lotti delle riflessioni eseguire `npm run test:day-batch`, `test:release` 
 Per allegati, conversione e aggiornamento legacy: `npm run test:legacy-deltas`, `test:release`, `test:tracing` e `test:incremental`. [Rapporto](VERIFICA-DELTA-LEGACY.md).
 
 Per la cancellazione incrementale: `npm run test:delete-delta`, `test:release` e `test:progressive`; copre anche la risposta persa dopo eliminazione e la pagina precedente in volo. [Rapporto](VERIFICA-CANCELLAZIONE-DELTA.md).
+
+Ricerca e contesa: `npm run test:search-concurrency`, `test:locks`, `test:tracing` e `test:release`. Il mock ora simula revisioni Drive a ogni saveAndClose. [Verifica, protocollo e limiti](VERIFICA-RICERCA-SENZA-LOCK-LUNGO.md).

@@ -200,15 +200,59 @@ function saveNoteText(p) {
 function planTask(p){
  ACTIVE_CONTEXT=p.context||{};return locked_(function(){if(!validDate_(p.date||''))throw new Error('Giorno programmato non valido.');const sheet=db_().getSheetByName('Entries'),found=findRows_(sheet,1,p.id,false);if(!found.length)throw new Error('Task non trovato.');const e=readEntry_(found[0]);if(e.type!=='task'||e.updatedAt!==p.updatedAt)throw new Error('Task cambiato: aggiorna prima di programmarlo.');const plans=db_().getSheetByName('TaskPlans');ensurePlanHeaders_(plans,true);const rows=findRows_(plans,1,p.id,false),values=[p.id,p.date,new Date().toISOString(),'','',taskImportance_(rows.length?rows_(plans,PLAN_HEADERS).find(v=>v.entryId===p.id).importance:'')];if(rows.length)writeRow_(plans,rows[0],PLAN_HEADERS.map((h,i)=>values[i]));else append_(plans,[values]);e.updatedAt=new Date(Math.max(Date.now(),Date.parse(e.updatedAt)+1)).toISOString();ioInvalidate_(sheet);sheet.getRange(found[0],9).setValues([[e.updatedAt]]);attachSchedules_([e]);return {delta:true,metadataOnly:true,entries:[e],commonPatch:{taskPlans:rows_(plans,PLAN_HEADERS)},commonIncluded:false};});
 }
-function searchArchive(p){
- return locked_(function(){const q=String(p.query||'').trim().toLowerCase();if(q.length<2||q.length>200)throw new Error('Scrivi da 2 a 200 caratteri.');
- const refs=rows_(db_().getSheetByName('DocRefs'),REF_HEADERS),docIds=Array.from(new Set(refs.map(r=>r.docId))).sort(),cursor=Math.max(0,Number(p.cursor)||0),batch=docIds.slice(cursor,cursor+5),docs={},errors=[];
- batch.forEach(id=>{try{const file=traceMeasure_('drive',()=>DriveApp.getFileById(id));inside_(file);if(file.isTrashed())throw new Error('Documento nel cestino.');docs[id]=traceMeasure_('docsOpen',()=>DocumentApp.openById(id)).getBody().getText();}catch(e){errors.push({docId:id,message:e.message||String(e)});}});
- const all=entrySearch_('date','.'),files=rows_(db_().getSheetByName('Files'),FILE_HEADERS),results=[];
- all.forEach(e=>{const r=refs.find(r=>r.entryId===e.id),metadata=cursor===0&&[e.text,e.projects,e.tags||'',e.date,...files.filter(f=>f.entryId===e.id).map(f=>f.title)].join(' ').toLowerCase().includes(q);let body='',match=false;const pending=queuedTask_(e.id);if(pending&&cursor===0){try{const content=docContent_(e.id);body=content?content.body:'';match=body.toLowerCase().includes(q);}catch(err){errors.push({entryId:e.id,message:err.message});}}if(!pending&&r&&docs[r.docId]!==undefined){try{body=sectionText_(r,docs);match=body.toLowerCase().includes(q);}catch(err){errors.push({entryId:e.id,message:err.message});}}if(metadata||match){const pos=body.toLowerCase().indexOf(q);results.push({...e,excerpt:body.slice(Math.max(0,pos-60),Math.max(0,pos-60)+220),docName:r&&r.docName,docUrl:r?'https://docs.google.com/document/d/'+r.docId+'/edit#bookmark='+r.bookmark:''});}});
- return {entries:results,files:cursor===0?files:[],projects:cursor===0?rows_(db_().getSheetByName('Projects'),PROJECT_HEADERS).filter(x=>(x.name+' '+x.description).toLowerCase().includes(q)):[],nextCursor:cursor+batch.length,totalDocs:docIds.length,done:cursor+batch.length>=docIds.length,errors};
- });
+// Search uses optimistic application revisions, never the long write lock.
+function searchTouch_(sheet){
+ if(!sheet||IO.searchTouched||!['Entries','DocRefs','Files','Projects','TaskDocQueue','DocContent'].includes(sheet.getName()))return;
+ traceMeasure_('searchRevision',()=>PropertiesService.getScriptProperties().setProperty('SEARCH_REVISION',Utilities.getUuid()));IO.searchTouched=true;traceCount_('searchInvalidations');
 }
+function searchStamp_(query){return traceMeasure_('searchCheck',()=>{
+ if(APP_LOCK_DEPTH)return null;let lock,held=false,stamp=null;
+ try{lock=LockService.getScriptLock();traceCount_('searchLockAttempts');held=lock.tryLock(0);if(!held){traceCount_('searchLockBusy');return null;}
+  stamp=traceMeasure_('searchStampLock',()=>{const values=PropertiesService.getScriptProperties().getProperties();return values.DB_ID?JSON.stringify([values.DB_ID,values.ROOT_ID||'',values.SEARCH_REVISION||'0',query]):null;});
+ }catch(ignore){traceCount_('searchCheckErrors');}finally{if(held)try{lock.releaseLock();}catch(ignore){stamp=null;traceCount_('searchCheckErrors');}}
+ return stamp;
+});}
+function searchReset_(reason,cursor){traceCount_('searchResets');return {entries:[],files:[],projects:[],nextCursor:cursor,totalDocs:0,done:true,partial:true,searchReset:reason,errors:[{code:reason,message:'Archivio cambiato o occupato. Ripeti la ricerca.'}]};}
+function searchArchive(p){
+ ACTIVE_CONTEXT=p&&p.context||{};
+ const q=String(p&&p.query||'').trim().toLowerCase(),cursor=p&&p.cursor===undefined?0:Number(p&&p.cursor);
+ if(q.length<2||q.length>200||!Number.isInteger(cursor)||cursor<0)throw Error('Ricerca o cursore non validi.');
+ const stamp=searchStamp_(q);if(!stamp)return searchReset_('busy',cursor);
+ if((cursor>0&&!p.searchVersion)||(p.searchVersion&&p.searchVersion!==stamp))return searchReset_('changed',cursor);
+ DB_HANDLE=null;ENTRY_SMALL_CACHE=null;ENTRY_TAG_HEADER_CHECKED=false;ENTRY_TAG_HEADER_WRITTEN=false;ioReset_();
+ const db=db_(),refs=rows_(db.getSheetByName('DocRefs'),REF_HEADERS),docIds=[...new Set(refs.map(r=>r.docId))].sort();
+ if(cursor>docIds.length)return searchReset_('changed',cursor);
+ const batch=docIds.slice(cursor,cursor+5),docs={},errors=[],all=entrySearch_('date','.'),files=rows_(db.getSheetByName('Files'),FILE_HEADERS);
+ const refMap=new Map(),fileMap=new Map(),queue=taskDocQueue_(),pending=new Set(queue?rows_(queue,TASK_DOC_HEADERS).filter(r=>r.status!=='done').map(r=>r.entryId):[]);
+ refs.forEach(r=>{if(!refMap.has(r.entryId))refMap.set(r.entryId,r);});
+ files.forEach(f=>{if(!fileMap.has(f.entryId))fileMap.set(f.entryId,[]);fileMap.get(f.entryId).push(f);});
+ const projects=cursor===0?rows_(db.getSheetByName('Projects'),PROJECT_HEADERS).filter(x=>(x.name+' '+x.description).toLowerCase().includes(q)):[];
+ if(searchStamp_(q)!==stamp)return searchReset_('changed',cursor);
+ const neededDocs=new Set(all.filter(e=>!pending.has(e.id)).map(e=>refMap.get(e.id)?.docId).filter(Boolean));
+ batch.forEach(id=>{
+  if(!neededDocs.has(id))return;
+  try{
+   const file=traceMeasure_('drive',()=>DriveApp.getFileById(id));inside_(file);if(file.isTrashed())throw Error('Documento non disponibile.');
+   const before=String(file.getLastUpdated().getTime());if(!/^\d+$/.test(before))throw Error('Revisione non disponibile.');
+   const text=traceMeasure_('docsOpen',()=>DocumentApp.openById(id)).getBody().getText();
+   // Re-read live ancestry/trash and revision instead of reusing the first check.
+   IO.inside=new Set();IO.root=null;const after=traceMeasure_('drive',()=>DriveApp.getFileById(id));inside_(after);
+   if(after.isTrashed()||String(after.getLastUpdated().getTime())!==before)throw Error('Documento cambiato.');
+   docs[id]=text;
+  }catch(ignore){errors.push({docId:id,message:'Documento non leggibile o cambiato durante la ricerca.'});}
+ });
+ const results=[];
+ all.forEach(e=>{
+  const r=refMap.get(e.id),metadata=cursor===0&&[e.text,e.projects,e.tags||'',e.date,...(fileMap.get(e.id)||[]).map(f=>f.title)].join(' ').toLowerCase().includes(q);
+  let body='',match=false;
+  if(pending.has(e.id)&&cursor===0){try{const content=docContent_(e.id);if(!content)throw Error('Contenuto mancante.');body=content.body;match=body.toLowerCase().includes(q);}catch(ignore){errors.push({entryId:e.id,message:'Contenuto in attesa non leggibile.'});}}
+  if(!pending.has(e.id)&&r&&docs[r.docId]!==undefined){try{const text=docs[r.docId],start='[BJ:'+e.id+']',end='[END:'+e.id+']',a=text.indexOf(start),b=text.indexOf(end,a+start.length);if(a<0||b<0)throw Error('Marcatori mancanti.');body=text.slice(a+start.length,b).trim();match=body.toLowerCase().includes(q);}catch(ignore){errors.push({entryId:e.id,message:'Sezione non leggibile.'});}}
+  if(metadata||match){const pos=body.toLowerCase().indexOf(q);results.push({...e,excerpt:body.slice(Math.max(0,pos-60),Math.max(0,pos-60)+220),docName:r&&r.docName,docUrl:r?'https://docs.google.com/document/d/'+r.docId+'/edit#bookmark='+r.bookmark:''});}
+ });
+ if(searchStamp_(q)!==stamp)return searchReset_('changed',cursor);
+ return {entries:results,files:cursor===0?files:[],projects,nextCursor:cursor+batch.length,totalDocs:docIds.length,done:cursor+batch.length>=docIds.length,errors,partial:errors.length>0,searchVersion:stamp};
+}
+
 function getJournalPreviews(p){return locked_(function(){const docs={},result=[],refs=rows_(db_().getSheetByName('DocRefs'),REF_HEADERS);(p.ids||[]).slice(0,12).forEach(id=>{try{const r=refs.find(r=>r.entryId===id);if(r)result.push({id,excerpt:sectionText_(r,docs).slice(0,220)});}catch(e){result.push({id,excerpt:''});}});return result;});}
 function addCompleteNote(p){
  const started=Date.now();let entered=0,sheetsMs=0,sectionMs=0;ACTIVE_CONTEXT=p&&p.context||{};
@@ -235,11 +279,12 @@ function deleteNote(p){
  ACTIVE_CONTEXT=p&&p.context||{};if(!p||typeof p.id!=='string'||!p.id||p.id.length>200)throw Error('Identità della voce non valida.');return locked_(function(){
  const sheet=db_().getSheetByName('Entries'),found=findRows_(sheet,1,p.id,false);
  if(!found.length)return ACTIVE_CONTEXT.incrementalCommon===true?{delta:true,entries:[],commonIncluded:false,deletedEntryIds:[p.id],deletedNoteId:p.id,alreadyAbsent:true}:state_();const e=readEntry_(found[0]);if(e.updatedAt!==p.updatedAt)throw new Error('La nota è cambiata. Aggiorna prima di eliminarla.');
+ searchTouch_(sheet);
  const r=ref_(e.id);if(r){const file=traceMeasure_('drive',()=>DriveApp.getFileById(r.docId));inside_(file);if(file.isTrashed())throw new Error('Documento nel cestino: ripristinalo prima di eliminare la voce.');const doc=traceMeasure_('docsOpen',()=>DocumentApp.openById(r.docId)),body=doc.getBody(),starts=[],ends=[];
  for(let i=0;i<body.getNumChildren();i++){const c=body.getChild(i);if(c.getText){const text=c.getText();if(text==='[BJ:'+e.id+']')starts.push(i);if(text==='[END:'+e.id+']')ends.push(i);}}
  if(starts.length||ends.length){if(starts.length!==1||ends.length!==1||ends[0]<=starts[0])throw new Error('Marcatori parziali o duplicati: ripristina la sezione dalla cronologia Docs prima di eliminarla.');let a=starts[0],b=ends[0];for(let i=a+1;i<b;i++){const c=body.getChild(i);if(c.getText&&/\[(?:BJ|END):/.test(c.getText()))throw new Error('La sezione contiene marcatori di altre note: ripristina la struttura prima di eliminare.');}const savedContent=docContent_(e.id);if(a>0&&[e.text,savedContent?.baselineTitle,savedContent?.headerTitle].filter(t=>t!==undefined&&t!==null).some(t=>body.getChild(a-1).getText()===e.date+' · '+t))a--;if(b===body.getNumChildren()-1)body.appendParagraph('');for(let i=b;i>=a;i--)body.removeChild(body.getChild(i));traceMeasure_('docsWrite',()=>doc.saveAndClose());}
  }
- taskIndexTouch_(sheet);[['Files',2],['DocRefs',1],['TaskPlans',1],['Previews',1],['TaskDocQueue',1],['DocContent',2],['JournalLayout',1]].forEach(([name,col])=>{const s=db_().getSheetByName(name);if(s)findRows_(s,col,e.id,false).sort((a,b)=>b-a).forEach(row=>s.deleteRow(row));ioInvalidate_(s);});sheet.deleteRow(found[0]);ioInvalidate_(sheet);ENTRY_SMALL_CACHE=null;if(ACTIVE_CONTEXT.incrementalCommon===true)return {delta:true,entries:[],commonIncluded:false,deletedEntryIds:[e.id],deletedNoteId:e.id,alreadyAbsent:false};const result=state_();result.deletedNoteId=e.id;return result;
+ searchTouch_(sheet);taskIndexTouch_(sheet);[['Files',2],['DocRefs',1],['TaskPlans',1],['Previews',1],['TaskDocQueue',1],['DocContent',2],['JournalLayout',1]].forEach(([name,col])=>{const s=db_().getSheetByName(name);if(s)findRows_(s,col,e.id,false).sort((a,b)=>b-a).forEach(row=>s.deleteRow(row));ioInvalidate_(s);});sheet.deleteRow(found[0]);ioInvalidate_(sheet);ENTRY_SMALL_CACHE=null;if(ACTIVE_CONTEXT.incrementalCommon===true)return {delta:true,entries:[],commonIncluded:false,deletedEntryIds:[e.id],deletedNoteId:e.id,alreadyAbsent:false};const result=state_();result.deletedNoteId=e.id;return result;
  });
 }
 
@@ -297,7 +342,7 @@ function ioRows_(sheet,width){
 }
 
 function ioInvalidate_(sheet){
-  taskIndexTouch_(sheet);
+  searchTouch_(sheet);taskIndexTouch_(sheet);
   if(sheet&&IO.tables) IO.tables.delete(sheet.getName());
   if(sheet) {
     const name = sheet.getName();
