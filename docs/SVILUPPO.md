@@ -15,6 +15,12 @@ Comandi:
 - `npm run test:cycle`: design del ciclo, form, bozze/conflitti, riflessione rich, tracker e geometrie nelle quattro palette.
 - `npm run test:diary-goals`: promemoria degli obiettivi, trimestre/anno visualizzato, arrivo dei dati con bozze aperte, fallback e geometrie.
 - `npm run test:tracing`: diagnostica backend simulata e privacy/export browser.
+- `npm run test:locks`: durata attesa/occupazione lock, errori e rilascio con clock controllato.
+- `npm run test:storage`: prova IndexedDB con soli dati fittizi, riavvio Chromium, guasti e privacy; usa un server HTTP locale temporaneo.
+- `npm run test:scale`: fixture sintetiche fino a 50.000 voci, storico revisioni e baseline del lettore in artifacts/scale-baseline.json; non misura la latenza Google.
+- `npm run test:entry-batch`: equivalenza e limiti delle letture Entries, soglia 500/501 e paginazione Task con corpi pending; incluso anche in npm test.
+- `npm run test:task-deferred`: API metadati/contenuti e browser con letture sospese, ricerca parziale, bozze/conflitti, focus e privacy; il backend è incluso anche in npm test.
+- `npm run test:task-index`: fotografia ordinata, versioni/invalidazioni, guasti e recupero browser; backend incluso in npm test, continuazioni misurate anche da test:scale.
 - `npm run test:e2e`: suite browser storica completa. Non ogni script di tests è incluso in questo comando.
 - `node tests/verify-p85-week.cjs`: checkup, salvataggio/riprova, tracker e layout.
 - `node tests/verify-p82-tasks.cjs`: task in archivio, privacy e salvataggi parziali.
@@ -48,3 +54,9 @@ impostazioni, al termine delle normali letture. L'esperimento usa al massimo
 25 chiavi sincronizzate del mese corrente e non popola la cache. Inviare il
 nuovo export per l'analisi; mantenere distinte le metriche del benchmark dai
 tempi delle normali operazioni. L'export conserva solo le ultime 200 misure.
+
+## Verifica delle letture comuni per periodo
+
+Eseguire npm run test:common-window e test:release. Il primo confronta payload con 50.000 record fuori periodo e controlla copertura, fallback e risposte obsolete nel browser. Dettagli e limiti nella [verifica dedicata](VERIFICA-DATI-COMUNI-PERIODO.md).
+
+Per le finestre di Settimana e Abitudini eseguire anche `npm run test:common-periods`, `test:cycle`, P85 e P88: attese, errori, bozze e versioni sono descritti nella [verifica del seguito](VERIFICA-SETTIMANA-ABITUDINI-PERIODO.md).

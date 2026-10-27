@@ -101,6 +101,35 @@ richiede un aggiornamento esplicito del deployment da parte dell'utente.
 
 ## Evoluzioni previste
 
+### Task differiti — measurementVersion 4, implementazione locale
+
+La navigazione Task ora misura l'elenco dei metadati, non lo scaricamento
+di tutti i corpi. `metadataOnly` numerico distingue le letture/navigazioni;
+`getJournalContents` è tracciata separatamente con le fasi e gli esiti esistenti.
+Formato export v1 conservato. Non confrontare il nuovo completamento dell'elenco
+con il completamento dei corpi v3; vedere la
+[verifica Task differiti](../VERIFICA-TASK-CONTENUTI-DIFFERITI.md).
+
+Seguito locale dell'indice: measurementVersion 4 conservata, aggiunti segmenti
+`taskIndexCheck/Build/Put/Get/Read/Revision` e contatori aggregati di utilizzo,
+invalidazione, reset, budget ed errori. Token, revisioni e chiavi non vengono
+esportati; la continuazione può ora evitare interamente le letture Sheets.
+Dettagli nella [verifica indice Task](../VERIFICA-INDICE-TASK.md).
+
+### Avvio SPEC-004 — measurementVersion 3, implementazione locale
+
+Il 27 ottobre aggiunti `lockWait` e `lockHeld`, con conteggi di tentativi,
+acquisizioni, busy ed errori di acquisizione. `lockMs` resta la misura storica
+dell'acquisizione; `lockHeld` include lavoro sotto lock, flush e rilascio.
+Gli eventi RPC tracciati usano il nuovo lockWait del wrapper diagnostico.
+`sheetRead` conta durate e richieste/righe/celle del solo `readSheetValues_`;
+non copre tutti gli accessi diretti o la scansione interna di TextFinder.
+
+Formato export v1 conservato, measurementVersion aggiornata a 3. I segmenti
+inclusivi non vanno sommati. Prova IndexedDB sintetica con rapporto separato,
+nessun nuovo accesso Google. Risultati e limiti nella
+[verifica dell'avvio SPEC-004](../VERIFICA-AVVIO-SPEC-004.md).
+
 ### Estensione diagnostica — fase 0 SPEC-002
 
 L'export mantiene il formato v1 e aggiunge `measurementVersion: 2`. Oltre ai

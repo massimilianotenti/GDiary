@@ -1,5 +1,100 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Settimana e Abitudini per periodo — SPEC-004, solo locale
+
+Estese le finestre alle due viste: Settimana legge il periodo visibile e il
+checkup; Abitudini legge la giornata e le settimane indipendenti del tracker
+e del giorno scelto, senza i periodi intermedi. Slice con ranges per unioni
+separate, scope week/date e merge limitato agli intervalli. Durante la lettura
+il vecchio modulo rimane montato e disabilitato; errori ripristinano selezione,
+bozze rich e versioni. Le risposte della vista precedente vengono invalidate.
+Fixture con 50.000 righe storiche per tabella: 126/124 celle contro 1.450.283
+della lettura completa, non una misura della latenza Google. Le viste senza
+finestra esplicita mantengono la compatibilità completa.
+Build, npm test, test:common-periods, test:common-window, test:release,
+test:cycle, test:incremental, test:diary-goals, test:tracing, P85 e P88 superati.
+Dettagli e limiti in
+[VERIFICA-SETTIMANA-ABITUDINI-PERIODO.md](VERIFICA-SETTIMANA-ABITUDINI-PERIODO.md).
+Index/Demo e sei file di staging rigenerati. Nessun deploy o dato reale;
+ultimo online documentato resta Apps Script 75.
+
+## Dati comuni del diario per periodo — SPEC-004, solo locale
+
+Il diario legge Days del mese più il giorno precedente, HabitLogs delle
+settimane interessate e Weeks del focus corrente. Contratto esplicito
+commonSlices/commonScope; cataloghi riutilizzati separatamente per 60 secondi.
+Merge limitato agli intervalli, cache vista subordinata alla copertura e
+risposte ritardate scartate dopo salvataggi confermati. In questa prima tranche le altre viste facevano
+fallback completo; il seguito sopra estende le finestre a Settimana e Abitudini. Fixture con 50.000 giorni/log fuori
+periodo: 85 celle lette contro 950.124 della lettura completa, non latenza reale.
+Dettagli, verifiche e limiti in
+[VERIFICA-DATI-COMUNI-PERIODO.md](VERIFICA-DATI-COMUNI-PERIODO.md).
+Nessun deploy o dato reale; Index/Demo e sei file di staging rigenerati.
+
+## Fotografia Task per le continuazioni — SPEC-004, solo locale
+
+Implementato lo step successivo: prima pagina dei metadati da Sheets, poi
+fotografia ordinata temporanea in CacheService, fino a 200 record per pagina.
+Token/offset/cursore, scope e revisione verificati. Nella fixture da 50.000
+voci le continuazioni passano da 389 letture/849.992 celle a zero letture
+Sheets. Restano chiamate Cache/Properties e costo della prima scansione.
+Nuova proprietà runtime TASK_INDEX_REVISION invalidata prima delle scritture
+pertinenti, una volta per richiesta. Nessun setup o nuovo foglio.
+Cache persa/scaduta o dati cambiati: stato parziale e retry con bozze conservate;
+fallback senza indice dopo problemi cache. Worker Docs e salvataggi canonici
+mantengono i contratti precedenti. Dettagli in
+[VERIFICA-INDICE-TASK.md](VERIFICA-INDICE-TASK.md).
+Build, npm test, test:task-index, test:scale, test:locks, test:tracing,
+test:release, test:task-deferred, test:progressive, test:incremental e P82
+superati; Index e Demo rigenerati, sei file di staging verificati.
+Nessun deploy o accesso ai dati reali; ultimo online documentato Apps Script 75.
+
+## Task: elenco e descrizioni separati — seguito SPEC-004, solo locale
+
+Implementato lo step successivo: la vista Task carica metadati a pagine fino
+a 200, senza Drive/Docs/DocContent. Le descrizioni vengono richieste
+all'apertura, per la ricerca nei testi o prima di salvare una modifica che
+non ha ancora il corpo originale. Nuova API versionata `getJournalContents`,
+massimo 25 voci e controlli della versione prima/dopo la lettura; lettore
+contenuti condiviso col diario normale. Ricerca parziale, retry, privacy,
+bozze e risposte obsolete gestiti senza usare placeholder nei salvataggi.
+Tracing measurementVersion 4: `metadataOnly` distingue la nuova navigazione
+dell'elenco dal completamento dei corpi delle versioni precedenti.
+Dettagli in [VERIFICA-TASK-CONTENUTI-DIFFERITI.md](VERIFICA-TASK-CONTENUTI-DIFFERITI.md).
+Build, npm test, test:task-deferred, test:release, test:progressive,
+test:incremental, test:tracing, test:scale, test:locks e P82 superati.
+Index e Demo rigenerati; nessuna dipendenza o autorizzazione Google nuova.
+Nessun deployment o accesso ai dati reali; ultimo online documentato Apps Script 75.
+
+## Letture Entries raggruppate — seguito SPEC-004, solo locale
+
+Implementato su richiesta lo step successivo: `entrySearch_` oltre 500 voci
+usa `readEntries_` con intervalli limitati a 256 righe e amplificazione massima
+otto. Restituisce solo i record richiesti; corpo storico escluso, ordine e
+contratti preservati. Nessuna nuova API o modifica ai salvataggi/lock.
+Nel dataset sintetico da 50.000 voci le letture per pagina Task scendono da
+20.003 a 389; le celle aumentano da 340.028 a 849.992. È un risultato sul
+lavoro simulato, non una misura della latenza Google. Dettagli e limiti in
+[VERIFICA-LETTURE-ENTRIES-BATCH.md](VERIFICA-LETTURE-ENTRIES-BATCH.md).
+Test dedicato `test:entry-batch`, incluso in npm test; budget in test:scale.
+Build, npm test, test:scale, test:locks, test:tracing, test:release,
+test:progressive, test:incremental e P82 superati; Index e Demo rigenerati.
+Nessun deployment: ultimo online documentato resta Apps Script 75.
+
+## Avvio SPEC-004 — 27 ottobre 2026, solo locale
+
+Autorizzato l'avvio degli sviluppi del piano prestazionale. Prima tranche:
+tracing measurementVersion 3 con attesa/occupazione lock e volume del lettore
+Sheets, fixture di crescita e prova IndexedDB manuale con soli dati fittizi
+in Impostazioni → Diagnostica prestazioni. Nessuna cache applicativa, outbox,
+modifica al protocollo di salvataggio o al lock del worker. Nessun deploy:
+ultimo online documentato resta Apps Script 75.
+Risultati, baseline e limiti in [VERIFICA-AVVIO-SPEC-004.md](VERIFICA-AVVIO-SPEC-004.md).
+Build, npm test, test:locks, test:storage, test:scale, test:tracing,
+test:release, test:progressive e test:incremental superati su dati simulati.
+La prova nel vero iframe Google e l'identità stabile dell'archivio restano
+da validare prima di conservare dati applicativi in IndexedDB.
+
 ## Stato consegnato
 
 GDiary v2.0.3. Sorgenti estratti dalla cartella storicamente chiamata BulletJournal-v3; il nome precedente non indica la versione corrente. Nessun accesso ai dati dell'utente, nessun deployment Google e nessuna creazione di repository GitHub eseguiti durante questo passaggio.

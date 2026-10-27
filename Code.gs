@@ -24,6 +24,7 @@ function setup() {
   return locked_(function() {
     const db = SpreadsheetApp.getActiveSpreadsheet();
     if (!db) throw new Error('Apri lo script da Estensioni > Apps Script nel tuo Sheet.');
+    taskIndexTouch_({getName:()=> 'Entries'});
     PropertiesService.getScriptProperties().setProperty('DB_ID', db.getId());
     [['Entries',ENTRY_HEADERS],['Projects',PROJECT_HEADERS],['Files',FILE_HEADERS],['Weeks',WEEK_HEADERS],['Days',DAY_HEADERS],['Goals',GOAL_HEADERS],['Habits',HABIT_HEADERS],['HabitLogs',LOG_HEADERS],['DocRefs',REF_HEADERS],['Registry',REG_HEADERS],['ExportJobs',JOB_HEADERS],['TaskPlans',PLAN_HEADERS]].forEach(function(pair) {
       let sheet = db.getSheetByName(pair[0]);
@@ -52,7 +53,7 @@ function setup() {
 }
 
 // Request-local diagnostics. No content or trace is persisted on Google.
-let ACTIVE_TRACE=null;
+let ACTIVE_TRACE=null,APP_LOCK_DEPTH=0;
 function traceMeasure_(category,fn){
  if(!ACTIVE_TRACE)return fn();
  const trace=ACTIVE_TRACE,outer=!trace.depth[category],start=Date.now(),frame={children:0};
@@ -64,7 +65,7 @@ function traceCount_(key,value=1){if(ACTIVE_TRACE)ACTIVE_TRACE.metrics[key]=(ACT
 function traceBytes_(value){let bytes=0;for(let i=0;i<value.length;i++){const c=value.charCodeAt(i);if(c<128)bytes++;else if(c<2048)bytes+=2;else if(c>=0xD800&&c<=0xDBFF&&i+1<value.length&&value.charCodeAt(i+1)>=0xDC00&&value.charCodeAt(i+1)<=0xDFFF){bytes+=4;i++;}else bytes+=3;}return bytes;}
 function traceDistribution_(prefix,count){traceCount_(prefix+(count===1?'1':count<=3?'2to3':count<=9?'4to9':'10plus'));}
 function traceApi(p){
- const handlers={benchmarkJournalCache,getState,getCommonState,getJournalPage,getEntryDetail,saveJournalPage,saveDay,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
+ const handlers={benchmarkJournalCache,getState,getCommonState,getJournalPage,getJournalContents,getEntryDetail,saveJournalPage,saveDay,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
  if(!p||!Object.prototype.hasOwnProperty.call(handlers,p.operation)||!/^[-a-zA-Z0-9]{10,80}$/.test(p.traceId||''))throw Error('Richiesta diagnostica non valida.');
  const previous=ACTIVE_TRACE,start=Date.now(),trace={metrics:{},depth:{},stack:[],accounted:0};
  const diagnostics=()=>{const totalMs=Date.now()-start;return {traceId:p.traceId,totalMs,unaccountedMs:Math.max(0,totalMs-trace.accounted),...trace.metrics};};
@@ -77,8 +78,14 @@ function traceApi(p){
 function locked_(fn,readOnly=false,background=false) {
   DB_HANDLE=null;ENTRY_SMALL_CACHE=null;ENTRY_TAG_HEADER_CHECKED=false;ENTRY_TAG_HEADER_WRITTEN=false;ioReset_();
   const lock = LockService.getScriptLock();
-  if(background){if(!traceMeasure_('lock',()=>lock.tryLock(0)))return {processed:0,busy:true,pending:null,errors:[]};}else traceMeasure_('lock',()=>lock.waitLock(30000));
-  try { return fn(); } finally { try { if(!readOnly)traceMeasure_('flush',()=>SpreadsheetApp.flush()); } finally { lock.releaseLock(); } }
+  traceCount_('lockAttempts');traceCount_(background?'lockBackgroundAttempts':'lockForegroundAttempts');
+  let acquired=false;
+  try{acquired=traceMeasure_('lock',()=>traceMeasure_('lockWait',()=>{if(background)return lock.tryLock(0);lock.waitLock(30000);return true;}));}
+  catch(error){traceCount_('lockAcquireErrors');throw error;}
+  if(!acquired){traceCount_('lockBusy');return {processed:0,busy:true,pending:null,errors:[]};}
+  traceCount_('lockAcquired');
+  APP_LOCK_DEPTH++;
+  try{return traceMeasure_('lockHeld',()=>{try { return fn(); } finally { try { if(!readOnly)traceMeasure_('flush',()=>SpreadsheetApp.flush()); } finally { lock.releaseLock(); } }});}finally{APP_LOCK_DEPTH--;}
 }
 function db_() {return traceMeasure_('sheets',()=>{
   if(DB_HANDLE)return DB_HANDLE;
@@ -119,6 +126,7 @@ function convertProjectToTag(p){
   const db=db_(),sheet=db.getSheetByName('Entries'),changes=plan.entries.map(e=>({...e,projects:e.projects.split(',').filter(s=>s!==slug).join(','),tags:normaliseTags_((e.tags?e.tags+',':'')+tag)}));
   ensureEntryTagHeader_(sheet,true);const rows=changes.map(e=>{const found=findRows_(sheet,1,e.id,false);if(found.length!==1)throw new Error('Indice voce non valido.');return {row:found[0],entry:e};}).sort((a,b)=>a.row-b.row),groups=[];
   rows.forEach(item=>{const last=groups[groups.length-1];if(last&&last[last.length-1].row+1===item.row)last.push(item);else groups.push([item]);});
+  if(changes.length)taskIndexTouch_(sheet);
   groups.forEach(group=>{const range=sheet.getRange(group[0].row,5,group.length,10),values=range.getDisplayValues();group.forEach((item,i)=>{const e=item.entry;values[i][0]=e.projects;values[i][4]=new Date(Math.max(Date.now(),Date.parse(e.updatedAt)+1)).toISOString();values[i][6]=e.projects?'project':'personal';values[i][9]=e.tags;});range.setNumberFormat('@').setValues(values.map(r=>r.map(v=>/^[=+\-@']/.test(String(v))?"'"+v:String(v))));});
   if(plan.project){const projects=db.getSheetByName('Projects'),found=findRows_(projects,1,slug,false);found.sort((a,b)=>b-a).forEach(row=>projects.deleteRow(row));ioInvalidate_(projects);}
   ENTRY_SMALL_CACHE=null;const result=state_();result.convertedCount=changes.length;return result;
@@ -167,6 +175,7 @@ function cachedRows_(sheet, headers) {
 function append_(sheet, rows) {return traceMeasure_('sheets',()=>{
   const cached=IO.tables&&IO.tables.get(sheet.getName());
   if (!rows.length) return;
+  taskIndexTouch_(sheet);
   if(sheet.getName()==='Entries')ensureEntryTagHeader_(sheet,true);
   const range = sheet.getRange(sheet.getLastRow()+1,1,rows.length,rows[0].length);
   range.setNumberFormat('@');
@@ -209,6 +218,47 @@ function parseJournal_(date, raw,legacyHashProjects=false) {
 }
 function getState(p) { ACTIVE_CONTEXT=p&&p.context||{}; return readState_(); }
 
+// Opt-in protocol: legacy callers still receive complete collections. A slice
+// is authoritative only inside its explicit inclusive date range.
+function commonJournalSlices_(db,month,today){
+ const shift=(date,n)=>{const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+ const monday=date=>shift(date,-((new Date(date+'T12:00:00Z').getUTCDay()+6)%7));
+ const first=month+'-01',next=new Date(first+'T12:00:00Z');next.setUTCMonth(next.getUTCMonth()+1);
+ const last=shift(next.toISOString().slice(0,10),-1),currentWeek=monday(today);
+ return {
+  days:commonDateSlice_(db.getSheetByName('Days'),DAY_HEADERS,'date',shift(first,-1),last),
+  weeks:commonDateSlice_(db.getSheetByName('Weeks'),WEEK_HEADERS,'week',currentWeek,currentWeek),
+  habitLogs:commonDateSlice_(db.getSheetByName('HabitLogs'),LOG_HEADERS,'date',monday(first),shift(monday(last),6))
+ };
+}
+function commonDateSlice_(sheet,headers,dateKey,from,to){
+ const slice=commonDateRanges_(sheet,headers,dateKey,[{from,to}]);
+ return {from,to,rows:slice.rows};
+}
+function commonDateRanges_(sheet,headers,dateKey,ranges){
+ if(sheet.getName()==='Days')ensureDayHeaders_(sheet);else verify_(sheet,headers);
+ // Search the date column on the service. Never materialise unrelated payloads,
+ // including on small sheets or when records are unsorted/interleaved.
+ const dates=new Set();ranges.forEach(({from,to})=>{for(let date=from;date<=to;){dates.add(date);const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+1);date=d.toISOString().slice(0,10);}});
+ const found=findRows_(sheet,headers.indexOf(dateKey)+1,'^('+[...dates].join('|')+')$',true).sort((a,b)=>a-b),groups=[],rows=[];
+ found.forEach(row=>{const group=groups[groups.length-1];if(group&&row===group.end+1&&group.end-group.start<255)group.end=row;else groups.push({start:row,end:row});});
+ groups.forEach(group=>readSheetValues_(sheet.getRange(group.start,1,group.end-group.start+1,headers.length)).forEach(values=>rows.push(Object.fromEntries(headers.map((h,i)=>[h,values[i]])))));
+ return {ranges,rows};
+}
+function commonPeriodState_(db,context,today){
+ const shift=(date,n)=>{const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+ const monday=date=>shift(date,-((new Date(date+'T12:00:00Z').getUTCDay()+6)%7));
+ const week=context.week||monday(today),date=context.date||today,kind=context.commonWindow;
+ if(!validDate_(week)||monday(week)!==week)throw Error('Settimana non valida.');
+ if(kind==='habits'&&!validDate_(date))throw Error('Giornata non valida.');
+ const weekRange={from:week,to:shift(week,6)},dayWeek=kind==='habits'?monday(date):week;
+ return {commonScope:{kind,week,...(kind==='habits'?{date}:{})},commonSlices:{
+  days:kind==='habits'?commonDateSlice_(db.getSheetByName('Days'),DAY_HEADERS,'date',shift(date,-1),date):commonDateSlice_(db.getSheetByName('Days'),DAY_HEADERS,'date',shift(week,-1),weekRange.to),
+  weeks:commonDateSlice_(db.getSheetByName('Weeks'),WEEK_HEADERS,'week',week,week),
+  habitLogs:commonDateRanges_(db.getSheetByName('HabitLogs'),LOG_HEADERS,'date',kind==='habits'&&dayWeek!==week?[weekRange,{from:dayWeek,to:shift(dayWeek,6)}]:[weekRange])
+ }};
+}
+
 function state_() {
  const started=Date.now(),db=db_(),today=Utilities.formatDate(new Date(),'Europe/Rome','yyyy-MM-dd');
  const context=ACTIVE_CONTEXT||{}, month=context.month||today.slice(0,7);
@@ -221,7 +271,7 @@ function state_() {
   const end=new Date(context.week+'T12:00:00Z');end.setUTCDate(end.getUTCDate()+6);const endDate=end.toISOString().slice(0,10);
   entries=weekEntries_(context.week,endDate);
  }
- const allTags=(context.view==='tags'||!(context.commonFresh||context.deferCommon))?tagCatalog_():undefined;
+ const allTags=(context.view==='tags'||!(context.commonFresh||context.deferCommon||context.catalogFresh))?tagCatalog_():undefined;
  if(context.view==='tags'&&context.tag){const tag=normaliseTags_(context.tag);if(tag.includes(','))throw new Error('Scegli un tag.');entries=entrySearch_('tags','(^|,)'+tag+'(,|$)');}
  if(!context.view||['journal','day'].includes(context.view)){entries=Array.from(new Map([...entries,...entrySearch_('type','^task$')].map(e=>[e.id,e])).values());}
  attachSchedules_(entries);attachPendingDocs_(entries);if(!context.view||context.view==='journal')entries=entries.filter(e=>e.date.startsWith(month+'-'));if(context.view==='day')entries=entries.filter(e=>taskOnDate_(e,context.date));
@@ -230,13 +280,12 @@ function state_() {
  const previewsMs=Date.now()-previewStarted,fileStarted=Date.now(),files=ids.size?objectsSearch_(db.getSheetByName('Files'),FILE_HEADERS,2,pattern):[],filesMs=Date.now()-fileStarted;
  const commonStarted=Date.now();
  const common=(context.commonFresh||context.deferCommon)?{}:{
+    ...(context.commonWindow==='journal'?{commonScope:{kind:'journal',month,today},commonSlices:commonJournalSlices_(db,month,today)}:['week','habits'].includes(context.commonWindow)?commonPeriodState_(db,context,today):{commonScope:{kind:'full'},weeks:rows_(db.getSheetByName('Weeks'),WEEK_HEADERS),days:rows_(db.getSheetByName('Days'),DAY_HEADERS),habitLogs:rows_(db.getSheetByName('HabitLogs'),LOG_HEADERS)}),
+    ...(context.catalogFresh?{}:{
     projects:cachedRows_(db.getSheetByName('Projects'),PROJECT_HEADERS),
-    weeks:rows_(db.getSheetByName('Weeks'),WEEK_HEADERS),
-    days:rows_(db.getSheetByName('Days'),DAY_HEADERS),
     goals:cachedRows_(db.getSheetByName('Goals'),GOAL_HEADERS),
     habits:cachedRows_(db.getSheetByName('Habits'),HABIT_HEADERS),
-    taskPlans:cachedRows_(db.getSheetByName('TaskPlans'),PLAN_HEADERS),
-    habitLogs:rows_(db.getSheetByName('HabitLogs'),LOG_HEADERS)
+    taskPlans:cachedRows_(db.getSheetByName('TaskPlans'),PLAN_HEADERS)})
  };
  return {today,month,entries,files,...common,settings:reflectionSettings_(),...(allTags?{allTags}:{}),commonIncluded:!(context.commonFresh||context.deferCommon),driveConfigured:!!PropertiesService.getScriptProperties().getProperty('ROOT_ID'),performance:{traceId:context.traceId||'',entriesMs,previewsMs,filesMs,commonMs:Date.now()-commonStarted,totalMs:Date.now()-started}};
 }

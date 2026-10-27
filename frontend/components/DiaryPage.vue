@@ -34,14 +34,16 @@ const groups=computed(()=>{const map=new Map();[...data.value.blocks].sort((a,b)
     <label>Ordina<select :value="data.taskFilters.sort" @change="data.filter('sort',$event.target.value)"><option value="priority">Importanza e scadenza</option><option value="date">Data della voce</option></select></label>
     <label class="task-filter-search">Cerca nei task<input aria-label="Cerca nei task" :value="searchText" @input="filterText" @keydown.enter.prevent="applySearch" placeholder="Titolo, testo, tag o progetto" /></label>
    </div>
-   <p class="hint">Tipo: Task · {{data.blocks.length}} risultati{{!data.complete?' tra le voci caricate · ricerca e ordinamento ancora parziali':''}}. Le modifiche da salvare restano visibili anche se non corrispondono ai filtri.</p>
+   <p class="hint">Tipo: Task · {{data.blocks.length}} risultati{{!data.complete||data.searchPartial?' tra le voci caricate · ricerca e conteggi ancora parziali':''}}. Le modifiche da salvare restano visibili anche se non corrispondono ai filtri.</p>
    <div class="task-filter-chips"><button v-if="data.taskFilters.project" @click="data.filter('project','')">Progetto: {{data.taskProjects.find(p=>p.slug===data.taskFilters.project)?.name}} ×</button><button v-if="data.taskFilters.tag" @click="data.filter('tag','')">#{{data.taskFilters.tag}} ×</button><button v-if="data.taskFilters.text" @click="searchText='';applySearch()">{{data.taskFilters.text}} ×</button></div>
   </section>
   <div v-if="data.taskDiary" class="diary-load-state" role="status" aria-live="polite" :aria-busy="data.loading">
    <p v-if="data.loading">Caricamento dei task in corso · {{data.loaded}} voci caricate. Filtri, ricerca e conteggi si aggiornano all’arrivo delle altre pagine.</p>
-   <p v-else-if="data.loadError">Caricamento interrotto · {{data.loaded}} voci caricate. I risultati sono parziali e le modifiche restano disponibili.</p>
-   <p v-else-if="data.complete">Caricamento completato · {{data.loaded}} voci caricate.</p>
-   <button v-if="data.loadError&&!data.loading" @click="data.retry">Riprova caricamento task</button>
+   <p v-else-if="data.loadError">{{data.snapshotReset?'Elenco cambiato o scaduto. Aggiorna per continuare; le bozze sono conservate.':'Caricamento interrotto · '+data.loaded+' voci caricate. I risultati sono parziali e le modifiche restano disponibili.'}}</p>
+   <p v-else-if="data.searchPartial">{{data.searchErrors?'Ricerca nei testi incompleta: alcune descrizioni non sono disponibili.':'Ricerca nei testi in corso · risultati parziali.'}}</p>
+   <p v-else-if="data.complete">Caricamento completato · {{data.loaded}} voci caricate.{{data.deferredContents&&!data.taskFilters.text?' Le descrizioni si caricano all’apertura.':''}}</p>
+   <button v-if="data.loadError&&!data.loading" @click="data.retry">{{data.snapshotReset?'Aggiorna elenco Task':'Riprova caricamento task'}}</button>
+   <button v-if="data.searchErrors&&!data.loading" @click="data.retrySearch">Riprova ricerca nei testi</button>
   </div>
   <ChromeSlot :bridge="data.bridge" kind="status"/>
   <p v-if="data.recoveredDrafts&&unsaved" class="diary-recovered-draft" role="status">Ripristinate {{data.recoveredDrafts}} bozze da questa scheda: contengono differenze rispetto alle voci salvate. Puoi salvarle con Salva pagina.</p>
@@ -50,7 +52,7 @@ const groups=computed(()=>{const map=new Map();[...data.value.blocks].sort((a,b)
     <header><h2>Obiettivi del trimestre</h2><p>{{data.cycleMemory.label}}</p></header>
     <article v-for="goal in data.cycleMemory.goals" :key="goal.id"><h3><svg v-if="goal.iconPath" class="outline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="goal.iconPath"/></svg><span>{{goal.title}}</span></h3><p v-if="goal.description" class="diary-cycle-description">{{goal.description}}</p></article>
    </section>
-   <section v-if="data.taskDiary" class="diary-task-results"><EntryBlock v-for="block in data.blocks" :key="block.clientId+':'+(block.updatedAt||'draft')" :block="block" :bridge="data.bridge" @changed="revision++"/><p v-if="!data.blocks.length" class="diary-empty">{{data.complete?'Nessun task corrisponde ai filtri.':'Nessun task corrisponde ai filtri tra le voci caricate.'}}</p></section>
+   <section v-if="data.taskDiary" class="diary-task-results"><EntryBlock v-for="block in data.blocks" :key="block.clientId+':'+(block.updatedAt||'draft')" :block="block" :bridge="data.bridge" @changed="revision++"/><p v-if="!data.blocks.length" class="diary-empty">{{data.complete&&!data.searchPartial?'Nessun task corrisponde ai filtri.':'Nessun task corrisponde ai filtri tra le voci caricate.'}}</p></section>
    <template v-if="!data.taskDiary"><section v-for="[date,blocks] in groups" :key="date" class="diary-day" :data-diary-date="date">
     <header class="diary-day-heading"><button :aria-label="data.dateLabel(date)" @click="data.openDay(date)" class="diary-date-button"><span class="diary-date-number">{{dayParts(date).number}}</span><span class="diary-date-copy"><strong>{{dayParts(date).weekday}}</strong><span>{{dayParts(date).label}}</span></span></button><span v-if="date===data.todayDate" class="diary-today">Oggi</span><details class="diary-day-menu"><summary aria-label="Aggiungi al giorno" title="Aggiungi una voce a questa giornata"><DiaryIcon name="plus"/></summary><div><button @click="data.add('note',date)"><DiaryIcon name="note"/>Nota</button><button @click="data.add('task',date)"><DiaryIcon name="task"/>Task</button><button @click="data.addDaily(date)">Inizio e fine giornata</button></div></details></header>
     <EntryBlock v-for="reflection in data.reflection(date)" :key="reflection.clientId" :block="reflection" :bridge="data.reflectionBridge" @changed="revision++"/>

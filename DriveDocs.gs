@@ -1,4 +1,8 @@
-function readSheetValues_(range){return traceMeasure_('sheets',()=>{const values=range.getValues();if(values.some(row=>row.some(v=>v instanceof Date)))return range.getDisplayValues();return values.map(row=>row.map(v=>String(v??'')));});}
+// Counts cover this reader, not every direct Sheets call in the application.
+function readSheetValues_(range){return traceMeasure_('sheets',()=>traceMeasure_('sheetRead',()=>{
+ const count=values=>{if(ACTIVE_TRACE){traceCount_('sheetReadRequests');traceCount_('sheetReadRows',values.length);traceCount_('sheetReadCells',values.reduce((n,row)=>n+row.length,0));}return values;};
+ const values=count(range.getValues());if(values.some(row=>row.some(v=>v instanceof Date)))return count(range.getDisplayValues());return values.map(row=>row.map(v=>String(v??'')));
+}));}
 // Set this to the ID of a PRIVATE folder you created on My Drive, then run setupDrive.
 const ROOT_FOLDER_ID = 'INCOLLA_ID_CARTELLA';
 
@@ -28,12 +32,25 @@ function objectsSearch_(sheet,headers,col,pattern) {
 
 function readEntry_(row){return readEntries_([row])[0];}
 
+// Bound each metadata range and the rows fetched between requested entries.
+// No historical body column is included. Results still follow the caller's
+// row order, including independent copies of duplicate requests.
+const ENTRY_READ_MAX_ROWS=256,ENTRY_READ_MAX_AMPLIFICATION=8;
+function entryReadRanges_(rows){
+ const groups=[];
+ [...new Set(rows)].sort((a,b)=>a-b).forEach(row=>{
+  const last=groups[groups.length-1],span=last?row-last.start+1:1;
+  if(last&&span<=ENTRY_READ_MAX_ROWS&&span<=(last.rows.length+1)*ENTRY_READ_MAX_AMPLIFICATION){last.size=span;last.rows.push(row);}
+  else groups.push({start:row,size:1,rows:[row]});
+ });
+ return groups;
+}
 function readEntries_(rows){
- if(!rows.length)return [];const sheet=db_().getSheetByName('Entries');ensureEntryTagHeader_(sheet);const groups=[],out=new Map();
- [...new Set(rows)].sort((a,b)=>a-b).forEach(row=>{const last=groups[groups.length-1];if(last&&last.start+last.size===row)last.size++;else groups.push({start:row,size:1});});
+ if(!rows.length)return [];const sheet=db_().getSheetByName('Entries');ensureEntryTagHeader_(sheet);const groups=entryReadRanges_(rows),out=new Map();
  groups.forEach(g=>{
   const values=readSheetValues_(sheet.getRange(g.start,1,g.size,11)),tail=readSheetValues_(sheet.getRange(g.start,13,g.size,2));
-  values.forEach((v,i)=>out.set(g.start+i,{...Object.fromEntries(ENTRY_HEADERS.slice(0,11).map((h,k)=>[h,String(v[k]??'')])),body:'',completedAt:String(tail[i][0]||''),tags:String(tail[i][1]||'')}));
+  traceCount_('entryReadRanges');traceCount_('entryRequestedRows',g.rows.length);traceCount_('entryReadRows',g.size);traceCount_('entryOverreadRows',g.size-g.rows.length);
+  g.rows.forEach(row=>{const i=row-g.start,v=values[i];out.set(row,{...Object.fromEntries(ENTRY_HEADERS.slice(0,11).map((h,k)=>[h,String(v[k]??'')])),body:'',completedAt:String(tail[i][0]||''),tags:String(tail[i][1]||'')});});
  });return rows.map(row=>({...out.get(row)}));
 }
 
@@ -47,13 +64,7 @@ function entrySearch_(field,pattern) {
   }
   const regex=new RegExp(pattern,'i');return ENTRY_SMALL_CACHE.filter(e=>regex.test(e[field]||'')).map(e=>({...e}));
  }
- const found=findRows_(sheet,ENTRY_HEADERS.indexOf(field)+1,pattern,true).sort((a,b)=>a-b);
- const groups=[];found.forEach(row=>{const last=groups[groups.length-1];if(last&&last[last.length-1]+1===row)last.push(row);else groups.push([row]);});
- const out=[];groups.forEach(group=>{
-  const values=readSheetValues_(sheet.getRange(group[0],1,group.length,11));
-  const completed=readSheetValues_(sheet.getRange(group[0],13,group.length,2));
-  values.forEach((v,i)=>out.push({...Object.fromEntries(ENTRY_HEADERS.slice(0,11).map((h,k)=>[h,String(v[k]??'')])),body:'',completedAt:String(completed[i][0]||''),tags:String(completed[i][1]||'')}));
- });return out;
+ return readEntries_(findRows_(sheet,ENTRY_HEADERS.indexOf(field)+1,pattern,true).sort((a,b)=>a-b));
 }
 
 function ref_(entryId) {
@@ -228,7 +239,7 @@ function deleteNote(p){
  for(let i=0;i<body.getNumChildren();i++){const c=body.getChild(i);if(c.getText){const text=c.getText();if(text==='[BJ:'+e.id+']')starts.push(i);if(text==='[END:'+e.id+']')ends.push(i);}}
  if(starts.length||ends.length){if(starts.length!==1||ends.length!==1||ends[0]<=starts[0])throw new Error('Marcatori parziali o duplicati: ripristina la sezione dalla cronologia Docs prima di eliminarla.');let a=starts[0],b=ends[0];for(let i=a+1;i<b;i++){const c=body.getChild(i);if(c.getText&&/\[(?:BJ|END):/.test(c.getText()))throw new Error('La sezione contiene marcatori di altre note: ripristina la struttura prima di eliminare.');}const savedContent=docContent_(e.id);if(a>0&&[e.text,savedContent?.baselineTitle,savedContent?.headerTitle].filter(t=>t!==undefined&&t!==null).some(t=>body.getChild(a-1).getText()===e.date+' · '+t))a--;if(b===body.getNumChildren()-1)body.appendParagraph('');for(let i=b;i>=a;i--)body.removeChild(body.getChild(i));traceMeasure_('docsWrite',()=>doc.saveAndClose());}
  }
- [['Files',2],['DocRefs',1],['TaskPlans',1],['Previews',1],['TaskDocQueue',1],['DocContent',2],['JournalLayout',1]].forEach(([name,col])=>{const s=db_().getSheetByName(name);if(s)findRows_(s,col,e.id,false).sort((a,b)=>b-a).forEach(row=>s.deleteRow(row));ioInvalidate_(s);});sheet.deleteRow(found[0]);ioInvalidate_(sheet);ENTRY_SMALL_CACHE=null;const result=state_();result.deletedNoteId=e.id;return result;
+ taskIndexTouch_(sheet);[['Files',2],['DocRefs',1],['TaskPlans',1],['Previews',1],['TaskDocQueue',1],['DocContent',2],['JournalLayout',1]].forEach(([name,col])=>{const s=db_().getSheetByName(name);if(s)findRows_(s,col,e.id,false).sort((a,b)=>b-a).forEach(row=>s.deleteRow(row));ioInvalidate_(s);});sheet.deleteRow(found[0]);ioInvalidate_(sheet);ENTRY_SMALL_CACHE=null;const result=state_();result.deletedNoteId=e.id;return result;
  });
 }
 
@@ -286,6 +297,7 @@ function ioRows_(sheet,width){
 }
 
 function ioInvalidate_(sheet){
+  taskIndexTouch_(sheet);
   if(sheet&&IO.tables) IO.tables.delete(sheet.getName());
   if(sheet) {
     const name = sheet.getName();
@@ -295,6 +307,13 @@ function ioInvalidate_(sheet){
   }
 }
 
+// Advance before the first relevant mutation, once per request. If Properties
+// fails, stop before writing; a stale snapshot must never survive a commit.
+function taskIndexTouch_(sheet){
+ if(!sheet||IO.taskIndexTouched||!['Entries','TaskPlans','JournalLayout','TaskDocQueue'].includes(sheet.getName()))return;
+ traceMeasure_('taskIndexRevision',()=>PropertiesService.getScriptProperties().setProperty('TASK_INDEX_REVISION',Utilities.getUuid()));
+ IO.taskIndexTouched=true;traceCount_('taskIndexInvalidations');
+}
 function writeRows_(sheet,start,values){return traceMeasure_('sheets',()=>{if(!values.length)return;ioInvalidate_(sheet);sheet.getRange(start,1,values.length,values[0].length).setNumberFormat('@').setValues(values.map(r=>r.map(v=>/^[=+\-@']/.test(String(v))?"'"+v:String(v))));});}
 const TASK_DOC_HEADERS=['entryId','status','updatedAt','error'];
 function taskDocQueue_(create=false){let sheet=db_().getSheetByName('TaskDocQueue');if(!sheet&&create){sheet=db_().insertSheet('TaskDocQueue');sheet.getRange(1,1,1,4).setValues([TASK_DOC_HEADERS]);sheet.setFrozenRows(1);}if(sheet)verify_(sheet,TASK_DOC_HEADERS);return sheet;}

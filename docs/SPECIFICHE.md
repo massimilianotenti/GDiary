@@ -29,6 +29,16 @@ Un diario che rende semplice scrivere, ritrovare e portare avanti attività. Tip
 - Data di annotazione, giorno pianificato, intervallo di lavorazione e deadline sono concetti distinti.
 - «Task aperti» è una scorciatoia facoltativa alla vista filtrata del diario, non un editor indipendente. Filtri: stato, periodo, progetto, tag, testo e ordinamento.
 - Dalla versione Apps Script 67: i task vengono mostrati pagina per pagina. Indicatore di caricamento e conteggi visibili segnalano risultati parziali; ricerca e ordinamento si aggiornano fino alla fine. Errori successivi conservano voci e bozze, con retry dal cursore fallito.
+- Seguito locale SPEC-004: la vista Task carica prima i metadati a pagine fino
+  a 200, poi le descrizioni all'apertura o quando necessarie alla ricerca nei
+  corpi e al salvataggio. Ricerca esplicitamente parziale fino al recupero dei
+  contenuti pertinenti, con retry. Le modifiche ai metadati fatte durante la
+  lettura restano conservate; un corpo non caricato non è un corpo vuoto.
+  Il diario normale mantiene il caricamento completo a pagine da 25.
+- Seguito locale: le pagine successive dell'elenco Task riusano una fotografia
+  temporanea dei metadati. Se i dati cambiano o la cache non è più disponibile,
+  il caricamento si dichiara parziale e offre «Aggiorna elenco Task», mantenendo
+  bozze e identità. Il fallback senza fotografia completa comunque il caricamento.
 - Limiti correnti del salvataggio diario: titolo massimo 2.000 caratteri; corpo massimo 100.000; batch massimo 25 blocchi. Non sono obiettivi editoriali per la lunghezza del testo.
 
 ## Riflessioni quotidiane
@@ -73,3 +83,11 @@ contenuti del diario o identificativi dell'archivio. Include chiamate remote,
 errori, batch di salvataggio e rendering. La preferenza resta nel browser;
 le misure si cancellano ricaricando, disattivando o con il comando dedicato.
 Vedere [SPEC-001](specs/001-tracing-prestazioni.md) per copertura e limiti.
+
+Sviluppo locale SPEC-004: il report usa measurementVersion 4, con tempi di
+attesa/occupazione lock e conteggi del lettore Sheets. A tracing attivo è
+disponibile una prova manuale della memoria locale con dati fittizi, rapporto
+esportabile, pulizia e richiesta di conservazione separata. La prova non
+memorizza contenuti del diario e non cambia il salvataggio applicativo.
+Il flag numerico `metadataOnly` distingue letture/navigazione dell'elenco
+Task da quelle complete; `getJournalContents` misura le letture differite.

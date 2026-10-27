@@ -13,7 +13,10 @@ const assert=require('assert'),path=require('path'),fs=require('fs'),{pathToFile
   assert.equal(await page.evaluate(()=>dirtyMain),false);
   await page.evaluate(async()=>{
    MockItem.prototype.getLastUpdated=function(){return new Date(1000);};
-   await api('getJournalPage',{month:'2026-10'});
+   const page=await api('getJournalPage',{month:'2026-10'});
+   await api('getEntryDetail',{id:page.entries.find(e=>!e.editorError).id});
+   const metadata=await api('getJournalPage',{month:'2026-10',taskOnly:true,taskArchive:true,metadataOnly:true});
+   await api('getJournalContents',{items:metadata.entries.slice(0,1).map(e=>({id:e.id,updatedAt:e.updatedAt}))});
    try{await api('saveJournalPage',{month:'invalid',blocks:[],body:'SECRET-BODY',title:'SECRET-TITLE',tags:'SECRET-TAG',id:'SECRET-DRIVE'});}catch(e){}
    recordTiming('getState',performance.now(),{performance:{totalMs:1,title:'SECRET-TITLE',body:'SECRET-BODY',tags:'SECRET-TAG',evilMs:'SECRET-DRIVE',entriesMs:Infinity} },false,{traceId:newTraceId()});
   });
@@ -22,10 +25,13 @@ const assert=require('assert'),path=require('path'),fs=require('fs'),{pathToFile
   assert(report.events.some(e=>e.operation==='saveJournalPage'&&e.outcome==='error'));
   assert(report.events.some(e=>e.operation==='render'));
   assert(!JSON.stringify(report).includes('SECRET'));
-  assert.equal(report.measurementVersion,2);
+  assert.equal(report.measurementVersion,4);
+  assert(report.events.some(e=>e.operation==='getJournalPage'&&e.metadataOnly===1&&!e.docsOpenCalls&&!e.docContentCalls));
+  assert(report.events.some(e=>e.operation==='getJournalContents'&&e.itemsCount===1&&e.responseBytes>0));
   assert(report.events.some(e=>e.operation==='getJournalPage'&&e.cacheGetAllCalls===1&&e.unaccountedMs>=0));
   assert(report.events.some(e=>e.operation==='getJournalPage'&&e.driveInsideCalls>0&&e.driveParentsCalls>0&&e.driveTrashCalls>0&&e.driveInsideNodes>0));
   assert(report.events.some(e=>e.operation==='getJournalPage'&&e.docContentBatchCalls===1&&e.contentBatchEntries>0&&e.contentBatchSearchCalls===1));
+  assert(report.events.some(e=>e.operation==='getEntryDetail'&&e.entryReadRanges===1&&e.entryRequestedRows===1&&e.entryReadRows===1&&e.entryOverreadRows===0));
   await page.evaluate(async()=>{rememberView();forceCommon=true;try{await run('getState');}finally{forceCommon=false;}});
   assert.equal(await page.evaluate(()=>timings.filter(e=>e.operation==='getState').length),2,'one synthetic privacy event plus one actual RPC');
   assert((await page.evaluate(()=>timings.filter(e=>e.operation==='getState'))).every(e=>!e.cache),'remote reread must not be marked as local cache');
@@ -34,6 +40,8 @@ const assert=require('assert'),path=require('path'),fs=require('fs'),{pathToFile
   assert(await page.evaluate(()=>timings.some(e=>e.operation==='benchmarkJournalCache'&&e.benchmarkRounds===5&&e.cacheBenchBulkCalls===5)));
   await page.evaluate(async()=>{try{await traceSaveAction_(async()=>{await api('saveDay',{date:'2026-09-01',updatedAt:'',intention:'Test diagnostico simulato'});await api('saveDay',{date:'invalid',updatedAt:'',intention:''});});}catch(e){}});
   const actionEvents=await page.evaluate(()=>performanceTraceReport().events);
+  assert(actionEvents.some(e=>e.operation==='saveDay'&&e.lockWaitCalls===1&&e.lockHeldCalls===1&&e.lockAcquired===1&&e.lockForegroundAttempts===1));
+  assert(actionEvents.some(e=>e.sheetReadCells>0&&e.sheetReadRequests>0));
   const action=actionEvents.find(e=>e.operation==='saveContinuous');assert(action&&action.batchesCount===2&&action.completedBatches===1&&action.failedBatches===1&&action.outcome==='partial');
   assert.equal(actionEvents.filter(e=>e.operation==='saveDay'&&e.actionId===action.traceId).length,2);
   const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Esporta misure',exact:true}).click();
