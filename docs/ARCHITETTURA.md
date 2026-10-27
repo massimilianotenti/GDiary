@@ -159,3 +159,14 @@ searchArchive legge metadati e Docs fuori dal lock, verificando SEARCH_REVISION 
 ## Worker a unità singole — sviluppo locale intermedio
 
 processTaskDocQueue orchestra fino a 10 identità, processDocQueueItem_ rilegge e finalizza una voce per acquisizione globale; budget morbido 5 secondi e stop su busy/esito incerto. Nessuna lease, nuovo schema o scrittura Docs fuori lock. Picco lock strumentato con lockHeldMaxMs. [Verifica e limiti](VERIFICA-WORKER-LOTTI-PICCOLI.md).
+
+## Contratto identità della copia locale — sviluppo locale
+
+getSyncManifest verifica utente attivo/effettivo, accesso e configurazione; inizializza archiveId/epoch in ScriptProperties e principalId in UserProperties sotto lock breve. Il modulo archive-identity conserva solo scope in memoria e revoca risposte obsolete. Capacità applicative false; verifica manuale, nessuna RPC all’avvio. [Contratto e limiti](VERIFICA-IDENTITA-ARCHIVIO.md).
+
+
+## Fondamenta repository locale (disabilitate sui dati reali)
+
+Schema, transazioni e prova sintetica sono implementati; nessuna vista usa
+ancora la copia locale. Contratto e limiti in
+[VERIFICA-REPOSITORY-LOCALE](VERIFICA-REPOSITORY-LOCALE.md).

@@ -72,3 +72,10 @@ Per la cancellazione incrementale: `npm run test:delete-delta`, `test:release` e
 Ricerca e contesa: `npm run test:search-concurrency`, `test:locks`, `test:tracing` e `test:release`. Il mock ora simula revisioni Drive a ogni saveAndClose. [Verifica, protocollo e limiti](VERIFICA-RICERCA-SENZA-LOCK-LUNGO.md).
 
 Worker: `npm run test:worker-chunks`, `test:locks`, `test:release` e P54. Il clock simulato distingue occupazione massima e totale; non misura Google. [Rapporto e limiti](VERIFICA-WORKER-LOTTI-PICCOLI.md).
+
+Identità: `npm run test:identity`, `test:storage`, `test:release` e `test:tracing`. Il nuovo scope userinfo.email richiederà verifica dell’autorizzazione al futuro deploy; nessun deploy è stato eseguito. [Rapporto](VERIFICA-IDENTITA-ARCHIVIO.md).
+
+
+`npm run test:repository` verifica repository IndexedDB e diagnostica sintetica
+su Demo.html, compreso riavvio Chromium e 10.000 metadati inventati.
+Vedere [contratto e limiti](VERIFICA-REPOSITORY-LOCALE.md).

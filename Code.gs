@@ -65,7 +65,7 @@ function traceCount_(key,value=1){if(ACTIVE_TRACE)ACTIVE_TRACE.metrics[key]=(ACT
 function traceBytes_(value){let bytes=0;for(let i=0;i<value.length;i++){const c=value.charCodeAt(i);if(c<128)bytes++;else if(c<2048)bytes+=2;else if(c>=0xD800&&c<=0xDBFF&&i+1<value.length&&value.charCodeAt(i+1)>=0xDC00&&value.charCodeAt(i+1)<=0xDFFF){bytes+=4;i++;}else bytes+=3;}return bytes;}
 function traceDistribution_(prefix,count){traceCount_(prefix+(count===1?'1':count<=3?'2to3':count<=9?'4to9':'10plus'));}
 function traceApi(p){
- const handlers={benchmarkJournalCache,getState,getCommonState,getJournalPage,getJournalContents,getEntryDetail,saveJournalPage,saveDay,saveDays,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
+ const handlers={getSyncManifest,benchmarkJournalCache,getState,getCommonState,getJournalPage,getJournalContents,getEntryDetail,saveJournalPage,saveDay,saveDays,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
  if(!p||!Object.prototype.hasOwnProperty.call(handlers,p.operation)||!/^[-a-zA-Z0-9]{10,80}$/.test(p.traceId||''))throw Error('Richiesta diagnostica non valida.');
  const previous=ACTIVE_TRACE,start=Date.now(),trace={metrics:{},depth:{},stack:[],accounted:0};
  const diagnostics=()=>{const totalMs=Date.now()-start;return {traceId:p.traceId,totalMs,unaccountedMs:Math.max(0,totalMs-trace.accounted),...trace.metrics};};
@@ -215,6 +215,34 @@ function parseJournal_(date, raw,legacyHashProjects=false) {
     if (!text) throw new Error('Ogni riga deve contenere un testo.');
     return {date,type,text,projects:projects.join(','),tags:normaliseTags_(tags.join(',')),due,status};
   });
+}
+// Stable identity contract only. Application persistence remains disabled until
+// the real iframe/storage matrix and the repository protocol are validated.
+function manifestPrincipal_(){
+ try{const active=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase(),effective=String(Session.getEffectiveUser().getEmail()||'').trim().toLowerCase();return active&&effective&&active===effective?true:false;}catch(ignore){return false;}
+}
+function getSyncManifest(p){
+ ACTIVE_CONTEXT=p&&p.context||{};
+ const base={protocolVersion:1,minClientProtocol:1,schemaVersion:1,capabilities:{localReadCache:false,changes:false,operations:false}};
+ const blocked=reason=>({...base,identityVerified:false,reason});
+ if(!manifestPrincipal_())return blocked('principalUnavailable');
+ let props,dbId,rootId;try{props=PropertiesService.getScriptProperties();dbId=props.getProperty('DB_ID');rootId=props.getProperty('ROOT_ID');}catch(ignore){return blocked('identityUnavailable');}
+ if(!dbId||!rootId)return blocked('notConfigured');
+ DB_HANDLE=null;ioReset_();
+ try{root_();const file=traceMeasure_('drive',()=>DriveApp.getFileById(dbId));if(file.isTrashed()||db_().getId()!==dbId)return blocked('archiveUnavailable');}catch(ignore){return blocked('archiveUnavailable');}
+ try{const result=locked_(function(){
+  if(!manifestPrincipal_())return blocked('principalUnavailable');
+  if(props.getProperty('DB_ID')!==dbId||props.getProperty('ROOT_ID')!==rootId)return blocked('configurationChanged');
+  const key='LOCAL_ARCHIVE_V1:'+JSON.stringify([dbId,rootId]);let raw=props.getProperty(key),record;
+  if(raw){try{record=JSON.parse(raw);}catch(ignore){return blocked('identityUnavailable');}}
+  else{record={schemaVersion:1,archiveId:Utilities.getUuid(),epoch:Utilities.getUuid()};raw=JSON.stringify(record);props.setProperty(key,raw);if(props.getProperty(key)!==raw)return blocked('identityUnavailable');}
+  const valid=id=>typeof id==='string'&&/^[a-zA-Z0-9-]{10,80}$/.test(id);
+  if(record.schemaVersion!==1||!valid(record.archiveId)||!valid(record.epoch))return blocked('identityUnavailable');
+  const user=PropertiesService.getUserProperties(),principalKey='LOCAL_PRINCIPAL_V1';let principalId=user.getProperty(principalKey);
+  if(!principalId){principalId=Utilities.getUuid();user.setProperty(principalKey,principalId);if(user.getProperty(principalKey)!==principalId)return blocked('identityUnavailable');}
+  if(!valid(principalId))return blocked('identityUnavailable');
+  return {...base,identityVerified:true,archiveId:record.archiveId,principalId,epoch:record.epoch};
+ },true,true);return result.busy?blocked('archiveBusy'):result;}catch(ignore){return blocked('identityUnavailable');}
 }
 function getState(p) { ACTIVE_CONTEXT=p&&p.context||{}; return readState_(); }
 

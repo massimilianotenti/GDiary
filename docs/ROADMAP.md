@@ -18,6 +18,7 @@ Il diario limita ora anche i dati comuni al periodo; [verifica](VERIFICA-DATI-CO
 Seguito: [cataloghi senza storico e delta delle mutazioni comuni](VERIFICA-CATALOGHI-DELTA.md), implementati localmente. Seguito implementato: [lotto multigiornata delle riflessioni](VERIFICA-RIFLESSIONI-LOTTO.md), con esiti per record e bozze conservate.
 Implementati anche [delta per allegati, aggiornamento legacy e conversione progetto/tag](VERIFICA-DELTA-LEGACY.md); seguito con [cancellazione incrementale](VERIFICA-CANCELLAZIONE-DELTA.md) implementato, contesa Docs ancora da trattare.
 La [ricerca senza lock lungo](VERIFICA-RICERCA-SENZA-LOCK-LUNGO.md) è ora implementata localmente; seguito con [worker a lotti piccoli](VERIFICA-WORKER-LOTTI-PICCOLI.md) implementato come alternativa intermedia; coordinamento condizionale completo ancora aperto.
+Il [contratto di identità archivio/principale](VERIFICA-IDENTITA-ARCHIVIO.md) è ora implementato localmente; la prova nel vero iframe resta aperta.
 La cache applicativa, il feed e l'outbox restano futuri. Dettagli
 in [VERIFICA-AVVIO-SPEC-004](VERIFICA-AVVIO-SPEC-004.md). Nessun deployment
 o migrazione dei dati reali autorizzati da questo piano.
@@ -47,3 +48,6 @@ Una PWA autonoma richiede hosting e caricamento offline dell'interfaccia; resta 
 Sia PWA sia Electron potrebbero mantenere Apps Script come intermediario oppure usare le API Google direttamente. google.script.run appartiene alle pagine HTML Service: per un'interfaccia autonoma occorre riprogettare comunicazione e autenticazione, non soltanto cambiare URL. Gestire anche restrizioni cross-origin e accesso autorizzato.
 
 Nessuna scelta definitiva su hosting, PWA, Electron, nuove API o cambio di backend è stata autorizzata come implementazione.
+
+
+Pacchetto 7 parziale: [fondamenta repository e prova sintetica](VERIFICA-REPOSITORY-LOCALE.md) implementate; riapertura viste e copia reale ancora disabilitate.

@@ -19,3 +19,7 @@ Copiare .clasp.example.json in .clasp.json e .deploy.example.json in .deploy.jso
 `npm run deploy:check` valida configurazione, build e controlli locali senza pubblicare. Richiede comunque i due file configurati e ROOT_FOLDER_ID valido.
 
 `npm run deploy` ESEGUE il push, crea una versione e aggiorna il deployment configurato. Il push usa --force; fare prima backup/confronto delle modifiche remote. I controlli del deploy non sostituiscono tutte le suite recenti: eseguire separatamente test:release. Non è stato eseguito un deploy reale per preparare questa cartella.
+
+## Sviluppo locale: identità per la futura copia browser
+
+I sorgenti aggiungono lo scope `https://www.googleapis.com/auth/userinfo.email` per confrontare utente attivo ed effettivo. Al prossimo rilascio autorizzato verificare la nuova autorizzazione e il comportamento nel deployment personale MYSELF/USER_DEPLOYING. Le capacità di cache applicativa restano disabilitate. Questo aggiornamento della documentazione non esegue né autorizza autonomamente un deployment. [Contratto e prove](VERIFICA-IDENTITA-ARCHIVIO.md).

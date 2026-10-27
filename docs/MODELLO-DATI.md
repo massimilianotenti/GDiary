@@ -152,3 +152,14 @@ Nuova ScriptProperty runtime SEARCH_REVISION, avanzata una volta per richiesta p
 ## Risultato worker a piccoli lotti — sviluppo locale
 
 Schema TaskDocQueue invariato. La risposta aggiunge attempted/chunks/stopReason; pending è null su lock occupato, processed conserva i successi precedenti. Nuove versioni di ID già tentati restano per un passaggio successivo. Invalidazioni Task/ricerca una per unità IO, anche più volte nella stessa RPC worker. [Verifica](VERIFICA-WORKER-LOTTI-PICCOLI.md).
+
+## Identità locale futura — sviluppo locale
+
+ScriptProperties: LOCAL_ARCHIVE_V1 seguito dalla coppia JSON DB_ID/ROOT_ID contiene schemaVersion, archiveId ed epoch. UserProperties: LOCAL_PRINCIPAL_V1 contiene un UUID del principale. Nessuna email persistita né foglio nuovo. getSyncManifest protocollo/schema 1, capacità cache/feed/operazioni false. Non è un token di autorizzazione. [Verifica](VERIFICA-IDENTITA-ARCHIVIO.md).
+
+
+## Fondamenta repository locale (disabilitate sui dati reali)
+
+Schema, transazioni e prova sintetica sono implementati; nessuna vista usa
+ancora la copia locale. Contratto e limiti in
+[VERIFICA-REPOSITORY-LOCALE](VERIFICA-REPOSITORY-LOCALE.md).

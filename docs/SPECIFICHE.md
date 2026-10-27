@@ -99,3 +99,14 @@ La ricerca verifica la revisione dei lotti e delle fonti Docs senza mantenere il
 ## Sincronizzazione a piccoli lotti — sviluppo locale
 
 Sincronizza ora può completare un sottoinsieme delle operazioni e lasciare il resto al passaggio successivo. L’interfaccia distingue archivio occupato, progresso confermato e lavoro rimasto; i testi sono già durevoli su Sheets. [Verifica e limiti](VERIFICA-WORKER-LOTTI-PICCOLI.md).
+
+## Verifica identità — sviluppo locale
+
+La diagnostica offre una verifica manuale dell’identità dell’archivio prima della futura copia locale. Espone soltanto l’esito; non salva il diario nel browser e non mostra email o identificativi. [Dettagli](VERIFICA-IDENTITA-ARCHIVIO.md).
+
+
+## Fondamenta repository locale (disabilitate sui dati reali)
+
+Schema, transazioni e prova sintetica sono implementati; nessuna vista usa
+ancora la copia locale. Contratto e limiti in
+[VERIFICA-REPOSITORY-LOCALE](VERIFICA-REPOSITORY-LOCALE.md).

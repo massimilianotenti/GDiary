@@ -1,5 +1,35 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Repository locale — SPEC-004 pacchetto 7 parziale, solo sintetico
+
+Fondamenta IndexedDB implementate: scope archivio/principale/epoca, lotti
+atomici con checkpoint e revisione CAS, corpi versionati, bozze indipendenti,
+invalidazione/cancellazione remota senza perdere bozze o outbox riservata.
+Prova manuale nella diagnostica su DB separato con soli marcatori inventati;
+nessuna apertura automatica o RPC. Copia applicativa ancora disabilitata:
+cacheReady resta false e nessuna vista usa il repository.
+[Contratto, verifiche e limiti](VERIFICA-REPOSITORY-LOCALE.md).
+Build, npm test, test:repository e test:release superati; Index/Demo rigenerati.
+Restano riapertura viste, integrazione risposte server e collaudo iframe reale.
+Nessun deploy o dato reale; ultimo online documentato resta Apps Script 75.
+
+## Identità archivio — SPEC-004 pacchetto 2 parziale, solo locale
+
+Nuovo getSyncManifest: archiveId/epoch persistenti per DB_ID+ROOT_ID e
+principalId separato in UserProperties, dopo confronto utente attivo/effettivo
+non vuoti. Nessuna email o ID Drive restituiti. Controlli live di accesso,
+lock breve non bloccante, identità corrotte non sostituite e retry dei metadati
+incerti. Capacità di copia locale/feed/outbox tutte disabilitate.
+Modulo frontend archive-identity e verifica manuale nella diagnostica, senza
+RPC all'avvio o aperture IndexedDB; risposte obsolete e fallimenti revocano
+lo scope. Nuovo scope userinfo.email nei sorgenti, da autorizzare al futuro
+deploy. Access MYSELF e USER_DEPLOYING invariati.
+[Verifica, contratto e limiti](VERIFICA-IDENTITA-ARCHIVIO.md).
+Build, npm test, test:identity, test:storage, test:release e test:tracing superati.
+Index/Demo e sei file di staging rigenerati. Commit worker precedente 3da5df2.
+Manca ancora la verifica sul vero iframe Google: pacchetto 2 non chiuso.
+Nessun deploy, setup o dato reale; ultimo online documentato Apps Script 75.
+
 ## Worker a lotti piccoli — SPEC-004 fase 1B parziale, solo locale
 
 Una voce per acquisizione del lock, rilascio/flush fra le voci, rilettura della

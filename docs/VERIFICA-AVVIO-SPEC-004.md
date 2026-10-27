@@ -117,9 +117,9 @@ il solo utente effettivo di esecuzione non identifica necessariamente chi
 visita una web app. Non usare email o ID Drive negli export né creare un
 namespace comune se l'identità autenticata non è disponibile.
 
-La generazione/persistenza dell'identità e il comportamento nei deployment
-supportati devono essere testati separatamente; non sono stati aggiunti alla
-prova sintetica per evitare di confonderla con un accesso ai dati applicativi.
+Il seguito [identità archivio](VERIFICA-IDENTITA-ARCHIVIO.md) implementa ora
+il contratto e i test locali separati. Il comportamento nel deployment Google
+supportato rimane da verificare; nessun dato applicativo è conservato nel browser.
 
 ## Prossime attività
 

@@ -1,6 +1,9 @@
 import {createApp,shallowRef,nextTick} from 'vue';
 import DiaryPage from './components/DiaryPage.vue';
 export {storageProbe} from './storage-probe.js';
+export {createArchiveIdentityClient} from './archive-identity.js';
+export {createLocalRepository} from './local-repository.js';
+export {repositoryProbe,createRepositoryProbe} from './repository-probe.js';
 import './diary.css';
 import './pleasant.css';
 import './app-theme.css';
