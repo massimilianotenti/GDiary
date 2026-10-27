@@ -66,3 +66,5 @@ Per cataloghi e salvataggi incrementali eseguire `npm run test:catalog-deltas`, 
 Per i lotti delle riflessioni eseguire `npm run test:day-batch`, `test:release` e P75. [Contratto, fault injection e limiti](VERIFICA-RIFLESSIONI-LOTTO.md).
 
 Per allegati, conversione e aggiornamento legacy: `npm run test:legacy-deltas`, `test:release`, `test:tracing` e `test:incremental`. [Rapporto](VERIFICA-DELTA-LEGACY.md).
+
+Per la cancellazione incrementale: `npm run test:delete-delta`, `test:release` e `test:progressive`; copre anche la risposta persa dopo eliminazione e la pagina precedente in volo. [Rapporto](VERIFICA-CANCELLAZIONE-DELTA.md).

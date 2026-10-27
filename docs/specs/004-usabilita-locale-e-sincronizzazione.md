@@ -1,6 +1,6 @@
 # SPEC-004 — Usabilità, dati locali e sincronizzazione incrementale
 
-**Stato:** Approvata per avvio sviluppo — fase 0 parziale, Entries raggruppate, Task con corpi differiti e fotografia delle continuazioni e dati comuni per periodo, scope cataloghi, delta comuni/legacy e lotto delle riflessioni implementati localmente; resto del piano da realizzare.
+**Stato:** Approvata per avvio sviluppo — fase 0 parziale, Entries raggruppate, Task con corpi differiti e fotografia delle continuazioni e dati comuni per periodo, scope cataloghi, delta comuni/legacy/cancellazione e lotto delle riflessioni implementati localmente; resto del piano da realizzare.
 
 **Data:** 27 ottobre 2026.
 
@@ -457,4 +457,4 @@ Letture temporali limitate al diario e contratto di copertura: [verifica locale]
 
 Cataloghi senza storico e delta canonici di obiettivi, abitudini, progetti e impostazioni: [verifica locale](../VERIFICA-CATALOGHI-DELTA.md). Altri percorsi legacy restano da implementare. Lotto riflessioni completato nel seguito: [verifica](../VERIFICA-RIFLESSIONI-LOTTO.md).
 
-Allegati, aggiornamento legacy e conversione progetto/tag ora rispondono con delta: [verifica](../VERIFICA-DELTA-LEGACY.md). deleteNote e contesa Docs restano invariati.
+Allegati, aggiornamento legacy e conversione progetto/tag ora rispondono con delta: [verifica](../VERIFICA-DELTA-LEGACY.md). La cancellazione ha ora [risposta incrementale](../VERIFICA-CANCELLAZIONE-DELTA.md); contesa Docs invariata.

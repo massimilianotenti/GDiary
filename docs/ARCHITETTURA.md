@@ -147,3 +147,7 @@ saveDays condivide dayValues_ con saveDay, legge solo le date richieste e distin
 ## Delta di allegati e percorsi legacy — sviluppo locale
 
 addFileLink espone fileUpserts canonici; updateEntry metadataOnly; convertProjectToTag patch dei metadati, rimozione progetto e aggiunta tag. Il client aggiorna solo le voci note, preserva contenuti e bozze e invalida le cache. Opt-in incrementalCommon, fallback completo per chiamanti legacy. [Verifica e limiti](VERIFICA-DELTA-LEGACY.md).
+
+## Cancellazione con delta — sviluppo locale
+
+deleteNote espone deletedEntryIds e alreadyAbsent con incrementalCommon; il client rimuove riferimenti in memoria e invalida sessioni/cursori, preservando gli oggetti bozza. Controlli e lock Docs restano invariati. [Verifica e limiti](VERIFICA-CANCELLAZIONE-DELTA.md).

@@ -1,5 +1,19 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Cancellazione con delta — SPEC-004, solo locale
+
+Con incrementalCommon:true, deleteNote risponde con deletedEntryIds e
+alreadyAbsent, senza ricostruire state_(). Il client elimina entry, collegamenti,
+pianificazione e copie in archivio/cache; preserva bozze estranee e sostituisce
+la sessione del diario per scartare richieste precedenti. Retry dopo risposta
+persa gestito dal ramo già assente. Versioni, marcatori e controlli live Drive
+invariati; nessuna atomicità o revisione del lock Docs introdotta.
+[Verifica e limiti](VERIFICA-CANCELLAZIONE-DELTA.md).
+Build, npm test, test:delete-delta, test:release, test:tracing,
+test:progressive, test:incremental e test:legacy-deltas superati.
+Index/Demo e sei file di staging rigenerati. Nessun deploy o dato reale;
+ultimo online documentato resta Apps Script 75.
+
 ## Delta dei percorsi legacy — SPEC-004, solo locale
 
 Con incrementalCommon:true, addFileLink restituisce il solo allegato canonico
@@ -9,7 +23,7 @@ ricostruzione state_() dopo queste scritture. Client: merge per identità,
 contenuti/privacy conservati, niente record incompleti per voci non caricate,
 cache invalidate e bozze mantenute con versioni originali. I client senza
 opt-in restano compatibili. Conversione ancora proporzionale ai record coinvolti;
-deleteNote e contesa dei writer Docs non modificati. [Verifica e limiti](VERIFICA-DELTA-LEGACY.md).
+La cancellazione è trattata nel seguito sopra; contesa dei writer Docs invariata. [Verifica e limiti](VERIFICA-DELTA-LEGACY.md).
 Build, npm test, test:legacy-deltas, test:release, test:tracing e
 test:incremental superati. Index/Demo e sei file di staging rigenerati.
 Nessun deploy o dato reale; ultimo online documentato resta Apps Script 75.

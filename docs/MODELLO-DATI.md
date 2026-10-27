@@ -140,3 +140,7 @@ Nessuno schema nuovo. Array days fino a 10 date/500.000 byte; results per data c
 ## Delta legacy — sviluppo locale
 
 fileUpserts contiene record FILE_HEADERS canonici per ID. entryPatches contiene id/projects/tags/scope/updatedAt delle voci convertite; commonRemovals.projects rimuove slug e addedTags aggiorna il catalogo. Nessuna modifica agli schemi persistiti. [Verifica](VERIFICA-DELTA-LEGACY.md).
+
+## Delta di cancellazione — sviluppo locale
+
+deletedEntryIds indica le identità assenti dopo deleteNote; alreadyAbsent distingue il ramo già assente. Nessuna tabella tombstone o ricevuta operationId aggiunta. Contratto completo legacy preservato. [Verifica](VERIFICA-CANCELLAZIONE-DELTA.md).

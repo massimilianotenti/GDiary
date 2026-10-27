@@ -89,6 +89,7 @@ Nessun tempo Google è stato misurato in questa tranche.
 Non si promettono atomicità della conversione o ricevute operationId. Un errore
 durante una conversione può richiedere rilettura e nuova anteprima, come prima.
 Non viene modificato il coordinamento dei writer Docs né alleggerito il lock
-remoto della cancellazione. deleteNote e il caso di voce già assente conservano
-ancora le proprie risposte complete. La contesa della ricerca/worker, la copia
+remoto della cancellazione. Il seguito [cancellazione incrementale](VERIFICA-CANCELLAZIONE-DELTA.md)
+converte ora anche deleteNote e il caso di voce già assente, mantenendo il
+contratto completo per i client legacy. La contesa della ricerca/worker, la copia
 locale persistente, il feed e l'outbox restano sviluppi successivi.
