@@ -1,6 +1,6 @@
 # SPEC-004 — Usabilità, dati locali e sincronizzazione incrementale
 
-**Stato:** Approvata per avvio sviluppo — fase 0 parziale, fase 1A locale, Entries raggruppate, Task con corpi differiti e fotografia delle continuazioni e dati comuni per periodo, scope cataloghi, delta comuni/legacy/cancellazione e lotto delle riflessioni implementati localmente; resto del piano da realizzare.
+**Stato:** Approvata per avvio sviluppo — fase 0 parziale, fase 1A locale e fallback 1B a lotti piccoli, Entries raggruppate, Task con corpi differiti e fotografia delle continuazioni e dati comuni per periodo, scope cataloghi, delta comuni/legacy/cancellazione e lotto delle riflessioni implementati localmente; resto del piano da realizzare.
 
 **Data:** 27 ottobre 2026.
 
@@ -124,6 +124,8 @@ Eliminare il flush non necessario nel percorso di sola lettura; usare mappe
 per riferimenti/allegati al posto di ricerche ripetute per ogni voce.
 
 ### 1B. Scrittura Docs coordinata
+
+Implementata solo l’alternativa intermedia a lotti piccoli sotto lock: [verifica](../VERIFICA-WORKER-LOTTI-PICCOLI.md). Prenotazioni, writer condizionale e lavoro fuori lock descritti sotto restano proposti.
 
 Estendere la coda con versione richiesta, token worker, scadenza prenotazione,
 tentativi e prossimo tentativo. Coordinare tutti gli scrittori dello stesso

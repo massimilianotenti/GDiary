@@ -1,5 +1,20 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Worker a lotti piccoli — SPEC-004 fase 1B parziale, solo locale
+
+Una voce per acquisizione del lock, rilascio/flush fra le voci, rilettura della
+coda a ogni unità. Massimo 10 identità e budget morbido di 5 secondi; stop su
+busy o esito di creazione/chiusura Docs incerto. Nuove versioni fra unità restano
+pending, errori non ripetuti nello stesso passaggio. UI mostra progresso e
+lavoro rimasto; tracing distingue occupazione totale e massima del lock.
+È l'alternativa intermedia della SPEC: scritture ancora sotto il lock globale,
+una singola chiamata lenta può oltrepassare il budget, costo totale potenzialmente
+maggiore. Writer condizionale e coordinamento completo restano da sviluppare.
+[Verifica, fonti e limiti](VERIFICA-WORKER-LOTTI-PICCOLI.md).
+Build, npm test, test:worker-chunks, test:release, test:locks, test:tracing,
+test:search-concurrency e P54 superati. Index/Demo e sei file di staging
+rigenerati; nessun deploy, trigger nuovo o dato reale. Ultimo online Apps Script 75.
+
 ## Ricerca senza lock lungo — SPEC-004 fase 1A, solo locale
 
 searchArchive ora legge fuori dal lock globale, con tre controlli brevi

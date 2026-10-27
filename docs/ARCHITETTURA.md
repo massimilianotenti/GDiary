@@ -155,3 +155,7 @@ deleteNote espone deletedEntryIds e alreadyAbsent con incrementalCommon; il clie
 ## Ricerca con revisione applicativa — sviluppo locale
 
 searchArchive legge metadati e Docs fuori dal lock, verificando SEARCH_REVISION con sonde brevi tryLock(0). I writer pertinenti avanzano la revisione prima delle mutazioni. searchVersion lega le continuazioni a archivio/query/revisione; reset e fonti Docs non verificate non sono ricerche complete. [Contratti e limiti](VERIFICA-RICERCA-SENZA-LOCK-LUNGO.md).
+
+## Worker a unità singole — sviluppo locale intermedio
+
+processTaskDocQueue orchestra fino a 10 identità, processDocQueueItem_ rilegge e finalizza una voce per acquisizione globale; budget morbido 5 secondi e stop su busy/esito incerto. Nessuna lease, nuovo schema o scrittura Docs fuori lock. Picco lock strumentato con lockHeldMaxMs. [Verifica e limiti](VERIFICA-WORKER-LOTTI-PICCOLI.md).

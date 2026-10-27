@@ -70,3 +70,5 @@ Per allegati, conversione e aggiornamento legacy: `npm run test:legacy-deltas`, 
 Per la cancellazione incrementale: `npm run test:delete-delta`, `test:release` e `test:progressive`; copre anche la risposta persa dopo eliminazione e la pagina precedente in volo. [Rapporto](VERIFICA-CANCELLAZIONE-DELTA.md).
 
 Ricerca e contesa: `npm run test:search-concurrency`, `test:locks`, `test:tracing` e `test:release`. Il mock ora simula revisioni Drive a ogni saveAndClose. [Verifica, protocollo e limiti](VERIFICA-RICERCA-SENZA-LOCK-LUNGO.md).
+
+Worker: `npm run test:worker-chunks`, `test:locks`, `test:release` e P54. Il clock simulato distingue occupazione massima e totale; non misura Google. [Rapporto e limiti](VERIFICA-WORKER-LOTTI-PICCOLI.md).

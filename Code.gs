@@ -84,8 +84,8 @@ function locked_(fn,readOnly=false,background=false) {
   catch(error){traceCount_('lockAcquireErrors');throw error;}
   if(!acquired){traceCount_('lockBusy');return {processed:0,busy:true,pending:null,errors:[]};}
   traceCount_('lockAcquired');
-  APP_LOCK_DEPTH++;
-  try{return traceMeasure_('lockHeld',()=>{try { return fn(); } finally { try { if(!readOnly)traceMeasure_('flush',()=>SpreadsheetApp.flush()); } finally { lock.releaseLock(); } }});}finally{APP_LOCK_DEPTH--;}
+  APP_LOCK_DEPTH++;const heldStarted=Date.now(),heldTrace=ACTIVE_TRACE;
+  try{return traceMeasure_('lockHeld',()=>{try { return fn(); } finally { try { if(!readOnly)traceMeasure_('flush',()=>SpreadsheetApp.flush()); } finally { lock.releaseLock(); } }});}finally{if(heldTrace)heldTrace.metrics.lockHeldMaxMs=Math.max(heldTrace.metrics.lockHeldMaxMs||0,Date.now()-heldStarted);APP_LOCK_DEPTH--;}
 }
 function db_() {return traceMeasure_('sheets',()=>{
   if(DB_HANDLE)return DB_HANDLE;

@@ -17,7 +17,7 @@ e fallback; [verifica indice Task](VERIFICA-INDICE-TASK.md).
 Il diario limita ora anche i dati comuni al periodo; [verifica](VERIFICA-DATI-COMUNI-PERIODO.md). Finestre estese anche a Settimana e Abitudini, con [verifica del seguito](VERIFICA-SETTIMANA-ABITUDINI-PERIODO.md).
 Seguito: [cataloghi senza storico e delta delle mutazioni comuni](VERIFICA-CATALOGHI-DELTA.md), implementati localmente. Seguito implementato: [lotto multigiornata delle riflessioni](VERIFICA-RIFLESSIONI-LOTTO.md), con esiti per record e bozze conservate.
 Implementati anche [delta per allegati, aggiornamento legacy e conversione progetto/tag](VERIFICA-DELTA-LEGACY.md); seguito con [cancellazione incrementale](VERIFICA-CANCELLAZIONE-DELTA.md) implementato, contesa Docs ancora da trattare.
-La [ricerca senza lock lungo](VERIFICA-RICERCA-SENZA-LOCK-LUNGO.md) è ora implementata localmente; il coordinamento del worker Docs rimane successivo.
+La [ricerca senza lock lungo](VERIFICA-RICERCA-SENZA-LOCK-LUNGO.md) è ora implementata localmente; seguito con [worker a lotti piccoli](VERIFICA-WORKER-LOTTI-PICCOLI.md) implementato come alternativa intermedia; coordinamento condizionale completo ancora aperto.
 La cache applicativa, il feed e l'outbox restano futuri. Dettagli
 in [VERIFICA-AVVIO-SPEC-004](VERIFICA-AVVIO-SPEC-004.md). Nessun deployment
 o migrazione dei dati reali autorizzati da questo piano.

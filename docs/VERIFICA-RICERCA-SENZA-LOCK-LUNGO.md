@@ -14,7 +14,8 @@ di qualsiasi scansione Sheets o chiamata Drive/Docs. Non attende un writer
 occupato e non tenta di rilasciare un lock già detenuto dal chiamante.
 
 Nuova proprietà runtime SEARCH_REVISION, cambiata prima delle mutazioni
-pertinenti e al massimo una volta per richiesta che usa gli helper IO.
+pertinenti e al massimo una volta per unità IO sotto lock. Il successivo worker a piccoli
+lotti può aprire più unità nella stessa RPC.
 Tabelle coperte: Entries, DocRefs, Files, Projects, TaskDocQueue e DocContent.
 Append, writeRow/writeRows, conversione progetto e cancellazione hanno hook
 prima delle modifiche osservabili. Per deleteNote la revisione viene anticipata
@@ -117,6 +118,6 @@ misurare costo e beneficio sul contenitore Google prima di dichiarare latenza.
 
 Il browser continua a disabilitare i controlli durante il ciclo della ricerca;
 questo step elimina la contesa remota lunga con altri writer, non introduce
-ricerca locale o UI utilizzabile durante tutte le RPC. Il worker Docs mantiene
-ancora il proprio lock lungo: il suo coordinamento è il prossimo intervento
+ricerca locale o UI utilizzabile durante tutte le RPC. Il successivo [worker a piccoli lotti](VERIFICA-WORKER-LOTTI-PICCOLI.md)
+rilascia ora il lock fra voci; la singola scrittura lo mantiene: il suo coordinamento è il prossimo intervento
 separato della fase 1B, prima di copia locale, feed e outbox.

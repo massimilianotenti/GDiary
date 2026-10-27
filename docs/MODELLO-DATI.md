@@ -148,3 +148,7 @@ deletedEntryIds indica le identità assenti dopo deleteNote; alreadyAbsent disti
 ## Revisione della ricerca — sviluppo locale
 
 Nuova ScriptProperty runtime SEARCH_REVISION, avanzata una volta per richiesta per Entries/DocRefs/Files/Projects/TaskDocQueue/DocContent. Nessun foglio nuovo. searchVersion è uno scope interno con query/revisione/configurazione; searchReset richiede ripartenza e partial indica fonti non verificate. Non è un feed né un namespace IndexedDB. [Verifica](VERIFICA-RICERCA-SENZA-LOCK-LUNGO.md).
+
+## Risultato worker a piccoli lotti — sviluppo locale
+
+Schema TaskDocQueue invariato. La risposta aggiunge attempted/chunks/stopReason; pending è null su lock occupato, processed conserva i successi precedenti. Nuove versioni di ID già tentati restano per un passaggio successivo. Invalidazioni Task/ricerca una per unità IO, anche più volte nella stessa RPC worker. [Verifica](VERIFICA-WORKER-LOTTI-PICCOLI.md).
