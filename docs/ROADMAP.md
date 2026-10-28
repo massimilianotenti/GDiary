@@ -69,3 +69,9 @@ Seguito del pacchetto 7: [indice limitato a 16 pagine del diario](VERIFICA-PAGIN
 implementato dietro interruttore spento, con lettura atomica mirata e anteprima
 anche delle continuazioni. Sostituisce il solo descrittore dell'ultima pagina;
 non costituisce una fotografia remota completa o un editor offline.
+
+
+Pacchetto 8 avviato: [nucleo dei commit recuperabili](VERIFICA-NUCLEO-COMMIT-RECUPERABILI.md)
+implementato e verificato con adapter sintetico e fault injection. Non è ancora
+collegato a Sheets, API legacy o repository; feed/operazioni reali disabilitati.
+Versioni commit-N interne al prototipo, nessuna modifica agli updatedAt esistenti.

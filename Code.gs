@@ -561,3 +561,140 @@ const OUTLINE_ICON_IDS=["target", "plant", "heart", "brain", "strength", "book",
 // Navigation is an eventually consistent read. It never prepares Docs or changes schema.
 function readState_(){DB_HANDLE=null;ENTRY_SMALL_CACHE=null;ENTRY_TAG_HEADER_CHECKED=false;ENTRY_TAG_HEADER_WRITTEN=false;ioReset_();const result=state_();result.performance={...result.performance,lockWaitMs:0,readWithoutLock:true};return result;}
 function tagCatalog_(){const sheet=db_().getSheetByName('Entries'),count=sheet.getLastRow()-1;if(count<=0)return [];return Array.from(new Set(sheet.getRange(2,ENTRY_HEADERS.indexOf('tags')+1,count,1).getDisplayValues().flatMap(row=>String(row[0]||'').split(',').filter(Boolean)))).sort();}
+
+// SPEC-004 package 8: synchronous recovery kernel, not wired to Google or any
+// application writer. A future adapter must supply one shared lock, durable
+// read-after-write units, archive/epoch isolation and a deterministic SHA-256.
+// No table/setup/RPC is created by defining or constructing this factory.
+function syncCommitCanonical_(value,depth=0){
+ if(depth>40)throw Object.assign(new Error('DataError'),{name:'DataError'});
+ if(value===null)return 'null';
+ if(typeof value==='string'||typeof value==='boolean')return JSON.stringify(value);
+ if(typeof value==='number'&&Number.isFinite(value))return JSON.stringify(value);
+ if(Array.isArray(value)){const parts=[];for(let i=0;i<value.length;i++)parts.push(syncCommitCanonical_(value[i],depth+1));return '['+parts.join(',')+']';}
+ if(value&&Object.prototype.toString.call(value)==='[object Object]')return '{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+syncCommitCanonical_(value[key],depth+1)).join(',')+'}';
+ throw Object.assign(new Error('DataError'),{name:'DataError'});
+}
+function syncCommitProtocol_(store,trustedScope){
+ const fail=name=>{throw Object.assign(new Error(name),{name});},copy=value=>JSON.parse(syncCommitCanonical_(value));
+ const same=(a,b)=>syncCommitCanonical_(a)===syncCommitCanonical_(b);
+ const hasKey=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
+ const fields=(value,keys)=>value&&Object.prototype.toString.call(value)==='[object Object]'&&Object.keys(value).every(key=>keys.includes(key));
+ const identifier=value=>typeof value==='string'&&/^[a-zA-Z0-9-]{10,80}$/.test(value);
+ const collections=['entries','contents','days','weeks','goals','habits','habitLogs','projects','taskPlans','files','settings','layouts','docRefs','docQueue','previews'];
+ const scope=copy(trustedScope),archive={archiveId:scope.archiveId,epoch:scope.epoch};
+ if(!fields(scope,['archiveId','principalId','epoch'])||![scope.archiveId,scope.principalId,scope.epoch].every(identifier))fail('DataError');
+ for(const method of ['withLock','digest','readHead','writeHead','readEntity','writeEntity','readCommit','writeCommit','findCommitByOperation','readReceipt','writeReceipt'])if(typeof store?.[method]!=='function')fail('DataError');
+ const hash=value=>{const digest=store.digest(syncCommitCanonical_(value));if(typeof digest!=='string'||!/^[a-f0-9]{64}$/.test(digest))fail('ProtocolCorrupt');return digest;};
+ const seal=value=>({...value,checksum:hash(value)});
+ function unseal(value){if(!value||typeof value.checksum!=='string')fail('ProtocolCorrupt');const {checksum,...body}=value;if(hash(body)!==checksum)fail('ProtocolCorrupt');return body;}
+ const checkedWrite=(write,read,value)=>{write(copy(value));if(!same(read(),value))fail('ProtocolCorrupt');};
+ const saveHead=value=>checkedWrite(record=>store.writeHead(record),()=>store.readHead(),seal(value));
+ const guarded=fn=>{try{const value=store.withLock(fn);if(value&&typeof value.then==='function')fail('ProtocolCorrupt');return {ok:true,value:copy(value)};}catch(error){return {ok:false,error:['DataError','ProtocolUnavailable','ProtocolCorrupt','OperationMismatch','CommitBlocked','ScopeChanged','BusyError'].includes(error?.name)?error.name:'StorageError'};}};
+ function requestValue(input){
+  if(!fields(input,['operationId','changes'])||!identifier(input.operationId)||!Array.isArray(input.changes)||!input.changes.length||input.changes.length>25)fail('DataError');
+  const value=copy(input),ids=new Set();
+  for(const change of value.changes){
+   if(!fields(change,['collection','id','baseVersion','action','data'])||!collections.includes(change.collection)||typeof change.id!=='string'||!change.id||change.id.length>200||!(change.baseVersion===null||typeof change.baseVersion==='string'&&/^commit-[1-9][0-9]{0,15}$/.test(change.baseVersion))||!['upsert','delete'].includes(change.action))fail('DataError');
+   const key=JSON.stringify([change.collection,change.id]);if(ids.has(key))fail('DataError');ids.add(key);
+   if(change.action==='delete'){if(hasKey(change,'data'))fail('DataError');}
+   else if(!change.data||Object.prototype.toString.call(change.data)!=='[object Object]')fail('DataError');
+  }
+  if(syncCommitCanonical_(value).length>32768)fail('DataError');return value;
+ }
+ function headValue(){
+  const raw=store.readHead();if(raw===null)fail('ProtocolUnavailable');const value=unseal(raw);
+  if(!value||value.format!=='sync-head/v1'||!same(value.archive,archive)||!Number.isSafeInteger(value.committedThrough)||value.committedThrough<0||value.committedThrough>=Number.MAX_SAFE_INTEGER||!hasKey(value,'pending'))fail('ProtocolCorrupt');
+  return copy(value);
+ }
+ function entityValue(value,collection,id,maxSequence){
+  if(value===null)return null;
+  if(!value||!same(value.archive,archive)||value.collection!==collection||value.id!==id||!Number.isSafeInteger(value.sequence)||value.sequence<1||value.sequence>maxSequence||value.version!=='commit-'+value.sequence||typeof value.deleted!=='boolean'||(value.deleted?value.data!==null:!value.data||Object.prototype.toString.call(value.data)!=='[object Object]'))fail('ProtocolCorrupt');
+  return value;
+ }
+ function afterImages(pending){return pending.request.changes.map(change=>({archive,collection:change.collection,id:change.id,sequence:pending.sequence,version:'commit-'+pending.sequence,deleted:change.action==='delete',data:change.action==='delete'?null:change.data}));}
+ function receiptValue(value,principalId,operationId){
+  if(value===null)return null;const body=unseal(value);
+  if(body.format!=='sync-receipt/v1'||!same(body.archive,archive)||body.principalId!==principalId||body.operationId!==operationId||!/^[a-f0-9]{64}$/.test(body.fingerprint||'')||body.response?.operationId!==operationId||!['committed','conflict'].includes(body.response?.status))fail('ProtocolCorrupt');
+  const response=body.response,validKey=item=>collections.includes(item?.collection)&&typeof item.id==='string'&&item.id.length>0&&item.id.length<=200;
+  if(response.status==='committed'){
+   if(!Number.isSafeInteger(response.sequence)||response.sequence<1||!Array.isArray(response.versions)||!response.versions.length||response.versions.length>25||response.versions.some(item=>!validKey(item)||item.version!=='commit-'+response.sequence||typeof item.deleted!=='boolean'))fail('ProtocolCorrupt');
+  }else if(response.sequence!==null||!Array.isArray(response.conflicts)||!response.conflicts.length||response.conflicts.length>25||response.conflicts.some(item=>!validKey(item)||!(item.expectedVersion===null||typeof item.expectedVersion==='string')||!(item.actualVersion===null||typeof item.actualVersion==='string')))fail('ProtocolCorrupt');
+  return body;
+ }
+ function recoverLocked(head){
+  if(head.pending===null)return head;
+  const pending=unseal(head.pending);
+  if(pending.sequence!==head.committedThrough+1||!identifier(pending.principalId)||!Array.isArray(pending.before))fail('ProtocolCorrupt');
+  const request=requestValue(pending.request);if(hash(request)!==pending.fingerprint||pending.before.length!==request.changes.length)fail('ProtocolCorrupt');
+  const after=afterImages(pending);
+  // Check every member before resuming: a legacy/external mutation must block
+  // recovery before it overwrites any further entity in the prepared plan.
+  const actual=request.changes.map((change,index)=>{
+   const before=entityValue(pending.before[index],change.collection,change.id,head.committedThrough);
+   if((before?.version??null)!==change.baseVersion)fail('ProtocolCorrupt');
+   const value=entityValue(store.readEntity(change.collection,change.id),change.collection,change.id,pending.sequence);
+   if(!same(value,before)&&!same(value,after[index]))fail('CommitBlocked');return value;
+  });
+  after.forEach((entity,index)=>{if(!same(actual[index],entity))checkedWrite(value=>store.writeEntity(entity.collection,entity.id,value),()=>store.readEntity(entity.collection,entity.id),entity);});
+  const commit=seal({format:'sync-commit/v1',archive,principalId:pending.principalId,operationId:request.operationId,fingerprint:pending.fingerprint,sequence:pending.sequence,changes:after});
+  const existingCommit=store.readCommit(pending.sequence);if(existingCommit!==null&&!same(existingCommit,commit))fail('ProtocolCorrupt');
+  if(existingCommit===null)checkedWrite(value=>store.writeCommit(pending.sequence,value),()=>store.readCommit(pending.sequence),commit);
+  const response={status:'committed',operationId:request.operationId,sequence:pending.sequence,versions:after.map(entity=>({collection:entity.collection,id:entity.id,version:entity.version,deleted:entity.deleted}))};
+  const receipt=seal({format:'sync-receipt/v1',archive,principalId:pending.principalId,operationId:request.operationId,fingerprint:pending.fingerprint,response});
+  const existingReceipt=store.readReceipt(pending.principalId,request.operationId);if(existingReceipt!==null&&!same(existingReceipt,receipt))fail('ProtocolCorrupt');
+  if(existingReceipt===null)checkedWrite(value=>store.writeReceipt(pending.principalId,request.operationId,value),()=>store.readReceipt(pending.principalId,request.operationId),receipt);
+  // Publication is last. A lost ACK at any preceding write leaves the entire
+  // recovery plan intact; neither readers nor the feed may skip that hole.
+  const next={...head,committedThrough:pending.sequence,pending:null};saveHead(next);return next;
+ }
+ function commitValue(value,sequence){
+  const commit=unseal(value);
+  if(commit.format!=='sync-commit/v1'||!same(commit.archive,archive)||commit.sequence!==sequence||!identifier(commit.operationId)||!identifier(commit.principalId)||!/^[a-f0-9]{64}$/.test(commit.fingerprint||'')||!Array.isArray(commit.changes)||!commit.changes.length||commit.changes.length>25)fail('ProtocolCorrupt');
+  const keys=new Set();for(const entity of commit.changes){if(!collections.includes(entity.collection)||typeof entity.id!=='string'||!entity.id||entity.id.length>200||entity.sequence!==sequence)fail('ProtocolCorrupt');entityValue(entity,entity.collection,entity.id,sequence);const key=JSON.stringify([entity.collection,entity.id]);if(keys.has(key))fail('ProtocolCorrupt');keys.add(key);}return commit;
+ }
+ const cursor=sequence=>({format:'sync-cursor/v1',...scope,sequence});
+ return Object.freeze({
+  execute:input=>guarded(()=>{
+   const request=requestValue(input),fingerprint=hash(request),head=recoverLocked(headValue());
+   const stored=receiptValue(store.readReceipt(scope.principalId,request.operationId),scope.principalId,request.operationId);
+   if(stored){if(stored.fingerprint!==fingerprint)fail('OperationMismatch');if(stored.response.status==='committed'){
+    if(stored.response.sequence>head.committedThrough)fail('ProtocolCorrupt');const commit=commitValue(store.readCommit(stored.response.sequence),stored.response.sequence);
+    if(commit.principalId!==scope.principalId||commit.operationId!==request.operationId||commit.fingerprint!==fingerprint||!same(stored.response.versions,commit.changes.map(entity=>({collection:entity.collection,id:entity.id,version:entity.version,deleted:entity.deleted}))))fail('ProtocolCorrupt');
+   }return stored.response;}
+   // A retained commit is an independent proof of an already-applied ID. A
+   // missing receipt must not turn an old edit/delete into a fresh operation.
+   const previous=store.findCommitByOperation(scope.principalId,request.operationId);
+   if(previous!==null){
+    const commit=commitValue(previous,previous.sequence);if(commit.sequence>head.committedThrough||commit.principalId!==scope.principalId||commit.operationId!==request.operationId)fail('ProtocolCorrupt');if(commit.fingerprint!==fingerprint)fail('OperationMismatch');
+    const response={status:'committed',operationId:request.operationId,sequence:commit.sequence,versions:commit.changes.map(entity=>({collection:entity.collection,id:entity.id,version:entity.version,deleted:entity.deleted}))};
+    const receipt=seal({format:'sync-receipt/v1',archive,principalId:scope.principalId,operationId:request.operationId,fingerprint,response});checkedWrite(value=>store.writeReceipt(scope.principalId,request.operationId,value),()=>store.readReceipt(scope.principalId,request.operationId),receipt);return response;
+   }
+   const before=request.changes.map(change=>entityValue(store.readEntity(change.collection,change.id),change.collection,change.id,head.committedThrough));
+   const conflicts=request.changes.flatMap((change,index)=>{const actual=before[index]?.version??null;return actual!==change.baseVersion||change.action==='delete'&&(!before[index]||before[index].deleted)?[{collection:change.collection,id:change.id,expectedVersion:change.baseVersion,actualVersion:actual}]:[];});
+   if(conflicts.length){
+    const response={status:'conflict',operationId:request.operationId,sequence:null,conflicts},receipt=seal({format:'sync-receipt/v1',archive,principalId:scope.principalId,operationId:request.operationId,fingerprint,response});
+    checkedWrite(value=>store.writeReceipt(scope.principalId,request.operationId,value),()=>store.readReceipt(scope.principalId,request.operationId),receipt);return response;
+   }
+   if(head.committedThrough>=Number.MAX_SAFE_INTEGER-1)fail('ProtocolUnavailable');
+   const pending=seal({sequence:head.committedThrough+1,principalId:scope.principalId,request,fingerprint,before});if(syncCommitCanonical_(pending).length>131072)fail('DataError');
+   const prepared={...head,pending};saveHead(prepared);recoverLocked(prepared);
+   return receiptValue(store.readReceipt(scope.principalId,request.operationId),scope.principalId,request.operationId).response;
+  }),
+  recover:()=>guarded(()=>{const head=recoverLocked(headValue());return {committedThrough:head.committedThrough};}),
+  read:(collection,id)=>guarded(()=>{if(!collections.includes(collection)||typeof id!=='string'||!id||id.length>200)fail('DataError');const head=recoverLocked(headValue());return {cursor:cursor(head.committedThrough),entity:entityValue(store.readEntity(collection,id),collection,id,head.committedThrough)};}),
+  changes:input=>guarded(()=>{
+   if(!fields(input,['cursor','limit'])||!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>5)fail('DataError');
+   const token=input.cursor;if(!fields(token,['format','archiveId','principalId','epoch','sequence'])||token.format!=='sync-cursor/v1'||!Number.isSafeInteger(token.sequence)||token.sequence<0)fail('DataError');
+   if(token.archiveId!==scope.archiveId||token.epoch!==scope.epoch||token.principalId!==scope.principalId)fail('ScopeChanged');
+   const head=recoverLocked(headValue());if(token.sequence>head.committedThrough)fail('DataError');
+   const commits=[];let through=token.sequence;
+   for(let sequence=through+1;sequence<=head.committedThrough&&commits.length<input.limit;sequence++){
+    const value=commitValue(store.readCommit(sequence),sequence),commit={sequence:value.sequence,operationId:value.operationId,changes:value.changes};
+    const candidate={commits:commits.concat([commit]),cursor:cursor(sequence),hasMore:sequence<head.committedThrough,highWater:head.committedThrough};
+    if(syncCommitCanonical_(candidate).length>131072){if(!commits.length)fail('ProtocolCorrupt');break;}commits.push(commit);through=sequence;
+   }
+   return {commits,cursor:cursor(through),hasMore:through<head.committedThrough,highWater:head.committedThrough};
+  })
+ });
+}

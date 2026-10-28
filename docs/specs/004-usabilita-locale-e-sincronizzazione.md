@@ -483,3 +483,8 @@ completa e abilitazione reale restano da sviluppare/collaudare.
 Pacchetto 7, seguito: [indice delle pagine locali del diario](../VERIFICA-PAGINE-LOCALI-DIARIO.md)
 implementato con limite 16 per scope e anteprima delle continuazioni. Rimangono
 periodo comune singolo, bootstrap coerente, altre viste e abilitazione reale.
+
+
+Pacchetto 8, primo incremento: [nucleo prepare/apply/commit e feed di riferimento](../VERIFICA-NUCLEO-COMMIT-RECUPERABILI.md)
+implementato con adapter sintetico. Nessuna mutazione legacy collegata, nessuna
+persistenza Google o capacità del manifest abilitata; pacchetto ancora parziale.

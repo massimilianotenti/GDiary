@@ -1,5 +1,22 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Commit recuperabili — 28 ottobre, pacchetto 8 parziale
+
+Nuovo nucleo interno syncCommitProtocol_ in Code.gs, con adapter sincrono
+iniettato: prepare/preimmagini, applicazione idempotente, ricevute stabili e
+pubblicazione del checkpoint solo alla fine. Feed di riferimento con snapshot
+immutabili, tombstone e pagine di commit interi; barriera di recupero anche
+sui lettori del protocollo. SHA-256/checksum e scope archivio/epoca/principale.
+Test:commits copre 16 interruzioni prima/dopo le scritture con processo nuovo,
+conflitti, ricevute mancanti, varianti esterne, limiti e corruzione.
+Nessun adapter Sheets o writer/lettore legacy collegato; nessuna API nuova,
+setup o tabella creata. Capacità del manifest ancora false.
+Build, npm test/test:commits, test:release, test:identity e test:tracing superati.
+Demo e staging dei sei file rigenerati; Index rigenerato senza differenze.
+[Contratto, matrice delle mutazioni e limiti](VERIFICA-NUCLEO-COMMIT-RECUPERABILI.md).
+Prossimo incremento: persistenza a frammenti/checkpoint e primo writer canonico.
+Nessun deploy o dato reale; ultimo online documentato resta Apps Script 75.
+
 ## Più pagine locali del diario — 28 ottobre, pacchetto 7 parziale
 
 Indice limitato a 16 pagine per scope, chiavi mese/progetto/cursore, ricostruzione

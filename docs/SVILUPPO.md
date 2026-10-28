@@ -96,3 +96,9 @@ invalidazione indipendente delle anteprime e riavvio Chromium.
 invalidazioni/CAS, compatibilità del descrittore singolo, riavvio e anteprima
 delle continuazioni nella shell senza perdere editor, privacy, bozze e selezione.
 [Contratto e limiti](VERIFICA-PAGINE-LOCALI-DIARIO.md).
+
+
+`npm run test:commits` verifica il nucleo dei commit con adapter sintetico e
+riavvio V8 dopo interruzioni prima/dopo ogni unità persistente; incluso in npm test.
+Non richiede Google e non simula transazioni ACID Sheets/Docs.
+[Contratto e matrice](VERIFICA-NUCLEO-COMMIT-RECUPERABILI.md).
