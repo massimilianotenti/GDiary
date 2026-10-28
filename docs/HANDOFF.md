@@ -1,5 +1,21 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Anteprima locale diario — 28 ottobre, pacchetto 7 ancora parziale
+
+Adattatore getJournalPage con ticket/revisione catturati prima della RPC,
+metadati e corpi separati, copertura dell'ultima pagina e lettura atomica per ID.
+Loader con anteprima obsoleta e risposta remota distinte, richieste superate
+scartate e persistenza che non blocca il rendering. Shell collegata dietro
+journalPageCache=null: nessuna attivazione sui dati reali o apertura automatica.
+Anteprima solo lettura, note private escluse, nessun merge canonico prima della
+risposta Google; bozze della scheda e versioni conservate. Prova diagnostica
+sintetica estesa con viewReopened. Nuovo test:local-views.
+[Contratto, verifiche e limiti](VERIFICA-ANTEPRIMA-LOCALE-DIARIO.md).
+Build, npm test, test:local-views, test:repository, test:identity, test:release,
+test:progressive e test:tracing superati; Index/Demo rigenerati.
+Restano dati comuni, più pagine/viste, consenso e collaudo iframe reale.
+Nessun deploy o dato reale; ultimo online documentato resta Apps Script 75.
+
 ## Repository locale — SPEC-004 pacchetto 7 parziale, solo sintetico
 
 Fondamenta IndexedDB implementate: scope archivio/principale/epoca, lotti

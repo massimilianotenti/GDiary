@@ -101,6 +101,23 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
   listEntries:()=>list('entries','byScope'),
   listCommon:collection=>Object.hasOwn(KEYS,collection)?list('commonRecords','byCollection',scope=>[...scopeKey(scope),collection]):Promise.resolve({ok:false,error:'DataError'}),
   listDrafts:()=>list('drafts','byScope'),
+  // Page membership, metadata and matching bodies must come from one read
+  // transaction. Separate getMeta/getEntry/getContent calls can mix revisions.
+  readRemoteView:()=>result(()=>execute('readonly',['archiveMeta','entries','contents'],({scope,tx,request,done})=>{
+   request(tx.objectStore('archiveMeta').get(scopeKey(scope)),stored=>{
+    const meta=validMeta(stored,scope),view=meta.coverage?.journalPage;
+    if(!view||view.format!=='journal-page/v1'||view.revision!==meta.revision){done(null);return;}
+    if(typeof view.key!=='string'||!Array.isArray(view.items)||view.items.length>25||new Set(view.items.map(item=>item?.id)).size!==view.items.length||view.items.some(item=>!id(item?.id)||!version(item?.version)))throw fail('SchemaError');
+    const entries=new Array(view.items.length);let remaining=view.items.length*2,missing=false;
+    const finish=()=>{if(--remaining===0)done(missing?null:{view,entries});};
+    if(!remaining){done({view,entries});return;}
+    view.items.forEach((item,index)=>{
+     const pair={};entries[index]=pair;
+     request(tx.objectStore('entries').get([...scopeKey(scope),item.id]),row=>{if(!row||row.version!==item.version||row.data?.id!==item.id||row.data?.updatedAt!==item.version)missing=true;else pair.entry=row.data;finish();});
+     request(tx.objectStore('contents').get([...scopeKey(scope),item.id]),row=>{if(!row||row.version!==item.version||row.data?.id!==item.id||row.data?.version!==item.version)missing=true;else pair.content=row.data;finish();});
+    });
+   });
+  })),
   listRecoveryDrafts:()=>result(async()=>{const scope=authorize(),response=await list('drafts','byOwner',scope=>[scope.archiveId,scope.principalId]);if(!response.ok)throw fail(response.error);guard(scope);return response.value.filter(r=>r.epoch!==scope.epoch);}),
   applyRemoteBatch:input=>result(async()=>{
    const batch=validateBatch(input);

@@ -1,4 +1,5 @@
 import {createLocalRepository} from './local-repository.js';
+import {createJournalReadCache} from './journal-read-cache.js';
 // Explicit synthetic-only harness. It never consumes state, manifest, diary
 // drafts, current user IDs or the application database name.
 const DB='gdiary-repository-probe-v1',VERSION='2026-10-01T00:00:00.000Z';
@@ -11,7 +12,7 @@ export function createRepositoryProbe(environment=globalThis){
  const check=result=>{if(!result.ok)throw Object.assign(new Error(result.error),{name:result.error});return result.value;};
  const safe=error=>['QuotaExceededError','SecurityError','NotSupportedError','VersionError','AbortError','TimeoutError','BlockedError','ConflictError','SchemaError'].includes(error?.name)?error.name:'StorageError';
  async function run(){return exclusive(async()=>{
-  const report={format:'gdiary-repository-probe/v1',ok:false,previousState:false,atomic:false,isolated:false,draftPreserved:false,reopened:false};let repo,scope=A;
+  const report={format:'gdiary-repository-probe/v1',ok:false,previousState:false,atomic:false,isolated:false,draftPreserved:false,reopened:false,viewReopened:false};let repo,scope=A;
   const started=environment.performance?.now?.()??Date.now();
   const open=()=>createLocalRepository({identity:{getScope:()=>scope,status:()=>({verified:true,cacheReady:true})},enabled:()=>true,environment,databaseName:DB});
   const sample=(revision,text=TEXT)=>({expectedRevision:revision,cursor:'synthetic-checkpoint',entries:[{id:ENTRY,updatedAt:VERSION,text}],contents:[{id:ENTRY,version:VERSION,body:text,rich:[{kind:'p',runs:[{text,bold:true}]}]}]});
@@ -23,8 +24,15 @@ export function createRepositoryProbe(environment=globalThis){
    scope=B;const otherRevision=check(await repo.clearRemote()).revision;report.isolated=check(await repo.getEntry(ENTRY))===null;check(await repo.applyRemoteBatch(sample(otherRevision,'Altro repository fittizio')));scope=A;report.isolated=report.isolated&&check(await repo.getContent(ENTRY)).body===TEXT;
    revision=check(await repo.clearRemote()).revision;
    report.draftPreserved=check(await repo.getEntry(ENTRY))===null&&check(await repo.getDraft('note',ENTRY)).snapshot.body===DRAFT;
-   check(await repo.applyRemoteBatch(sample(revision)));repo.close();repo=open();report.reopened=check(await repo.getContent(ENTRY)).body===TEXT;
-   report.ok=report.atomic&&report.isolated&&report.draftPreserved&&report.reopened;
+   check(await repo.applyRemoteBatch(sample(revision)));
+   const identity={getScope:()=>scope,status:()=>({verified:true,cacheReady:true})},request={month:'2026-10',project:'',cursor:''};
+   let cache=createJournalReadCache({repository:repo,identity,enabled:()=>true});
+   const prepared=await cache.prepare(request);if(!prepared.ok)throw Object.assign(new Error(prepared.error),{name:prepared.error});
+   const saved=await cache.save(prepared.ticket,{month:'2026-10',entries:[{id:ENTRY,date:'2026-10-01',updatedAt:VERSION,text:'Pagina fittizia',body:TEXT,rich:[{kind:'p',runs:[{text:TEXT,bold:true}]}]}],total:1,nextCursor:'',nextEntry:null,contentsIncluded:true});if(!saved.ok)throw Object.assign(new Error(saved.error),{name:saved.error});
+   repo.close();repo=open();report.reopened=check(await repo.getContent(ENTRY)).body===TEXT;
+   cache=createJournalReadCache({repository:repo,identity,enabled:()=>true});
+   const page=await cache.read(request);report.viewReopened=page.ok&&page.hit&&page.stale&&page.response.entries[0].rich[0].runs[0].bold===true;
+   report.ok=report.atomic&&report.isolated&&report.draftPreserved&&report.reopened&&report.viewReopened;
   }catch(error){report.error=safe(error);}finally{repo?.close();report.durationMs=Math.max(0,Math.round((environment.performance?.now?.()??Date.now())-started));}
   return report;
  });}

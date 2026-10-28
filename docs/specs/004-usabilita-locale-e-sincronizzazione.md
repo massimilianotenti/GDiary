@@ -467,3 +467,8 @@ Pacchetto 2: identità persistente server e scope client in memoria implementati
 
 
 Pacchetto 7 parziale: [fondamenta repository e prova sintetica](../VERIFICA-REPOSITORY-LOCALE.md) implementate; riapertura viste e copia reale ancora disabilitate.
+
+
+Pacchetto 7, seguito del 28 ottobre: [adattatore e anteprima dell'ultima pagina](../VERIFICA-ANTEPRIMA-LOCALE-DIARIO.md)
+implementati e collegati alla shell dietro interruttore spento. Non chiude il
+pacchetto: dati comuni, riapertura completa e abilitazione reale restano futuri.

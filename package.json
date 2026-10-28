@@ -29,7 +29,8 @@
     "test:search-concurrency": "node tests/verify-search-concurrency.cjs && node tests/verify-search-concurrency-browser.cjs",
     "test:worker-chunks": "node tests/verify-worker-chunks.cjs && node tests/verify-worker-chunks-browser.cjs",
     "test:identity": "node tests/verify-archive-identity.cjs && node tests/verify-archive-identity-browser.cjs",
-    "test:repository": "node tests/verify-local-repository.cjs && node tests/verify-repository-probe.cjs"
+    "test:repository": "node tests/verify-local-repository.cjs && node tests/verify-repository-probe.cjs",
+    "test:local-views": "node tests/verify-journal-read-cache.cjs"
   },
   "dependencies": {
     "vue": "3.5.44"

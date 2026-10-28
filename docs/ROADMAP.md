@@ -51,3 +51,9 @@ Nessuna scelta definitiva su hosting, PWA, Electron, nuove API o cambio di backe
 
 
 Pacchetto 7 parziale: [fondamenta repository e prova sintetica](VERIFICA-REPOSITORY-LOCALE.md) implementate; riapertura viste e copia reale ancora disabilitate.
+
+
+Seguito del pacchetto 7: [adattatore e anteprima locale del diario](VERIFICA-ANTEPRIMA-LOCALE-DIARIO.md)
+implementati dietro interruttore spento. Ultima pagina ordinaria, lettura atomica,
+preview distinta dalla risposta canonica; copia reale e riapertura completa
+ancora disabilitate.

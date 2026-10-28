@@ -79,3 +79,8 @@ Identità: `npm run test:identity`, `test:storage`, `test:release` e `test:traci
 `npm run test:repository` verifica repository IndexedDB e diagnostica sintetica
 su Demo.html, compreso riavvio Chromium e 10.000 metadati inventati.
 Vedere [contratto e limiti](VERIFICA-REPOSITORY-LOCALE.md).
+
+
+`npm run test:local-views` verifica adattatore pagine, loader e collegamento
+alla shell con dati inventati, inclusi riavvio Chromium, CAS, risposte tardive,
+privacy e bozze. [Contratto e limiti](VERIFICA-ANTEPRIMA-LOCALE-DIARIO.md).

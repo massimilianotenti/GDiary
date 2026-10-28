@@ -754,6 +754,9 @@ document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&e
 $('message').setAttribute('role','status');$('message').setAttribute('aria-live','polite');
 let taskDiary=false,taskFilters={status:'open',period:'archive',project:'',tag:'',text:'',sort:'priority'};
 let continuousMode=true,continuousProject='',continuousSession=null,continuousLoading=null,continuousActive=null,taskContentsFlight=null;
+// No production initializer: enabling real storage requires the iframe and
+// privacy/consent gates. Synthetic browser tests inject an isolated cache.
+let journalPageCache=null;
 run('getState');
 
 // BEGIN GENERATED CHANGELOG: sync with work/sync-changelog.cjs
@@ -874,6 +877,8 @@ async function loadContinuous(c,more=false){
  const current=()=>month===requestedMonth&&continuousProject===requestedProject&&taskDiary===requestedTasks&&view==='journal'&&continuousMode&&continuousSession===session&&continuousKey()===key;
  const marker=node('p',more?'Caricamento delle altre voci…':'Caricamento della pagina modificabile…','hint');if(!session.loaded)c.append(marker);
  continuousLoading=session;session.loading=true;session.loadError=false;
+ c.querySelectorAll('.journal-local-preview').forEach(preview=>preview.remove());
+ let localPreview=null,localScope=null;
  if(session.loaded)renderContinuous(c);
  try{
   const request={month:requestedMonth,project:requestedTasks?'':requestedProject,taskOnly:requestedTasks,taskArchive:requestedTasks&&taskFilters.period!=='month',...(requestedTasks?{metadataOnly:true}:{})};
@@ -882,8 +887,26 @@ async function loadContinuous(c,more=false){
   do{
    if(!current())return;
    if(seen.has(cursor))throw Error('Paginazione non avanzata: riprova.');seen.add(cursor);
-   const response=await api('getJournalPage',{...request,cursor,...(requestedTasks&&session.taskSnapshot&&cursor?{taskSnapshot:session.taskSnapshot,snapshotOffset:session.snapshotOffset}:{}),...(requestedTasks&&session.snapshotDisabled?{snapshotDisabled:true}:{})},navContext());
+   const pageRequest={...request,cursor,...(requestedTasks&&session.taskSnapshot&&cursor?{taskSnapshot:session.taskSnapshot,snapshotOffset:session.snapshotOffset}:{}),...(requestedTasks&&session.snapshotDisabled?{snapshotDisabled:true}:{})};
+   let response;
+   const loader=window.BulletJournalVue?.createJournalPageLoader;
+   if(loader){
+    const result=await loader({cache:requestedTasks?null:journalPageCache,fetchPage:value=>api('getJournalPage',value,navContext())}).load(pageRequest,{
+     isCurrent:current,onRemote:value=>{response=value;},
+     onCached:cached=>{
+      if(session.loaded||dirtyMain||dirtyDetail||cursor)return;
+      localScope=cached.scope;localPreview=node('section','','journal-local-preview');localPreview.setAttribute('aria-label','Anteprima della copia locale');
+      localPreview.append(node('p','Copia locale del '+new Date(cached.savedAt).toLocaleString('it-IT')+' · verifica su Google in corso.','hint'));
+      // Preview only: no editor, IDs, action buttons or canonical merge.
+      // Private entries wait for the ordinary verified view.
+      cached.response.entries.filter(entry=>!privateEntry(entry)).forEach(entry=>{const article=node('article');article.append(node('h3',entry.text));const excerpt=node('p');renderExcerpt(excerpt,entry);article.append(excerpt);localPreview.append(article);});
+      c.append(localPreview);
+     }
+    });
+    if(result.outcome==='cancelled')return;
+   }else response=await api('getJournalPage',pageRequest,navContext());
    if(!current())return;
+   localPreview?.remove();localPreview=null;
    if(response.snapshotReset){session.snapshotReset=response.snapshotReset;session.complete=false;throw Error('Elenco Task cambiato o non più disponibile. Aggiorna l’elenco; le bozze sono conservate.');}
    const active=document.activeElement?.closest('.continuous-block'),anchor=active||[...document.querySelectorAll('.continuous-block')].find(n=>n.getBoundingClientRect().top>=0&&n.getBoundingClientRect().top<innerHeight);
    const anchorTop=anchor?.getBoundingClientRect().top,scrollBefore=window.scrollY;
@@ -900,8 +923,10 @@ async function loadContinuous(c,more=false){
  }catch(err){
   if(!current())return;
   if(traceNav)traceNav.failed=true;session.loadError=true;
+  if(localPreview)localPreview.querySelector('.hint').textContent='Copia locale · verifica su Google non riuscita. I salvataggi richiedono la connessione.';
   if(!session.loaded){marker.textContent='Pagina non disponibile: '+(err.message||String(err));marker.className='form-error';c.append(button('Riprova',()=>loadContinuous(c)),button('Apri lettura di recupero',()=>{continuousMode=false;render();}));}
  }finally{
+  if(!current()||localScope&&!journalPageCache?.isCurrent(localScope))localPreview?.remove();
   session.loading=false;
   if(continuousLoading===session)continuousLoading=false;
   if(current()&&session.loaded){renderContinuous(c);if(requestedTasks&&session.deferredContents){const restored=session.blocks.filter(b=>session.pendingDrafts?.has(b.id));if(restored.length)loadTaskContents(session,restored).catch(()=>{});scheduleTaskTextSearch(session);}}

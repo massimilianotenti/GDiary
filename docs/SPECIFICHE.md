@@ -110,3 +110,9 @@ La diagnostica offre una verifica manuale dell’identità dell’archivio prima
 Schema, transazioni e prova sintetica sono implementati; nessuna vista usa
 ancora la copia locale. Contratto e limiti in
 [VERIFICA-REPOSITORY-LOCALE](VERIFICA-REPOSITORY-LOCALE.md).
+
+
+Seguito del pacchetto 7: [adattatore e anteprima locale del diario](VERIFICA-ANTEPRIMA-LOCALE-DIARIO.md)
+implementati dietro interruttore spento. Ultima pagina ordinaria, lettura atomica,
+preview distinta dalla risposta canonica; copia reale e riapertura completa
+ancora disabilitate.
