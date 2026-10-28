@@ -25,7 +25,7 @@ function fixture(snapshot){
 }
 const base=fixture().initialize();assert.equal(base.controller.resolve(),null);assert.equal(base.controller.status().registered,false);assert.equal(base.writes().length,0);assert.equal(base.f.metrics().events.length,0);
 const registered=copy(base.controller.register(ids));assert.equal(registered.mode,'readOnly');assert.equal(registered.revision,1);assert.equal(base.writes().length,4);const props=copy(base.props);assert.deepEqual(copy(base.controller.register(ids)),registered);assert.deepEqual(base.props,props,'registration retry does not reset state');
-assert.throws(()=>base.controller.resolve().saveLegacy({date:base.date,updatedAt:base.row.updatedAt,reflection:'Da bloccare'}),error=>error.name==='ProtocolUnavailable');
+assert.throws(()=>base.controller.resolve().saveLegacy({date:base.date,updatedAt:base.row.updatedAt,reflection:'Da bloccare'}),error=>error.name==='ProtocolUnavailable'&&error.reason==='readOnly'&&error.message.includes('sola lettura'));
 base.controller.setMode({mode:'active',expectedRevision:1});const gateway=base.controller.resolve(),preview=gateway.preview(base.date);gateway.migrate({date:base.date,expectedLegacy:preview.legacy,operationId:'synthetic-controller-migrate'});
 const ack=copy(gateway.saveLegacy({date:base.date,updatedAt:base.row.updatedAt,reflection:'Canonico dopo riavvio 🌱'}));assert.equal(ack.commonUpserts.days[0].reflection,'Canonico dopo riavvio 🌱');
 const active=base.snapshot(),restarted=fixture(active);assert.equal(restarted.controller.status().mode,'active');assert.equal(restarted.controller.resolve().readRows()[0].reflection,'Canonico dopo riavvio 🌱');assert.equal(restarted.row.reflection,'Riflessione originaria');

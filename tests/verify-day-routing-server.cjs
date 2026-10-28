@@ -1,22 +1,7 @@
-const fs=require('fs'),vm=require('vm'),path=require('path'),assert=require('assert');
-const {createFaultSheets}=require('./helpers/fault-sheets.cjs'),{seal}=require('./helpers/recoverable-commit-store.cjs');
-const backend=fs.readFileSync(path.resolve(__dirname,'../Demo.html'),'utf8').match(/<script>([\s\S]*?)<\/script>/)[1],copy=value=>JSON.parse(JSON.stringify(value));
-const ids={daysSheetId:10,indexSheetId:11,blockSheetId:12},date='2026-10-28';
-function open(snapshot){
- const ledger=createFaultSheets(snapshot?.ledger),ctx=vm.createContext({window:{},document:{addEventListener(){}},setTimeout,console});vm.runInContext(backend,ctx);
- if(snapshot){ctx.restored=snapshot;vm.runInContext('Object.assign(mockProps,restored.props);restored.users.forEach(([key,value])=>mockUserProperties.set(key,value));mockSheets.Days.data=restored.days;',ctx);}
- else ctx.saveDay({date,updatedAt:'',reflection:'Riga originaria sintetica'});
- const manifest=copy(ctx.getSyncManifest()),scope={archiveId:manifest.archiveId,epoch:manifest.epoch,principalId:manifest.principalId};assert(manifest.identityVerified);
- ctx.syntheticLedger=ledger;ctx.syntheticUtilities=ledger.globals.Utilities;
- vm.runInContext(`Object.assign(Utilities,syntheticUtilities);SpreadsheetApp.flush=syntheticLedger.globals.SpreadsheetApp.flush;
-  mockSheets.Days.getSheetId=()=>10;mockSheets.Days.getParent=()=>db;
-  syntheticLedger.index.getSheetId=()=>11;syntheticLedger.index.getParent=()=>db;
-  syntheticLedger.blocks.getSheetId=()=>12;syntheticLedger.blocks.getParent=()=>db;
-  db.getSheetById=id=>({10:mockSheets.Days,11:syntheticLedger.index,12:syntheticLedger.blocks})[id];`,ctx);
- if(!snapshot){const store=ctx.syncSheetsCommitStore_(ledger.index,ledger.blocks,{archiveId:scope.archiveId,epoch:scope.epoch},ledger.services);store.withLock(()=>store.writeHead(seal({format:'sync-head/v1',archive:{archiveId:scope.archiveId,epoch:scope.epoch},committedThrough:0,pending:null})));}
- return {ctx,ledger,scope,controller:ctx.syncDayRoutingServer_({allowConfigure:true,allowMigration:true}),
-  snapshot(){return {...copy(vm.runInContext('({props:mockProps,users:[...mockUserProperties],days:mockSheets.Days.data})',ctx)),ledger:ledger.snapshot()};}};
-}
+const vm=require("vm"),assert=require("assert");
+const {createDayRoutingServer:open}=require("./helpers/day-routing-server.cjs");
+const copy=value=>JSON.parse(JSON.stringify(value));
+const ids={daysSheetId:10,indexSheetId:11,blockSheetId:12},date="2026-10-28";
 const first=open(),ctl=first.controller;assert.equal(ctl.status().registered,false);ctl.register(ids);
 assert.throws(()=>first.ctx.saveDay({date,updatedAt:'',reflection:'Bloccata'}),error=>error.name==='ProtocolUnavailable');
 ctl.setMode({mode:'active',expectedRevision:1});const preview=ctl.resolve().preview(date);ctl.resolve().migrate({date,expectedLegacy:preview.legacy,operationId:'synthetic-server-migration'});

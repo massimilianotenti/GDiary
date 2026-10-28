@@ -151,3 +151,8 @@ Prossimo incremento: collaudo browser della migrazione/controller attivi su
 Demo sintetica, comprese bozze, conflitti, reload, errori e modalità readOnly.
 La verifica nel vero iframe Google e l'abilitazione reale richiedono un passaggio
 separato e pertinente. Nessun deploy o modifica dell'archivio Google eseguiti.
+
+Seguito completato: [collaudo browser del controller e della migrazione attivi](VERIFICA-BROWSER-ROUTING-GIORNI.md)
+su HTTP locale e backend V8 sintetico. Include bozze/rich/focus, due client,
+reload, ACK persi/malformati e readOnly con messaggio corretto. Non è il collaudo
+iframe Google o l'abilitazione reale del registro.

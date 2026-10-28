@@ -516,3 +516,8 @@ con binding verificato, ancora richiesta, stato a due slot e active/readOnly;
 161 interruzioni simulate e riavvio delle API sulla Demo. Nessuna registrazione
 reale; prossimo incremento sul browser del percorso attivo. Feed completo,
 provisioning e collaudo Google rimangono aperti.
+
+Pacchetto 8, seguito: [collaudo browser locale Days attivo](../VERIFICA-BROWSER-ROUTING-GIORNI.md)
+superato con UI reale e backend V8/Sheets simulato, incluse bozze, conflitti,
+reload, errori e readOnly. Nessuna abilitazione reale; prossima estensione
+locale ai checkup Weeks e poi alla restante matrice delle mutazioni.

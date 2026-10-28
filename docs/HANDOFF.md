@@ -1,5 +1,26 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Collaudo browser Days attivo — 28 ottobre, pacchetto 8 parziale
+
+Nuovo test:day-browser con UI reale e RPC HTTP su server V8 locale, backend
+Demo, SHA-256 Node e adattatore Sheet/Range simulato. Bozze pre-migrazione,
+focus/selezione, evento tardivo durante ACK, risposta persa e malformata senza
+nuovi commit al retry, riavvio V8/reload rich, conflitto fra due browser con
+salvataggio parziale, readOnly persistente e righe legacy congelate superati.
+Tracing attivo senza testi/identità nell'export; screenshot sintetici e layout
+320/390 px verificati. Corretto il messaggio readOnly: testo comprensibile
+con nome ProtocolUnavailable e motivo interno preservati, senza perdere bozze.
+Fixture server condivisa coi test V8. Build, npm test, test:day-browser,
+test:day-controller, test:day-batch, test:release e test:tracing superati;
+test browser aggiunto a test:e2e, suite storica completa non rieseguita.
+Demo/staging sei file rigenerati; Index senza differenze frontend.
+[Scenari, risultati e limiti](VERIFICA-BROWSER-ROUTING-GIORNI.md).
+Verifica locale del percorso Days attivo completata; registrazione reale,
+iframe Google, provisioning e capacità manifest ancora non abilitati.
+Nessun deploy o dato reale; online Apps Script 75. Prossimo incremento:
+estendere il registro a Weeks con writer/lettori coerenti, poi le altre
+mutazioni; pacchetto 8 e feed dell'archivio ancora parziali.
+
 ## Controller persistente Days — 28 ottobre, pacchetto 8 parziale
 
 Controller con ancora immutabile in ScriptProperties e stato a due slot,

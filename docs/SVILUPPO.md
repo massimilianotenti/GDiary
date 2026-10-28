@@ -132,3 +132,9 @@ stato a due slot, CAS active/readOnly e binding autorizzato. Include 161
 interruzioni/prefissi delle proprietà e riavvii del backend Demo con provider
 Apps Script e API effettive, senza iniezione globale. Nessuna registrazione
 reale. [Contratto e limiti](VERIFICA-CONTROLLER-ROUTING-GIORNI.md).
+
+`npm run test:day-browser` esegue il collaudo Chromium del percorso Days attivo
+con server HTTP/V8 temporaneo e dati sintetici. Include bozze/rich/focus,
+retry dopo ACK perso/malformato, reload, due client in conflitto, readOnly,
+tracing e layout 320/390 px. È incluso in test:e2e, non nella suite backend
+npm test. [Scenari, correzione e limiti](VERIFICA-BROWSER-ROUTING-GIORNI.md).

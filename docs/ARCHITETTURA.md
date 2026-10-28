@@ -225,3 +225,8 @@ Ancora richiesta e stato a due slot nelle proprietà; risoluzione per ogni
 accesso e ricontrollo delle corse di attivazione. readOnly conserva il gateway
 canonico. Registrazione esplicita su fogli/identità già provisionati; permessi
 operatore false per default e nessuna nuova RPC o registrazione reale.
+
+Seguito: [collaudo browser del percorso Days attivo](VERIFICA-BROWSER-ROUTING-GIORNI.md)
+superato con UI reale e server V8 locale. Nessun nuovo trasporto nell'app:
+il ponte HTTP e le registrazioni sono esclusivamente fixture. readOnly conserva
+il nome d'errore del protocollo ma fornisce un messaggio comprensibile alla UI.

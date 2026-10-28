@@ -1127,10 +1127,10 @@ function syncDayMigrationGateway_(store,trustedScope,source){
 // never provisions tables or identities. The immutable anchor prevents a
 // missing/disabled state from silently exposing frozen legacy preimages.
 function syncDayRoutingController_(services){
- const fail=name=>{throw Object.assign(Error(name==='ConflictError'?'Giornata o configurazione modificata altrove. Conserva la bozza e aggiorna.':name),{name});},copy=value=>JSON.parse(syncCommitCanonical_(value));
+ const fail=(name,reason='')=>{const message=reason==='readOnly'?'Il diario è in sola lettura. Riprova quando le scritture saranno abilitate.':name==='ConflictError'?'Giornata o configurazione modificata altrove. Conserva la bozza e aggiorna.':name;throw Object.assign(Error(message),{name,...(reason==='readOnly'?{reason}:{})});},copy=value=>JSON.parse(syncCommitCanonical_(value));
  const keys={anchor:'SYNC_DAY_ROUTING_ANCHOR_V1',a:'SYNC_DAY_ROUTING_STATE_A_V1',b:'SYNC_DAY_ROUTING_STATE_B_V1',am:'SYNC_DAY_ROUTING_MARK_A_V1',bm:'SYNC_DAY_ROUTING_MARK_B_V1'};
  let owned=false;
- const protect=fn=>{try{return fn();}catch(error){fail(['DataError','ProtocolUnavailable','ProtocolCorrupt','ScopeChanged','BusyError','ConflictError','OperationMismatch','CommitBlocked','StorageError'].includes(error?.name)?error.name:'StorageError');}};
+ const protect=fn=>{try{return fn();}catch(error){fail(['DataError','ProtocolUnavailable','ProtocolCorrupt','ScopeChanged','BusyError','ConflictError','OperationMismatch','CommitBlocked','StorageError'].includes(error?.name)?error.name:'StorageError',error?.name==='ProtocolUnavailable'&&error.reason==='readOnly'?'readOnly':'');}};
  const locked=fn=>{if(owned)fail('BusyError');return services.withLock(()=>{owned=true;try{return fn();}finally{owned=false;}});};
  const hash=value=>{const digest=services.digest(syncCommitCanonical_(value));if(typeof digest!=='string'||!/^[a-f0-9]{64}$/.test(digest))fail('ProtocolCorrupt');return digest;};
  const seal=value=>({...value,checksum:hash(value)});
@@ -1197,7 +1197,8 @@ function syncDayRoutingController_(services){
  const statusOf=loaded=>loaded?{registered:true,protocolVersion:1,mode:loaded.state.mode,revision:loaded.state.revision}:{registered:false,protocolVersion:1};
  const act=(method,args,write=false,migrate=false)=>protect(()=>locked(()=>{
   const loaded=load();if(!loaded)fail('ProtocolUnavailable');
-  if(write&&loaded.state.mode!=='active'||migrate&&services.allowMigration?.()!==true)fail('ProtocolUnavailable');
+  if(write&&loaded.state.mode!=='active')fail('ProtocolUnavailable','readOnly');
+  if(migrate&&services.allowMigration?.()!==true)fail('ProtocolUnavailable');
   const result=binding(loaded).gateway[method](...args);check(loaded);return result;
  }));
  const facade=Object.freeze({readRows:(...args)=>act('readRows',args),preview:(...args)=>act('preview',args),saveLegacy:(...args)=>act('saveLegacy',args,true),saveBatch:(...args)=>act('saveBatch',args,true),migrate:(...args)=>act('migrate',args,true,true)});

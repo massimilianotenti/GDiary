@@ -162,3 +162,8 @@ verificato sulle fixture: riapertura senza iniezione in memoria, binding
 autorizzato e modalità readOnly che mantiene i dati canonici. Nessuna nuova
 opzione utente o attivazione reale; rollback verso vecchi deployment privo
 di controller non supportato.
+
+Seguito: [percorso Days attivo collaudato nel browser locale](VERIFICA-BROWSER-ROUTING-GIORNI.md).
+Bozze, conflitti, reload, ACK persi/malformati e readOnly verificati con dati
+inventati. Migliorato il messaggio di sola lettura, mantenendo le bozze.
+Nessuna registrazione reale, nuova modalità offline o attivazione del manifest.

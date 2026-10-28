@@ -101,3 +101,8 @@ Seguito: [controller persistente e modalità active/readOnly](VERIFICA-CONTROLLE
 implementati con binding autorizzato e ripresa dei metadati, verificati sul
 backend Demo. Prossimo incremento sul browser con percorso attivo; provisioning,
 collaudo iframe e abilitazione reale restano distinti e non eseguiti.
+
+Seguito: [collaudo browser locale del routing Days attivo](VERIFICA-BROWSER-ROUTING-GIORNI.md)
+completato, con bozze/rich, conflitti, reload, errori e readOnly. Prossimo
+incremento del pacchetto 8 sui checkup Weeks, quindi sulle altre mutazioni.
+Provisioning e collaudo Google restano separati; il feed non è ancora completo.
