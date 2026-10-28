@@ -488,3 +488,8 @@ periodo comune singolo, bootstrap coerente, altre viste e abilitazione reale.
 Pacchetto 8, primo incremento: [nucleo prepare/apply/commit e feed di riferimento](../VERIFICA-NUCLEO-COMMIT-RECUPERABILI.md)
 implementato con adapter sintetico. Nessuna mutazione legacy collegata, nessuna
 persistenza Google o capacità del manifest abilitata; pacchetto ancora parziale.
+
+
+Pacchetto 8, seguito: [adattatore di persistenza a frammenti/checkpoint](../VERIFICA-PERSISTENZA-COMMIT-SHEETS.md)
+implementato con test locali delle API Sheets simulate. Ancora senza
+provisioning reale o writer legacy; limiti di storico/compattazione espliciti.

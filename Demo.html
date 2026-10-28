@@ -1040,6 +1040,99 @@ function syncCommitProtocol_(store,trustedScope){
  });
 }
 
+const SYNC_SHEET_INDEX_HEADERS=['key','operation','reference','publication'];
+const SYNC_SHEET_BLOCK_HEADERS=['generation','part','payload'];
+// Explicitly supplied dedicated sheets only: no db_(), creation, setup or caller
+// in production. Payloads and reference publications are append-only.
+function syncSheetsCommitStore_(indexSheet,blockSheet,trustedArchive,services={}){
+ const fail=name=>{throw Object.assign(new Error(name),{name});},copy=value=>JSON.parse(syncCommitCanonical_(value));
+ const same=(a,b)=>syncCommitCanonical_(a)===syncCommitCanonical_(b),archive=copy(trustedArchive);
+ if(!archive||Object.keys(archive).sort().join(',')!=='archiveId,epoch'||![archive.archiveId,archive.epoch].every(value=>typeof value==='string'&&/^[a-zA-Z0-9-]{10,80}$/.test(value))||indexSheet===blockSheet)fail('DataError');
+ const digest=services.digest||function(text){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,text,Utilities.Charset.UTF_8).map(byte=>('0'+((byte+256)%256).toString(16)).slice(-2)).join('');};
+ const encode=services.encode||function(text){return Utilities.base64Encode(text,Utilities.Charset.UTF_8);};
+ const decode=services.decode||function(text){return Utilities.newBlob(Utilities.base64Decode(text)).getDataAsString('UTF-8');};
+ const flush=services.flush||function(){SpreadsheetApp.flush();},uuid=services.uuid||function(){return Utilities.getUuid();};
+ const lock=services.withLock||function(fn){const handle=LockService.getScriptLock();if(!handle.tryLock(0))fail('BusyError');try{return fn();}finally{handle.releaseLock();}};
+ let active=false;
+ const guard=()=>{if(!active||services.enabled?.()!==true)fail('ProtocolUnavailable');if(services.authorize?.(copy(archive))!==true)fail('ScopeChanged');};
+ const hash=text=>{const result=digest(text);if(typeof result!=='string'||!/^[a-f0-9]{64}$/.test(result))fail('ProtocolCorrupt');return result;};
+ const key=(kind,id)=>'k:'+hash(syncCommitCanonical_([archive,kind,id]));
+ function headers(sheet,expected){if(sheet.getLastColumn()!==expected.length||!same(sheet.getRange(1,1,1,expected.length).getDisplayValues()[0],expected))fail('ProtocolCorrupt');}
+ function capacity(sheet,end){const max=sheet.getMaxRows();if(end>max)sheet.insertRowsAfter(max,end-max);}
+ function append(sheet,rows){guard();const start=sheet.getLastRow()+1;capacity(sheet,start+rows.length-1);sheet.getRange(start,1,rows.length,rows[0].length).setNumberFormat('@').setValues(rows);flush();guard();if(!same(sheet.getRange(start,1,rows.length,rows[0].length).getDisplayValues(),rows))fail('ProtocolCorrupt');return start;}
+ function find(column,value){
+  guard();const count=indexSheet.getLastRow()-1;if(count<=0)return [];
+  const rows=indexSheet.getRange(2,column,count,1).createTextFinder(value).useRegularExpression(false).matchEntireCell(true).findAll().map(range=>range.getRow());
+  if(rows.length>512)fail('ProtocolUnavailable');return rows;
+ }
+ function unpack(text){
+  try{if(typeof text!=='string'||!text||text.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(text))fail('ProtocolCorrupt');const raw=decode(text);if(encode(raw)!==text)fail('ProtocolCorrupt');return raw;}catch(error){fail('ProtocolCorrupt');}
+ }
+ function references(rows,expectedKey,operation){
+  const refs=[];
+  for(const row of rows){
+   const cells=indexSheet.getRange(row,1,1,4).getDisplayValues()[0],marker=cells[3];
+   if(!/^ok:[a-f0-9]{64}$/.test(marker)){
+    // A publication cell starts empty and is never overwritten. A prefix is
+    // an unacknowledged attempt, not a reason to discard the last good value.
+    if(marker!==''&&!/^o(k(:[a-f0-9]{0,63})?)?$/.test(marker))fail('ProtocolCorrupt');continue;
+   }
+   if(marker!=='ok:'+hash(syncCommitCanonical_(cells.slice(0,3)))||typeof cells[2]!=='string'||cells[2].length>2048||!cells[2].startsWith('r1:'))fail('ProtocolCorrupt');
+   let ref;try{ref=JSON.parse(unpack(cells[2].slice(3)));}catch(error){fail('ProtocolCorrupt');}
+   if(!ref||ref.format!=='sync-sheet-ref/v1'||ref.key!==cells[0]||expectedKey&&ref.key!==expectedKey||operation!==undefined&&cells[1]!==operation||!Number.isSafeInteger(ref.revision)||ref.revision<1||ref.revision>=Number.MAX_SAFE_INTEGER||!Number.isSafeInteger(ref.start)||ref.start<2||!Number.isSafeInteger(ref.count)||ref.count<1||ref.count>256||typeof ref.generation!=='string'||!/^g:[a-zA-Z0-9-]{10,80}$/.test(ref.generation)||!/^[a-f0-9]{64}$/.test(ref.digest||''))fail('ProtocolCorrupt');
+   refs.push({row,operation:cells[1],...ref});
+  }
+  return refs;
+ }
+ function latest(refs){
+  if(!refs.length)return null;const revision=Math.max(...refs.map(ref=>ref.revision)),candidates=refs.filter(ref=>ref.revision===revision),first=candidates[0];
+  if(candidates.some(ref=>ref.key!==first.key||ref.operation!==first.operation||ref.digest!==first.digest))fail('ProtocolCorrupt');return first;
+ }
+ function load(ref){
+  if(ref===null)return null;guard();
+  if(ref.start+ref.count-1>blockSheet.getLastRow())fail('ProtocolCorrupt');
+  const rows=blockSheet.getRange(ref.start,1,ref.count,3).getDisplayValues();
+  if(rows.some((row,i)=>row[0]!==ref.generation||row[1]!=='n:'+i||typeof row[2]!=='string'||!row[2].startsWith('b1:')||row[2].length>8195))fail('ProtocolCorrupt');
+  const encoded=rows.map(row=>row[2].slice(3)).join(''),raw=unpack(encoded);if(raw.length>262144||hash(raw)!==ref.digest)fail('ProtocolCorrupt');
+  let value;try{value=JSON.parse(raw);}catch(error){fail('ProtocolCorrupt');}
+  if(!value||!same(value.archive,archive)||syncCommitCanonical_(value)!==raw)fail('ProtocolCorrupt');return value;
+ }
+ function read(kind,id,operation){guard();return load(latest(references(find(1,key(kind,id)),key(kind,id),operation)));}
+ function write(kind,id,value,operation='',immutable=false){
+  guard();if(!same(value.archive,archive))fail('ScopeChanged');const lookup=key(kind,id),refs=references(find(1,lookup),lookup,operation),prior=latest(refs),raw=syncCommitCanonical_(value);
+  if(raw.length>262144)fail('DataError');
+  if(prior){const previous=load(prior);if(same(previous,value))return;if(immutable)fail('OperationMismatch');if(prior.revision>=Number.MAX_SAFE_INTEGER-1)fail('ProtocolUnavailable');}
+  const generation='g:'+uuid();if(!/^g:[a-zA-Z0-9-]{10,80}$/.test(generation))fail('ProtocolCorrupt');
+  const encoded=encode(raw);if(unpack(encoded)!==raw)fail('ProtocolCorrupt');
+  const parts=[];for(let offset=0;offset<encoded.length;offset+=8192)parts.push([generation,'n:'+parts.length,'b1:'+encoded.slice(offset,offset+8192)]);
+  if(!parts.length||parts.length>256)fail('DataError');
+  const start=append(blockSheet,parts),ref={format:'sync-sheet-ref/v1',key:lookup,revision:(prior?.revision||0)+1,generation,start,count:parts.length,digest:hash(raw)};
+  const cells=[lookup,operation,'r1:'+encode(syncCommitCanonical_(ref)),''],row=append(indexSheet,[cells]);
+  const marker='ok:'+hash(syncCommitCanonical_(cells.slice(0,3)));
+  guard();indexSheet.getRange(row,4).setNumberFormat('@').setValue(marker);flush();guard();
+  if(indexSheet.getRange(row,4).getDisplayValues()[0][0]!==marker)fail('ProtocolCorrupt');
+  const published=latest(references(find(1,lookup),lookup,operation));if(!published||published.revision!==ref.revision||published.digest!==ref.digest||!same(load(published),value))fail('ProtocolCorrupt');
+ }
+ return Object.freeze({
+  digest:hash,
+  withLock(fn){if(active)fail('BusyError');if(services.enabled?.()!==true)fail('ProtocolUnavailable');return lock(()=>{active=true;try{guard();headers(indexSheet,SYNC_SHEET_INDEX_HEADERS);headers(blockSheet,SYNC_SHEET_BLOCK_HEADERS);return fn();}finally{active=false;}});},
+  readHead:()=>read('head','head',''),writeHead:value=>write('head','head',value),
+  readEntity:(collection,id)=>read('entity',[collection,id],''),writeEntity:(collection,id,value)=>write('entity',[collection,id],value),
+  readCommit:sequence=>{
+   const value=read('commit',sequence);if(value===null)return null;
+   const expected=key('operation',[value.principalId,value.operationId]),ref=latest(references(find(1,key('commit',sequence)),key('commit',sequence),expected));if(!ref)fail('ProtocolCorrupt');return value;
+  },
+  writeCommit:(sequence,value)=>write('commit',sequence,value,key('operation',[value.principalId,value.operationId]),true),
+  findCommitByOperation(principalId,operationId){
+   guard();
+   const operation=key('operation',[principalId,operationId]),refs=references(find(2,operation),undefined,operation);
+   if(new Set(refs.map(ref=>ref.key)).size>1)fail('ProtocolCorrupt');const ref=latest(refs),value=load(ref);
+   if(value&&(ref.key!==key('commit',value.sequence)||value.principalId!==principalId||value.operationId!==operationId))fail('ProtocolCorrupt');return value;
+  },
+  readReceipt:(principalId,operationId)=>read('receipt',[principalId,operationId],''),writeReceipt:(principalId,operationId,value)=>write('receipt',[principalId,operationId],value,'',true)
+ });
+}
+
 // Counts cover this reader, not every direct Sheets call in the application.
 function readSheetValues_(range){return traceMeasure_('sheets',()=>traceMeasure_('sheetRead',()=>{
  const count=values=>{if(ACTIVE_TRACE){traceCount_('sheetReadRequests');traceCount_('sheetReadRows',values.length);traceCount_('sheetReadCells',values.reduce((n,row)=>n+row.length,0));}return values;};

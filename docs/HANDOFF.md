@@ -1,5 +1,22 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Persistenza commit a frammenti — 28 ottobre, pacchetto 8 parziale
+
+Adattatore interno syncSheetsCommitStore_ per due fogli dedicati espliciti:
+frammenti UTF-8/Base64 e riferimenti append-only, marcatore separato dopo
+flush/rilettura, revisioni/checksum e alias operationId pubblicato con il commit.
+Recupero col nucleo senza duplicare ricevute o sequenze; payload pubblicati
+corrotti bloccano il protocollo. Guardie di attivazione/accesso e lock condiviso.
+Nuovo test:commit-storage: 332 interruzioni su mock, Unicode/formule, revoca,
+corruzione e letture mirate con 50.000 righe estranee. Nessun accesso Google.
+Build, npm test/test:commit-storage, test:release, test:identity e test:tracing
+superati; Demo/staging rigenerati, Index senza differenze frontend.
+[Schema, limiti e fonti](VERIFICA-PERSISTENZA-COMMIT-SHEETS.md).
+Non collegato ai writer/lettori legacy; nessuna creazione fogli o inizializzazione
+automatica. Budget 512 riferimenti per chiave: compattazione necessaria prima
+dell'uso continuativo. Capacità del manifest ancora false; nessun deploy o dato
+reale. Ultimo online documentato Apps Script 75.
+
 ## Commit recuperabili — 28 ottobre, pacchetto 8 parziale
 
 Nuovo nucleo interno syncCommitProtocol_ in Code.gs, con adapter sincrono

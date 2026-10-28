@@ -187,3 +187,9 @@ Pacchetto 8 avviato: [nucleo dei commit recuperabili](VERIFICA-NUCLEO-COMMIT-REC
 implementato e verificato con adapter sintetico e fault injection. Non è ancora
 collegato a Sheets, API legacy o repository; feed/operazioni reali disabilitati.
 Versioni commit-N interne al prototipo, nessuna modifica agli updatedAt esistenti.
+
+
+Seguito del pacchetto 8: [persistenza a frammenti su due fogli dedicati](VERIFICA-PERSISTENZA-COMMIT-SHEETS.md)
+implementata e verificata sui mock, con pubblicazione separata e lookup per chiave.
+Nessuna attivazione o provisioning reale; writer/lettori legacy ancora scollegati.
+Il budget di storico richiede compattazione prima di un uso continuativo.

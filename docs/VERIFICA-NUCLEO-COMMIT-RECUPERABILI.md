@@ -156,3 +156,8 @@ prove sui frammenti/checkpoint, poi piano canonico e migrazione controllata di
 un primo writer e dei relativi lettori. Seguono copertura dell'intera matrice,
 ricevute/retention, binding delle risposte allo scope e consumo dei delta nel
 repository. Bootstrap e riconciliazione Docs restano nel pacchetto 9.
+
+
+Seguito implementato: [adattatore Sheets con frammenti e pubblicazione verificata](VERIFICA-PERSISTENZA-COMMIT-SHEETS.md).
+È ancora scollegato dal percorso applicativo e verificato soltanto su mock;
+la descrizione del primo incremento sopra precede questo adattatore.

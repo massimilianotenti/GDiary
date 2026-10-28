@@ -102,3 +102,9 @@ delle continuazioni nella shell senza perdere editor, privacy, bozze e selezione
 riavvio V8 dopo interruzioni prima/dopo ogni unità persistente; incluso in npm test.
 Non richiede Google e non simula transazioni ACID Sheets/Docs.
 [Contratto e matrice](VERIFICA-NUCLEO-COMMIT-RECUPERABILI.md).
+
+
+`npm run test:commit-storage` (anche in npm test) verifica il binding Sheet/Range
+su mock con 332 interruzioni, prefissi di pubblicazione, riavvio V8 e 50.000
+righe estranee. Non accede a Google né crea fogli reali.
+[Contratto, fonti e limiti](VERIFICA-PERSISTENZA-COMMIT-SHEETS.md).
