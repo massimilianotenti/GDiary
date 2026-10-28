@@ -1,5 +1,28 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Controller persistente Days — 28 ottobre, pacchetto 8 parziale
+
+Controller con ancora immutabile in ScriptProperties e stato a due slot,
+pubblicazione separata e CAS delle modalità active/readOnly. Binding verificato
+per archivio/epoca, DB/cartella e ID/parent dei tre fogli; identità già esistente,
+nessuna inizializzazione o provisioning automatico. Registro mancante/corrotto
+e configurazione/accesso cambiati bloccano senza fallback legacy. readOnly
+conserva le letture canoniche e blocca nuovi salvataggi/migrazioni Days.
+Risoluzione collegata agli ingressi effettivi, anche dopo riavvio V8 senza
+iniezione; ricontrollo delle corse di attivazione nei lettori e sotto lock nei
+writer. Permessi operatore/migrazione false per default; nessuna nuova RPC.
+test:day-controller incluso in npm test: 161 interruzioni/prefissi delle
+proprietà, binding/revoche/CAS, riavvii e API effettive sulla Demo.
+Build, npm test, test:day-controller, test:release e test:tracing superati;
+Demo/staging sei file rigenerati, Index senza differenze frontend.
+[Contratto e limiti](VERIFICA-CONTROLLER-ROUTING-GIORNI.md).
+Ancora iniziale troncata bloccata senza riparazione automatica. readOnly è il
+rollback operativo della build compatibile: vecchi deployment privi di
+controller rimangono inadatti dopo una futura migrazione. Capability manifest
+false, nessuna registrazione o attivazione reale; online Apps Script 75.
+Prossimo incremento: collaudo browser del percorso attivo su Demo sintetica,
+con bozze, conflitti, reload/errori e readOnly. Provisioning e Google separati.
+
 ## Capacità e compattazione riferimenti — 28 ottobre, pacchetto 8 parziale
 
 Commit del ponte Days completato: 4a219f6. Nuovo preflightWrites nell'adattatore

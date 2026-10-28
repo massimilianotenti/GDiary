@@ -340,8 +340,13 @@ const DocumentApp={create:name=>new MockDoc(name),openById:id=>{if(!mockDocs[id]
 
 
 let DB_HANDLE=null,ENTRY_SMALL_CACHE=null,ENTRY_TAG_HEADER_CHECKED=false,ENTRY_TAG_HEADER_WRITTEN=false;
-// Server-owned injection point only. No production controller enables it yet.
+// Test/server injection only. Persisted routing is also resolved on each call.
 let DAY_COMMIT_GATEWAY=null;
+let DAY_ROUTING_CONTROLLER=null;
+function dayCommitGateway_(){
+ try{if(DAY_ROUTING_CONTROLLER)return DAY_ROUTING_CONTROLLER.resolve();if(DAY_COMMIT_GATEWAY)return DAY_COMMIT_GATEWAY;return syncDayRoutingServer_().resolve();}
+ catch(error){if(['ProtocolUnavailable','ProtocolCorrupt','ScopeChanged','BusyError','StorageError'].includes(error?.name))throw error;throw Object.assign(Error('StorageError'),{name:'StorageError'});}
+}
 const PLAN_HEADERS=['entryId','date','updatedAt','workStart','workEnd','importance'];
 const ENTRY_HEADERS = ['id','date','type','text','projects','due','status','createdAt','updatedAt','requestId','scope','body','completedAt','tags'];
 const PROJECT_HEADERS = ['slug','name','description','updatedAt'];
@@ -486,11 +491,12 @@ function saveReflectionSettings(p){
     const props=PropertiesService.getScriptProperties();props.setProperty('DAILY_REFLECTION_MODE',p.dailyReflectionMode);props.setProperty('REFLECTION_SETTINGS_VERSION',Utilities.getUuid());return ACTIVE_CONTEXT.incrementalCommon===true?{delta:true,entries:[],commonIncluded:false,settingsPatch:reflectionSettings_()}:state_();});
 }
 function rows_(sheet, headers) {
-  if(sheet.getName()==='Days'&&DAY_COMMIT_GATEWAY)return DAY_COMMIT_GATEWAY.readRows();
+  if(sheet.getName()==='Days'){const gateway=dayCommitGateway_();if(gateway)return gateway.readRows();}
   if(sheet.getName()==='Days')ensureDayHeaders_(sheet);else verify_(sheet,headers);
-  if (sheet.getLastRow()<2) return [];
-  return ioRows_(sheet,headers.length)
+  const records=sheet.getLastRow()<2?[]:ioRows_(sheet,headers.length)
     .map(r => Object.fromEntries(headers.map((h,i)=>[h,r[i]])));
+  if(sheet.getName()==='Days'){const gateway=dayCommitGateway_();if(gateway)return gateway.readRows();}
+  return records;
 }
 
 function cachedRows_(sheet, headers) {
@@ -608,8 +614,10 @@ function commonDateSlice_(sheet,headers,dateKey,from,to){
  return {from,to,rows:slice.rows};
 }
 function commonDateRanges_(sheet,headers,dateKey,ranges){
- if(sheet.getName()==='Days'&&DAY_COMMIT_GATEWAY)return {ranges,rows:DAY_COMMIT_GATEWAY.readRows(ranges)};
- return commonDateRangesRaw_(sheet,headers,dateKey,ranges);
+ if(sheet.getName()==='Days'){const gateway=dayCommitGateway_();if(gateway)return {ranges,rows:gateway.readRows(ranges)};}
+ const result=commonDateRangesRaw_(sheet,headers,dateKey,ranges);
+ if(sheet.getName()==='Days'){const gateway=dayCommitGateway_();if(gateway)return {ranges,rows:gateway.readRows(ranges)};}
+ return result;
 }
 function commonDateRangesRaw_(sheet,headers,dateKey,ranges){
  if(sheet.getName()==='Days')ensureDayHeaders_(sheet);else verify_(sheet,headers);
@@ -823,16 +831,17 @@ function dayValues_(payload) {
   for(const field of ['intention','reflection'])if(Object.prototype.hasOwnProperty.call(payload,field)){const key=field+'Rich';values[key]='';if(payload[key]!==undefined){const raw=String(payload[field]||'').replace(/\r\n?/g,'\n'),rich=validateRich_(payload[key],raw);const serial=JSON.stringify(rich);if(serial.length>45000)throw Error('Formattazione della riflessione troppo estesa.');values[key]=serial;}}
   return values;
 }
-function saveDayImpl_(payload){if(DAY_COMMIT_GATEWAY)return DAY_COMMIT_GATEWAY.saveLegacy(payload);return saveRecord_('Days',DAY_HEADERS,'date',dayValues_(payload),payload.updatedAt);}
+function saveDayImpl_(payload){const gateway=dayCommitGateway_();if(gateway)return gateway.saveLegacy(payload);return saveRecord_('Days',DAY_HEADERS,'date',dayValues_(payload),payload.updatedAt);}
 // Bounded, best-effort batch. Only an explicit saved result acknowledges a day.
 function saveDays(p){
  ACTIVE_CONTEXT=p&&p.context||{};
  if(!p||!Array.isArray(p.days)||!p.days.length||p.days.length>10||traceBytes_(JSON.stringify(p.days))>500000)throw Error('Lotto giornate non valido o troppo grande.');
  const dates=p.days.map(item=>item&&item.date);
  if(dates.some(date=>!validDate_(date))||new Set(dates).size!==dates.length)throw Error('Date delle giornate non valide o duplicate.');
- if(DAY_COMMIT_GATEWAY)return DAY_COMMIT_GATEWAY.saveBatch(p.days);
+ const gateway=dayCommitGateway_();if(gateway)return gateway.saveBatch(p.days);
  const prepared=p.days.map(item=>{try{return {date:item.date,version:item.updatedAt||'',values:dayValues_(item)};}catch(error){return {date:item.date,status:'invalid',error:'Campi della giornata non validi.'};}});
  return locked_(function(){
+  if(dayCommitGateway_())throw Object.assign(Error('Routing giornaliero cambiato. Riprova conservando la bozza.'),{name:'ScopeChanged'});
   const sheet=db_().getSheetByName('Days');ensureDayHeaders_(sheet);
   const found=findRows_(sheet,1,'^('+dates.join('|')+')$',true).sort((a,b)=>a-b),groups=[],records=new Map();
   found.forEach(row=>{const last=groups[groups.length-1];if(last&&row===last.end+1&&last.end-last.start<255)last.end=row;else groups.push({start:row,end:row});});
@@ -856,8 +865,9 @@ function saveDays(p){
  });
 }
 function saveRecord_(name,headers,key,values,version) {
-  if(name==='Days'&&DAY_COMMIT_GATEWAY)throw Object.assign(Error('Writer giornaliero non instradato.'),{name:'ProtocolUnavailable'});
+  if(name==='Days'&&dayCommitGateway_())throw Object.assign(Error('Writer giornaliero non instradato.'),{name:'ProtocolUnavailable'});
   return locked_(function(){
+    if(name==='Days'&&dayCommitGateway_())throw Object.assign(Error('Routing giornaliero cambiato. Riprova conservando la bozza.'),{name:'ScopeChanged'});
     const sheet=db_().getSheetByName(name), records=rows_(sheet,headers), index=records.findIndex(r=>r[key]===values[key]);
     const existing=index<0?null:records[index];
     if((existing?existing.updatedAt:'')!==(version||'')) throw new Error('Pagina modificata altrove. Conserva la bozza, aggiorna e riprova.');
@@ -1111,6 +1121,128 @@ function syncDayMigrationGateway_(store,trustedScope,source){
    const out=[];for(const row of rows){if(replacements.has(row.date)){const replacement=replacements.get(row.date);if(replacement)out.push(replacement);replacements.delete(row.date);}else out.push(row);}
    for(const row of replacements.values())if(row)out.push(row);return out;
   });}
+ });
+}
+// Persistent, single-archive routing controller. Registration is explicit and
+// never provisions tables or identities. The immutable anchor prevents a
+// missing/disabled state from silently exposing frozen legacy preimages.
+function syncDayRoutingController_(services){
+ const fail=name=>{throw Object.assign(Error(name==='ConflictError'?'Giornata o configurazione modificata altrove. Conserva la bozza e aggiorna.':name),{name});},copy=value=>JSON.parse(syncCommitCanonical_(value));
+ const keys={anchor:'SYNC_DAY_ROUTING_ANCHOR_V1',a:'SYNC_DAY_ROUTING_STATE_A_V1',b:'SYNC_DAY_ROUTING_STATE_B_V1',am:'SYNC_DAY_ROUTING_MARK_A_V1',bm:'SYNC_DAY_ROUTING_MARK_B_V1'};
+ let owned=false;
+ const protect=fn=>{try{return fn();}catch(error){fail(['DataError','ProtocolUnavailable','ProtocolCorrupt','ScopeChanged','BusyError','ConflictError','OperationMismatch','CommitBlocked','StorageError'].includes(error?.name)?error.name:'StorageError');}};
+ const locked=fn=>{if(owned)fail('BusyError');return services.withLock(()=>{owned=true;try{return fn();}finally{owned=false;}});};
+ const hash=value=>{const digest=services.digest(syncCommitCanonical_(value));if(typeof digest!=='string'||!/^[a-f0-9]{64}$/.test(digest))fail('ProtocolCorrupt');return digest;};
+ const seal=value=>({...value,checksum:hash(value)});
+ const fields=(value,list)=>value&&Object.prototype.toString.call(value)==='[object Object]'&&Object.keys(value).length===list.length&&Object.keys(value).every(key=>list.includes(key));
+ const identifier=value=>typeof value==='string'&&/^[a-zA-Z0-9-]{10,80}$/.test(value);
+ const nonempty=value=>typeof value==='string'&&value.length>0&&value.length<=200;
+ function parse(raw){try{if(typeof raw!=='string'||raw.length>4096)fail('ProtocolCorrupt');const value=JSON.parse(raw),{checksum,...body}=value;if(hash(body)!==checksum||syncCommitCanonical_(value)!==raw)fail('ProtocolCorrupt');return body;}catch(ignore){fail('ProtocolCorrupt');}}
+ const snapshot=()=>{const properties=services.properties.getProperties();if(!properties||Object.prototype.toString.call(properties)!=='[object Object]')fail('StorageError');return properties;};
+ const absent=p=>{if(Object.keys(p).some(key=>key.startsWith('SYNC_DAY_ROUTING_')&&!Object.values(keys).includes(key)))fail('ProtocolUnavailable');return Object.values(keys).every(key=>!Object.prototype.hasOwnProperty.call(p,key));};
+ function anchorValue(raw){
+  const value=parse(raw);
+  if(!fields(value,['format','archive','binding'])||value.format!=='sync-day-routing-anchor/v1'||!fields(value.archive,['archiveId','epoch'])||![value.archive.archiveId,value.archive.epoch].every(identifier)||!fields(value.binding,['dbId','rootId','daysSheetId','indexSheetId','blockSheetId'])||![value.binding.dbId,value.binding.rootId].every(nonempty))fail('ProtocolCorrupt');
+  const ids=[value.binding.daysSheetId,value.binding.indexSheetId,value.binding.blockSheetId];if(ids.some(id=>!Number.isSafeInteger(id)||id<0)||new Set(ids).size!==3)fail('ProtocolCorrupt');return value;
+ }
+ function current(p,anchor){
+  const states=[];
+  for(const [slot,dataKey,markKey]of [['a',keys.a,keys.am],['b',keys.b,keys.bm]]){
+   const marker=p[markKey]??'';
+   if(typeof marker!=='string')fail('ProtocolCorrupt');
+   if(!/^ok:[1-9][0-9]{0,15}:[a-f0-9]{64}$/.test(marker)){
+    // Preparation/prefix markers are unpublished. A complete bad publication
+    // is corruption, and must never select an older mode instead.
+    if(marker!==''&&!/^(?:p(?:r(?:e(?:p(?:a(?:r(?:e(?::.*)?)?)?)?)?)?)?|o(?:k(?::(?:[1-9][0-9]{0,15}(?::[a-f0-9]{0,63})?)?)?)?)$/.test(marker))fail('ProtocolCorrupt');
+    continue;
+   }
+   const state=parse(p[dataKey]),parts=marker.split(':');
+   if(!fields(state,['format','anchorDigest','revision','mode'])||state.format!=='sync-day-routing-state/v1'||state.anchorDigest!==hash(anchor)||!Number.isSafeInteger(state.revision)||state.revision<1||state.revision>=Number.MAX_SAFE_INTEGER||String(state.revision)!==parts[1]||hash(state)!==parts[2]||!['active','readOnly'].includes(state.mode))fail('ProtocolCorrupt');
+   states.push({...state,slot});
+  }
+  if(!states.length)fail('ProtocolUnavailable');const revision=Math.max(...states.map(state=>state.revision)),latest=states.filter(state=>state.revision===revision);
+  if(latest.some(state=>state.mode!==latest[0].mode))fail('ProtocolCorrupt');return latest[0];
+ }
+ function context(anchor){
+  const ctx=services.context();
+  if(!ctx||ctx.authorized!==true||![ctx.archiveId,ctx.epoch,ctx.principalId].every(identifier)||ctx.archiveId!==anchor.archive.archiveId||ctx.epoch!==anchor.archive.epoch||ctx.dbId!==anchor.binding.dbId||ctx.rootId!==anchor.binding.rootId)fail('ScopeChanged');return ctx;
+ }
+ function sheets(anchor,ctx){
+  const ids=[anchor.binding.daysSheetId,anchor.binding.indexSheetId,anchor.binding.blockSheetId];
+  const tables=ids.map(id=>services.sheet(id,ctx));
+  if(tables.some((sheet,i)=>!sheet||sheet.getSheetId()!==ids[i]||sheet.getParent().getId()!==ctx.dbId)||tables[0].getName()!=='Days')fail('ScopeChanged');return tables;
+ }
+ function load(){
+  const p=snapshot();if(absent(p))return null;if(!p[keys.anchor])fail('ProtocolCorrupt');
+  const anchor=anchorValue(p[keys.anchor]),state=current(p,anchor),ctx=context(anchor),tables=sheets(anchor,ctx);return {anchor,state,ctx,tables};
+ }
+ function check(loaded){
+  const fresh=load();if(!fresh||hash(fresh.anchor)!==hash(loaded.anchor)||fresh.state.revision!==loaded.state.revision||fresh.ctx.principalId!==loaded.ctx.principalId)fail('ScopeChanged');return true;
+ }
+ function binding(loaded){
+  const [day,index,blocks]=loaded.tables,scope={archiveId:loaded.ctx.archiveId,epoch:loaded.ctx.epoch,principalId:loaded.ctx.principalId};
+  const store=syncSheetsCommitStore_(index,blocks,loaded.anchor.archive,{digest:services.digest,enabled:()=>owned,authorize:()=>check(loaded),withLock(fn){if(!owned)fail('ProtocolUnavailable');return fn();}});
+  return {store,scope,gateway:syncDayMigrationGateway_(store,scope,syncDaySheetSource_(day))};
+ }
+ function publish(anchor,mode,revision,slot,principalId){
+  const state={format:'sync-day-routing-state/v1',anchorDigest:hash(anchor),mode,revision},dataKey=keys[slot],markKey=keys[slot+'m'];
+  const raw=syncCommitCanonical_(seal(state)),marker='ok:'+revision+':'+hash(state);
+  // Only the inactive slot is touched. A crash always retains the latest
+  // published slot, or leaves a required anchor with no usable state yet.
+  for(const [key,value]of [[markKey,'prepare:'+revision],[dataKey,raw],[markKey,marker]]){
+   if(services.allowConfigure?.()!==true)fail('ProtocolUnavailable');
+   services.properties.setProperty(key,value);if(snapshot()[key]!==value)fail('StorageError');if(context(anchor).principalId!==principalId)fail('ScopeChanged');
+  }
+ }
+ const statusOf=loaded=>loaded?{registered:true,protocolVersion:1,mode:loaded.state.mode,revision:loaded.state.revision}:{registered:false,protocolVersion:1};
+ const act=(method,args,write=false,migrate=false)=>protect(()=>locked(()=>{
+  const loaded=load();if(!loaded)fail('ProtocolUnavailable');
+  if(write&&loaded.state.mode!=='active'||migrate&&services.allowMigration?.()!==true)fail('ProtocolUnavailable');
+  const result=binding(loaded).gateway[method](...args);check(loaded);return result;
+ }));
+ const facade=Object.freeze({readRows:(...args)=>act('readRows',args),preview:(...args)=>act('preview',args),saveLegacy:(...args)=>act('saveLegacy',args,true),saveBatch:(...args)=>act('saveBatch',args,true),migrate:(...args)=>act('migrate',args,true,true)});
+ return Object.freeze({
+  resolve:()=>protect(()=>{if(absent(snapshot()))return null;return locked(()=>{load();return facade;});}),
+  status:()=>protect(()=>{if(absent(snapshot()))return statusOf(null);return locked(()=>statusOf(load()));}),
+  register:input=>protect(()=>locked(()=>{
+   if(services.allowConfigure?.()!==true)fail('ProtocolUnavailable');
+   if(!fields(input,['daysSheetId','indexSheetId','blockSheetId'])||Object.values(input).some(id=>!Number.isSafeInteger(id)||id<0)||new Set(Object.values(input)).size!==3)fail('DataError');
+   const ctx=services.context();if(!ctx||ctx.authorized!==true||![ctx.archiveId,ctx.epoch,ctx.principalId].every(identifier)||![ctx.dbId,ctx.rootId].every(nonempty))fail('ScopeChanged');
+   const anchor={format:'sync-day-routing-anchor/v1',archive:{archiveId:ctx.archiveId,epoch:ctx.epoch},binding:{dbId:ctx.dbId,rootId:ctx.rootId,...copy(input)}};
+   const p=snapshot();if(!absent(p)&&!p[keys.anchor])fail('ProtocolCorrupt');
+   if(p[keys.anchor]&&hash(anchorValue(p[keys.anchor]))!==hash(anchor))fail('ScopeChanged');
+   const tables=sheets(anchor,ctx);ensureDayHeaders_(tables[0]);
+   // Check existing provisioned storage before making the anchor required.
+   const store=syncSheetsCommitStore_(tables[1],tables[2],anchor.archive,{digest:services.digest,enabled:()=>owned,authorize:()=>{if(context(anchor).principalId!==ctx.principalId)fail('ScopeChanged');sheets(anchor,ctx);return true;},withLock:fn=>fn()});
+   const recovered=syncCommitProtocol_(store,{archiveId:ctx.archiveId,epoch:ctx.epoch,principalId:ctx.principalId}).recover();if(!recovered.ok)fail(recovered.error);
+   if(!p[keys.anchor]){if(services.allowConfigure?.()!==true)fail('ProtocolUnavailable');const raw=syncCommitCanonical_(seal(anchor));services.properties.setProperty(keys.anchor,raw);if(snapshot()[keys.anchor]!==raw)fail('StorageError');if(context(anchor).principalId!==ctx.principalId)fail('ScopeChanged');}
+   let established=false;try{current(snapshot(),anchor);established=true;}catch(error){if(error.name!=='ProtocolUnavailable')throw error;}
+   if(!established)publish(anchor,'readOnly',1,'a',ctx.principalId);return statusOf(load());
+  })),
+  setMode:input=>protect(()=>locked(()=>{
+   if(services.allowConfigure?.()!==true)fail('ProtocolUnavailable');
+   if(!fields(input,['mode','expectedRevision'])||!['active','readOnly'].includes(input.mode)||!Number.isSafeInteger(input.expectedRevision)||input.expectedRevision<1)fail('DataError');
+   const loaded=load();if(!loaded)fail('ProtocolUnavailable');const state=loaded.state;
+   if(state.mode===input.mode&&(state.revision===input.expectedRevision||state.revision===input.expectedRevision+1))return statusOf(loaded);
+   if(state.revision!==input.expectedRevision)fail('ConflictError');if(state.revision>=Number.MAX_SAFE_INTEGER-1)fail('ProtocolUnavailable');
+   publish(loaded.anchor,input.mode,state.revision+1,state.slot==='a'?'b':'a',loaded.ctx.principalId);return statusOf(load());
+  }))
+ });
+}
+function syncDayRoutingServer_(permissions={}){
+ const properties=PropertiesService.getScriptProperties();
+ return syncDayRoutingController_({properties,digest:text=>Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,text,Utilities.Charset.UTF_8).map(byte=>('0'+((byte+256)%256).toString(16)).slice(-2)).join(''),
+  allowConfigure:()=>permissions.allowConfigure===true,allowMigration:()=>permissions.allowMigration===true,
+  withLock(fn){if(APP_LOCK_DEPTH>0)return fn();const lock=LockService.getScriptLock();if(!lock.tryLock(0))throw Object.assign(Error('BusyError'),{name:'BusyError'});try{return fn();}finally{lock.releaseLock();}},
+  context(){
+   const p=properties.getProperties(),dbId=p.DB_ID,rootId=p.ROOT_ID;
+   if(!manifestPrincipal_()||!dbId||!rootId)return {authorized:false};
+   const identity=JSON.parse(p['LOCAL_ARCHIVE_V1:'+JSON.stringify([dbId,rootId])]||'null'),principalId=PropertiesService.getUserProperties().getProperty('LOCAL_PRINCIPAL_V1');
+   if(!identity||identity.schemaVersion!==1)return {authorized:false};
+   const authorized=!DriveApp.getFileById(dbId).isTrashed()&&!DriveApp.getFolderById(rootId).isTrashed();
+   return {authorized,dbId,rootId,archiveId:identity.archiveId,epoch:identity.epoch,principalId};
+  },
+  sheet(id,ctx){const db=SpreadsheetApp.openById(ctx.dbId);if(db.getId()!==ctx.dbId)throw Object.assign(Error('ScopeChanged'),{name:'ScopeChanged'});return db.getSheetById(id);}
  });
 }
 function syncCommitProtocol_(store,trustedScope){

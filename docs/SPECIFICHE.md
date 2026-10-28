@@ -156,3 +156,9 @@ Seguito: [controllo della capacità e compattazione dei riferimenti](VERIFICA-CA
 implementati come servizi interni, verificati sui mock. Rifiuto prima del
 prepare se manca il budget; manutenzione esplicita senza perdita di dati
 canonici, ricevute o feed. Nessuna nuova opzione utente o pulizia automatica.
+
+Seguito: [controller Days persistente](VERIFICA-CONTROLLER-ROUTING-GIORNI.md)
+verificato sulle fixture: riapertura senza iniezione in memoria, binding
+autorizzato e modalità readOnly che mantiene i dati canonici. Nessuna nuova
+opzione utente o attivazione reale; rollback verso vecchi deployment privo
+di controller non supportato.

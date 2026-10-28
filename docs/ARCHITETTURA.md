@@ -219,3 +219,9 @@ Budget delle scritture prima del prepare e aggregato per il ponte Days;
 ritiro esplicito e limitato delle chiavi head/entità superate, mantenendo
 l'ultima riga pubblicata. Payload e record immutabili conservati, nessuna
 retention o attivazione automatica; controller del routing ancora futuro.
+
+Seguito: [controller persistente Days e binding Apps Script](VERIFICA-CONTROLLER-ROUTING-GIORNI.md).
+Ancora richiesta e stato a due slot nelle proprietà; risoluzione per ogni
+accesso e ricontrollo delle corse di attivazione. readOnly conserva il gateway
+canonico. Registrazione esplicita su fogli/identità già provisionati; permessi
+operatore false per default e nessuna nuova RPC o registrazione reale.

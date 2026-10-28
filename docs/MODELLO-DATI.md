@@ -213,3 +213,11 @@ Schema dei due fogli invariato. Le sole vecchie chiavi head/entità selezionate
 dalla manutenzione diventano retired:hash; la riga della revisione corrente
 e tutti i payload restano invariati. Le righe ritirate escono dai lookup
 delle chiavi k:hash, senza eliminazione fisica o reset delle versioni.
+
+Seguito: [metadati persistenti del controller Days](VERIFICA-CONTROLLER-ROUTING-GIORNI.md).
+Namespace riservato SYNC_DAY_ROUTING_: ANCHOR_V1 immutabile con archivio/epoca
+e binding DB/cartella/fogli; STATE_A_V1/STATE_B_V1 con anchorDigest, revisione
+e modalità; MARK_A_V1/MARK_B_V1 per preparazione/pubblicazione. Checksum SHA-256,
+nessuna identità utente in chiaro o contenuto del diario. Nessuna proprietà
+viene creata dall'avvio ordinario: registrazione server esplicita e disabilitata
+per default; nessuna tabella o modifica degli schemi del diario.

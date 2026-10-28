@@ -126,3 +126,9 @@ riferimenti, confini 510/511/512, budget completo del ponte Days, dry-run e
 compattazione recuperabile di head/entità con 182 interruzioni RPC/prefisso.
 Non riduce lo spazio dei payload e non esegue manutenzione reale.
 [Contratto, limiti e seguito](VERIFICA-CAPACITA-COMMIT.md).
+
+`npm run test:day-controller` (anche in npm test) verifica ancora persistente,
+stato a due slot, CAS active/readOnly e binding autorizzato. Include 161
+interruzioni/prefissi delle proprietà e riavvii del backend Demo con provider
+Apps Script e API effettive, senza iniezione globale. Nessuna registrazione
+reale. [Contratto e limiti](VERIFICA-CONTROLLER-ROUTING-GIORNI.md).

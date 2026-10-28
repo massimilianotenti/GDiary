@@ -510,3 +510,9 @@ Pacchetto 8, seguito: [preflight e compattazione dei riferimenti attivi](../VERI
 implementati con budget aggregato Days e 182 interruzioni simulate. Non
 eliminano payload o record immutabili; controller persistente del routing,
 retention e recupero dello spazio fisico rimangono aperti.
+
+Pacchetto 8, seguito: [controller persistente Days](../VERIFICA-CONTROLLER-ROUTING-GIORNI.md)
+con binding verificato, ancora richiesta, stato a due slot e active/readOnly;
+161 interruzioni simulate e riavvio delle API sulla Demo. Nessuna registrazione
+reale; prossimo incremento sul browser del percorso attivo. Feed completo,
+provisioning e collaudo Google rimangono aperti.

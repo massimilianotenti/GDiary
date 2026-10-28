@@ -120,3 +120,8 @@ autorizzato e stato di attivazione/rollback; successivo collaudo browser del
 percorso attivo. Provisioning e verifica Google restano distinti. Retention
 e compattazione fisica saranno una manutenzione separata, preservando piani,
 ricevute e baseline. Manifest e migrazione reale restano spenti; online v75.
+
+Seguito implementato: [controller persistente Days e binding autorizzato](VERIFICA-CONTROLLER-ROUTING-GIORNI.md).
+Modalità active/readOnly senza fallback alle preimmagini, con metadati
+verificati dopo riavvio. Registrazione reale e collaudo browser attivo ancora
+separati; nessuna policy automatica di manutenzione o recupero spazio.

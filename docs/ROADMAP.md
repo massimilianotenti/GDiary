@@ -96,3 +96,8 @@ Seguito: [capacità e compattazione dei riferimenti attivi](VERIFICA-CAPACITA-CO
 implementate con preflight, dry-run e ripresa dopo interruzione. Nessun recupero
 di spazio fisico o retention; prossimo incremento sul controller persistente
 del routing Days e sul collaudo browser attivo. Capacità reali ancora false.
+
+Seguito: [controller persistente e modalità active/readOnly](VERIFICA-CONTROLLER-ROUTING-GIORNI.md)
+implementati con binding autorizzato e ripresa dei metadati, verificati sul
+backend Demo. Prossimo incremento sul browser con percorso attivo; provisioning,
+collaudo iframe e abilitazione reale restano distinti e non eseguiti.
