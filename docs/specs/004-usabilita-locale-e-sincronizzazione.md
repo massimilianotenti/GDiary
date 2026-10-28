@@ -493,3 +493,9 @@ persistenza Google o capacità del manifest abilitata; pacchetto ancora parziale
 Pacchetto 8, seguito: [adattatore di persistenza a frammenti/checkpoint](../VERIFICA-PERSISTENZA-COMMIT-SHEETS.md)
 implementato con test locali delle API Sheets simulate. Ancora senza
 provisioning reale o writer legacy; limiti di storico/compattazione espliciti.
+
+Pacchetto 8, seguito: [primo writer di dominio delle riflessioni giornaliere](../VERIFICA-WRITER-GIORNALIERO-CANONICO.md)
+con planner puro, snapshot completo e lettore con barriera di recupero,
+verificato su store sintetico e adattatore Sheets simulato. Il passaggio
+di saveDay/saveDays e dei lettori applicativi al modello canonico resta
+da implementare; nessuna capacità reale abilitata.

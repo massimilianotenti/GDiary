@@ -562,10 +562,10 @@ const OUTLINE_ICON_IDS=["target", "plant", "heart", "brain", "strength", "book",
 function readState_(){DB_HANDLE=null;ENTRY_SMALL_CACHE=null;ENTRY_TAG_HEADER_CHECKED=false;ENTRY_TAG_HEADER_WRITTEN=false;ioReset_();const result=state_();result.performance={...result.performance,lockWaitMs:0,readWithoutLock:true};return result;}
 function tagCatalog_(){const sheet=db_().getSheetByName('Entries'),count=sheet.getLastRow()-1;if(count<=0)return [];return Array.from(new Set(sheet.getRange(2,ENTRY_HEADERS.indexOf('tags')+1,count,1).getDisplayValues().flatMap(row=>String(row[0]||'').split(',').filter(Boolean)))).sort();}
 
-// SPEC-004 package 8: synchronous recovery kernel, not wired to Google or any
-// application writer. A future adapter must supply one shared lock, durable
-// read-after-write units, archive/epoch isolation and a deterministic SHA-256.
-// No table/setup/RPC is created by defining or constructing this factory.
+// SPEC-004 package 8: recovery kernel and internal domain writer. Application
+// RPCs remain legacy. An injected store supplies one shared lock, durable
+// read-after-write units, archive/epoch isolation and deterministic SHA-256.
+// Defining or constructing these factories creates no table/setup/RPC.
 function syncCommitCanonical_(value,depth=0){
  if(depth>40)throw Object.assign(new Error('DataError'),{name:'DataError'});
  if(value===null)return 'null';
@@ -574,6 +574,57 @@ function syncCommitCanonical_(value,depth=0){
  if(Array.isArray(value)){const parts=[];for(let i=0;i<value.length;i++)parts.push(syncCommitCanonical_(value[i],depth+1));return '['+parts.join(',')+']';}
  if(value&&Object.prototype.toString.call(value)==='[object Object]')return '{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+syncCommitCanonical_(value[key],depth+1)).join(',')+'}';
  throw Object.assign(new Error('DataError'),{name:'DataError'});
+}
+// SPEC-004 package 8: first domain writer, internal and opt-in through the
+// injected store only. No RPC, provisioning or legacy saveDay routing.
+// A complete snapshot is required: planning must not depend on a later read
+// or retry could change the fingerprint after an uncertain commit.
+function syncDaySnapshot_(day){
+ const fail=()=>{throw Object.assign(new Error('DataError'),{name:'DataError'});};
+ const keys=DAY_HEADERS.filter(key=>key!=='updatedAt');
+ if(!day||Object.prototype.toString.call(day)!=='[object Object]'||Object.keys(day).length!==keys.length||Object.keys(day).some(key=>!keys.includes(key))||typeof day.date!=='string'||!validDate_(day.date))fail();
+ const record={date:day.date};
+ for(const key of keys)if(key!=='date'){
+  const value=day[key];if(typeof value!=='string')fail();
+  if(!key.endsWith('Rich')){if(value.length>6000)fail();record[key]=value;continue;}
+  if(value===''){record[key]='';continue;}
+  if(value.length>45000)fail();
+  try{
+   const rich=JSON.parse(value),clean=validateRich_(rich,day[key.slice(0,-4)]);
+   // Reject unsupported attributes instead of silently discarding formatting.
+   if(syncCommitCanonical_(rich)!==syncCommitCanonical_(clean))fail();
+   record[key]=syncCommitCanonical_(clean);
+  }catch(error){fail();}
+ }
+ return record;
+}
+function syncPlanDayOperation_(input){
+ const fail=()=>{throw Object.assign(new Error('DataError'),{name:'DataError'});};
+ if(!input||Object.prototype.toString.call(input)!=='[object Object]'||Object.keys(input).length!==3||Object.keys(input).some(key=>!['operationId','baseVersion','day'].includes(key))||typeof input.operationId!=='string'||!/^[a-zA-Z0-9-]{10,80}$/.test(input.operationId)||!(input.baseVersion===null||typeof input.baseVersion==='string'&&/^commit-[1-9][0-9]{0,15}$/.test(input.baseVersion)))fail();
+ const record=syncDaySnapshot_(input.day);
+ const request={operationId:input.operationId,changes:[{collection:'days',id:record.date,baseVersion:input.baseVersion,action:'upsert',data:{format:'sync-day/v1',record}}]};
+ if(syncCommitCanonical_(request).length>32768)fail();return request;
+}
+function syncDayWriter_(store,trustedScope){
+ const protocol=syncCommitProtocol_(store,trustedScope),scope=JSON.parse(syncCommitCanonical_(trustedScope));
+ const error=name=>({ok:false,error:name});
+ return Object.freeze({
+  save(input){
+   let request;try{request=syncPlanDayOperation_(input);}catch(ignore){return error('DataError');}
+   const result=protocol.execute(request);return result.ok?{ok:true,value:{...result.value,scope:JSON.parse(syncCommitCanonical_(scope))}}:result;
+  },
+  read(date){
+   if(typeof date!=='string'||!validDate_(date))return error('DataError');
+   const result=protocol.read('days',date);if(!result.ok)return result;
+   const {cursor,entity}=result.value;
+   if(entity===null||entity.deleted)return {ok:true,value:{cursor,day:null,version:entity?.version??null,deleted:entity?.deleted??false}};
+   try{
+    const data=entity.data;if(!data||Object.keys(data).length!==2||data.format!=='sync-day/v1')return error('ProtocolCorrupt');
+    const day=syncDaySnapshot_(data.record);if(day.date!==date||syncCommitCanonical_(day)!==syncCommitCanonical_(data.record))return error('ProtocolCorrupt');
+    return {ok:true,value:{cursor,day,version:entity.version,deleted:false}};
+   }catch(ignore){return error('ProtocolCorrupt');}
+  }
+ });
 }
 function syncCommitProtocol_(store,trustedScope){
  const fail=name=>{throw Object.assign(new Error(name),{name});},copy=value=>JSON.parse(syncCommitCanonical_(value));

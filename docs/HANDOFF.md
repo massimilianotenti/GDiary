@@ -1,5 +1,23 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Primo writer canonico giornaliero — 28 ottobre, pacchetto 8 parziale
+
+Servizio interno syncDayWriter_ con planner puro e lettore di dominio,
+collegato al nucleo dei commit attraverso lo store iniettato. Snapshot completo
+delle riflessioni, testo/spazi/rich conservati, versioni commit-N e ACK legati
+allo scope. Payload parziali o formati non supportati rifiutati; retry e
+conflitti stabili, lettore con recupero e controllo dello schema canonico.
+Nuovo test:canonical-days incluso in npm test: 20 interruzioni sulle unità e
+165 sulle chiamate Sheets simulate, con riavvio V8, più verifica su Demo.html.
+Build, npm test, test:release e test:tracing superati; Demo/staging dei sei
+file rigenerati, Index senza differenze frontend.
+[Contratto, verifiche e seguito](VERIFICA-WRITER-GIORNALIERO-CANONICO.md).
+Ancora scollegato da saveDay/saveDays e dai lettori applicativi: nessuna
+migrazione, RPC nuova o doppia scrittura. Capacità manifest false.
+Prossimo incremento: migrazione controllata di Days e instradamento coerente
+dei lettori per periodo; compattazione e controller di attivazione ancora
+aperti. Nessun deploy o dato reale; ultimo online Apps Script 75.
+
 ## Persistenza commit a frammenti — 28 ottobre, pacchetto 8 parziale
 
 Adattatore interno syncSheetsCommitStore_ per due fogli dedicati espliciti:

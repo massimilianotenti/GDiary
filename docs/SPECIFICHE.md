@@ -140,3 +140,8 @@ Seguito del pacchetto 8: [persistenza a frammenti su due fogli dedicati](VERIFIC
 implementata e verificata sui mock, con pubblicazione separata e lookup per chiave.
 Nessuna attivazione o provisioning reale; writer/lettori legacy ancora scollegati.
 Il budget di storico richiede compattazione prima di un uso continuativo.
+
+Seguito del pacchetto 8: [primo writer interno delle riflessioni giornaliere](VERIFICA-WRITER-GIORNALIERO-CANONICO.md)
+implementato con snapshot completi, versioni canoniche, retry/conflitti e
+lettore con recupero. È una componente server verificata sui mock; non
+introduce nuove funzioni nell'interfaccia o salvataggi offline.

@@ -200,3 +200,9 @@ Seguito del pacchetto 8: [persistenza a frammenti su due fogli dedicati](VERIFIC
 implementata e verificata sui mock, con pubblicazione separata e lookup per chiave.
 Nessuna attivazione o provisioning reale; writer/lettori legacy ancora scollegati.
 Il budget di storico richiede compattazione prima di un uso continuativo.
+
+Seguito del pacchetto 8: [writer e lettore interni delle riflessioni giornaliere](VERIFICA-WRITER-GIORNALIERO-CANONICO.md).
+syncDayWriter_ applica snapshot completi tramite il nucleo, con ACK legato
+allo scope e lettore che recupera i prepare e valida lo schema di dominio.
+Nessuna RPC o instradamento di saveDay/saveDays: la migrazione dei writer e
+dei lettori per periodo resta aperta.

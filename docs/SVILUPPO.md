@@ -108,3 +108,9 @@ Non richiede Google e non simula transazioni ACID Sheets/Docs.
 su mock con 332 interruzioni, prefissi di pubblicazione, riavvio V8 e 50.000
 righe estranee. Non accede a Google né crea fogli reali.
 [Contratto, fonti e limiti](VERIFICA-PERSISTENZA-COMMIT-SHEETS.md).
+
+`npm run test:canonical-days` (anche in npm test) verifica il primo writer
+interno delle riflessioni e il relativo lettore: snapshot completo, rich,
+retry/conflitti, 20 interruzioni del nucleo e 165 delle chiamate Sheets simulate,
+riavvio V8 e copia generata in Demo.html. Non migra o abilita saveDay/saveDays.
+[Contratto e limiti](VERIFICA-WRITER-GIORNALIERO-CANONICO.md).

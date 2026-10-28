@@ -81,3 +81,8 @@ Seguito del pacchetto 8: [persistenza a frammenti su due fogli dedicati](VERIFIC
 implementata e verificata sui mock, con pubblicazione separata e lookup per chiave.
 Nessuna attivazione o provisioning reale; writer/lettori legacy ancora scollegati.
 Il budget di storico richiede compattazione prima di un uso continuativo.
+
+Seguito del pacchetto 8: [primo writer interno delle riflessioni giornaliere](VERIFICA-WRITER-GIORNALIERO-CANONICO.md)
+con planner e lettore canonico verificati sul nucleo e sull'adattatore Sheets
+simulato. Ancora senza migrazione di Days o instradamento dei lettori
+applicativi; manifest e capacità reali restano disabilitati.
