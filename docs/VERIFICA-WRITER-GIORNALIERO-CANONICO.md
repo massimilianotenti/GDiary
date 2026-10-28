@@ -91,3 +91,7 @@ Restano aperti il budget di 512 riferimenti per chiave, la compattazione e il
 collaudo delle effettive barriere Google documentati nell'adattatore Sheets.
 Il feed completo dell'archivio richiede la copertura dell'intera matrice delle
 mutazioni. Online resta il deployment Apps Script 75.
+
+Seguito implementato: [ponte di migrazione Days e routing dei lettori](VERIFICA-MIGRAZIONE-GIORNI.md),
+con piani durevoli per le patch e date legacy congelate. L'iniezione resta
+spenta nei sorgenti; il controller persistente di attivazione non è incluso.

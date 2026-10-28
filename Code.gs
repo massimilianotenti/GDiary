@@ -1,4 +1,6 @@
 let DB_HANDLE=null,ENTRY_SMALL_CACHE=null,ENTRY_TAG_HEADER_CHECKED=false,ENTRY_TAG_HEADER_WRITTEN=false;
+// Server-owned injection point only. No production controller enables it yet.
+let DAY_COMMIT_GATEWAY=null;
 const PLAN_HEADERS=['entryId','date','updatedAt','workStart','workEnd','importance'];
 const ENTRY_HEADERS = ['id','date','type','text','projects','due','status','createdAt','updatedAt','requestId','scope','body','completedAt','tags'];
 const PROJECT_HEADERS = ['slug','name','description','updatedAt'];
@@ -143,6 +145,7 @@ function saveReflectionSettings(p){
     const props=PropertiesService.getScriptProperties();props.setProperty('DAILY_REFLECTION_MODE',p.dailyReflectionMode);props.setProperty('REFLECTION_SETTINGS_VERSION',Utilities.getUuid());return ACTIVE_CONTEXT.incrementalCommon===true?{delta:true,entries:[],commonIncluded:false,settingsPatch:reflectionSettings_()}:state_();});
 }
 function rows_(sheet, headers) {
+  if(sheet.getName()==='Days'&&DAY_COMMIT_GATEWAY)return DAY_COMMIT_GATEWAY.readRows();
   if(sheet.getName()==='Days')ensureDayHeaders_(sheet);else verify_(sheet,headers);
   if (sheet.getLastRow()<2) return [];
   return ioRows_(sheet,headers.length)
@@ -264,6 +267,10 @@ function commonDateSlice_(sheet,headers,dateKey,from,to){
  return {from,to,rows:slice.rows};
 }
 function commonDateRanges_(sheet,headers,dateKey,ranges){
+ if(sheet.getName()==='Days'&&DAY_COMMIT_GATEWAY)return {ranges,rows:DAY_COMMIT_GATEWAY.readRows(ranges)};
+ return commonDateRangesRaw_(sheet,headers,dateKey,ranges);
+}
+function commonDateRangesRaw_(sheet,headers,dateKey,ranges){
  if(sheet.getName()==='Days')ensureDayHeaders_(sheet);else verify_(sheet,headers);
  // Search the date column on the service. Never materialise unrelated payloads,
  // including on small sheets or when records are unsorted/interleaved.
@@ -475,13 +482,14 @@ function dayValues_(payload) {
   for(const field of ['intention','reflection'])if(Object.prototype.hasOwnProperty.call(payload,field)){const key=field+'Rich';values[key]='';if(payload[key]!==undefined){const raw=String(payload[field]||'').replace(/\r\n?/g,'\n'),rich=validateRich_(payload[key],raw);const serial=JSON.stringify(rich);if(serial.length>45000)throw Error('Formattazione della riflessione troppo estesa.');values[key]=serial;}}
   return values;
 }
-function saveDayImpl_(payload){return saveRecord_('Days',DAY_HEADERS,'date',dayValues_(payload),payload.updatedAt);}
+function saveDayImpl_(payload){if(DAY_COMMIT_GATEWAY)return DAY_COMMIT_GATEWAY.saveLegacy(payload);return saveRecord_('Days',DAY_HEADERS,'date',dayValues_(payload),payload.updatedAt);}
 // Bounded, best-effort batch. Only an explicit saved result acknowledges a day.
 function saveDays(p){
  ACTIVE_CONTEXT=p&&p.context||{};
  if(!p||!Array.isArray(p.days)||!p.days.length||p.days.length>10||traceBytes_(JSON.stringify(p.days))>500000)throw Error('Lotto giornate non valido o troppo grande.');
  const dates=p.days.map(item=>item&&item.date);
  if(dates.some(date=>!validDate_(date))||new Set(dates).size!==dates.length)throw Error('Date delle giornate non valide o duplicate.');
+ if(DAY_COMMIT_GATEWAY)return DAY_COMMIT_GATEWAY.saveBatch(p.days);
  const prepared=p.days.map(item=>{try{return {date:item.date,version:item.updatedAt||'',values:dayValues_(item)};}catch(error){return {date:item.date,status:'invalid',error:'Campi della giornata non validi.'};}});
  return locked_(function(){
   const sheet=db_().getSheetByName('Days');ensureDayHeaders_(sheet);
@@ -507,6 +515,7 @@ function saveDays(p){
  });
 }
 function saveRecord_(name,headers,key,values,version) {
+  if(name==='Days'&&DAY_COMMIT_GATEWAY)throw Object.assign(Error('Writer giornaliero non instradato.'),{name:'ProtocolUnavailable'});
   return locked_(function(){
     const sheet=db_().getSheetByName(name), records=rows_(sheet,headers), index=records.findIndex(r=>r[key]===values[key]);
     const existing=index<0?null:records[index];
@@ -624,6 +633,133 @@ function syncDayWriter_(store,trustedScope){
     return {ok:true,value:{cursor,day,version:entity.version,deleted:false}};
    }catch(ignore){return error('ProtocolCorrupt');}
   }
+ });
+}
+// Raw Days access for the server-owned migration gateway. No table creation,
+// no routing recursion, and no request-wide cached preimages.
+function syncDaySheetSource_(sheet){
+ const read=date=>commonDateRangesRaw_(sheet,DAY_HEADERS,'date',[{from:date,to:date}]).rows;
+ return Object.freeze({
+  read,
+  readRows(ranges){
+   if(ranges)return commonDateRangesRaw_(sheet,DAY_HEADERS,'date',ranges).rows;
+   ensureDayHeaders_(sheet);const count=sheet.getLastRow()-1;
+   return count>0?readSheetValues_(sheet.getRange(2,1,count,DAY_HEADERS.length)).map(row=>Object.fromEntries(DAY_HEADERS.map((key,i)=>[key,row[i]]))):[];
+  },
+  saveLegacy(payload){
+   const values=dayValues_(payload),found=read(payload.date);
+   if(found.length>1||(found[0]?.updatedAt||'')!==(payload.updatedAt||''))throw Object.assign(Error('Giornata modificata altrove. Conserva la bozza e aggiorna.'),{name:'ConflictError'});
+   const record={...Object.fromEntries(DAY_HEADERS.map(key=>[key,''])),...found[0],...values};
+   record.updatedAt=new Date(Math.max(Date.now(),found[0]?Date.parse(found[0].updatedAt)+1:0)).toISOString();
+   ensureDayHeaders_(sheet,true);const rows=findRows_(sheet,1,payload.date,false);
+   if(rows.length)writeRow_(sheet,rows[0],DAY_HEADERS.map(key=>record[key]));else append_(sheet,[DAY_HEADERS.map(key=>record[key])]);
+   // The commit store's lock is read-only for legacy mutations, so these writes
+   // need their own flush before the shared lock is released.
+   traceMeasure_('flush',()=>SpreadsheetApp.flush());return record;
+  }
+ });
+}
+function syncDayMigrationGateway_(store,trustedScope,source){
+ const fail=name=>{throw Object.assign(Error(name==='ConflictError'?'Giornata modificata altrove. Conserva la bozza e aggiorna.':name),{name});},copy=value=>JSON.parse(syncCommitCanonical_(value));
+ const scope=copy(trustedScope),directoryId='day-routing-v1',routeId=date=>'day-route:'+date;
+ let owned=false;
+ const nested={...store,withLock(fn){if(!owned)fail('ProtocolUnavailable');return fn();}};
+ const protocol=syncCommitProtocol_(nested,scope),writer=syncDayWriter_(nested,scope);
+ for(const method of ['read','readRows','saveLegacy'])if(typeof source?.[method]!=='function')fail('DataError');
+ const unwrap=result=>{if(!result.ok)fail(result.error);return result.value;};
+ const run=fn=>{if(owned)fail('BusyError');try{return copy(store.withLock(()=>{owned=true;try{const value=fn();unwrap(protocol.recover());return value;}finally{owned=false;}}));}catch(error){fail(['DataError','ProtocolUnavailable','ProtocolCorrupt','OperationMismatch','CommitBlocked','ScopeChanged','BusyError','ConflictError','StorageError'].includes(error?.name)?error.name:'StorageError');}};
+ const hash=value=>{const digest=store.digest(syncCommitCanonical_(value));if(typeof digest!=='string'||!/^[a-f0-9]{64}$/.test(digest))fail('ProtocolCorrupt');return digest;};
+ const fields=(value,keys)=>value&&Object.prototype.toString.call(value)==='[object Object]'&&Object.keys(value).length===keys.length&&Object.keys(value).every(key=>keys.includes(key));
+ const validId=id=>typeof id==='string'&&/^[a-zA-Z0-9-]{10,80}$/.test(id)&&!id.startsWith('day-reserve-');
+ function rawRecord(row,date){
+  if(row===null)return null;
+  if(!row||typeof row!=='object'||Object.keys(row).some(key=>!DAY_HEADERS.includes(key))||row.date!==date)fail('DataError');
+  const record={};for(const key of DAY_HEADERS){const value=row[key]===undefined&&DAY_EXTRA_HEADERS.includes(key)?'':row[key];if(typeof value!=='string')fail('DataError');record[key]=value;}return record;
+ }
+ function rawOne(date,rows=source.read(date)){if(!Array.isArray(rows)||rows.length>1)fail('CommitBlocked');return rows.length?rawRecord(rows[0],date):null;}
+ const snapshot=row=>syncDaySnapshot_(Object.fromEntries(DAY_HEADERS.filter(key=>key!=='updatedAt').map(key=>[key,row?.[key]??''])));
+ function directoryData(data){
+  if(!fields(data,['format','dates'])||data.format!=='sync-day-routing/v1'||!Array.isArray(data.dates)||data.dates.length>128||data.dates.some(date=>typeof date!=='string'||!validDate_(date))||new Set(data.dates).size!==data.dates.length||syncCommitCanonical_([...data.dates].sort())!==syncCommitCanonical_(data.dates))fail('ProtocolCorrupt');return data;
+ }
+ function directory(){const entity=unwrap(protocol.read('settings',directoryId)).entity;if(!entity)return {dates:[],version:null};if(entity.deleted)fail('ProtocolCorrupt');return {...directoryData(entity.data),version:entity.version};}
+ function routeData(data,date){if(!fields(data,['format','date','sourceDigest','legacyVersion'])||data.format!=='sync-day-route/v1'||data.date!==date||!/^[a-f0-9]{64}$/.test(data.sourceDigest)||typeof data.legacyVersion!=='string')fail('ProtocolCorrupt');return data;}
+ function route(date){const entity=unwrap(protocol.read('settings',routeId(date))).entity;if(!entity||entity.deleted)fail('ProtocolCorrupt');return {...routeData(entity.data,date),version:entity.version};}
+ function checkSource(date,descriptor,rows){if(hash(rawOne(date,rows))!==descriptor.sourceDigest)fail('CommitBlocked');}
+ function planValue(data,kind,fingerprint,operationId,date){
+   if(!fields(data,['format','kind','fingerprint','request'])||data.format!=='sync-day-plan/v1')fail('ProtocolCorrupt');
+   if(data.kind!==kind||data.fingerprint!==fingerprint)fail('OperationMismatch');
+  const request=data.request;if(!fields(request,['operationId','changes'])||request.operationId!==operationId||!Array.isArray(request.changes)||request.changes.length!==(kind==='migrate'?3:1))fail('ProtocolCorrupt');
+  const change=request.changes[0];if(!fields(change,['collection','id','baseVersion','action','data'])||change.collection!=='days'||change.id!==date||change.action!=='upsert'||!fields(change.data,['format','record'])||change.data.format!=='sync-day/v1'||syncCommitCanonical_(syncDaySnapshot_(change.data.record))!==syncCommitCanonical_(change.data.record)||change.data.record.date!==date)fail('ProtocolCorrupt');
+  if(kind==='migrate'){
+   const r=request.changes[1],d=request.changes[2];
+   if(change.baseVersion!==null||!fields(r,['collection','id','baseVersion','action','data'])||r.collection!=='settings'||r.id!==routeId(date)||r.action!=='upsert'||r.baseVersion!==null||!fields(d,['collection','id','baseVersion','action','data'])||d.collection!=='settings'||d.id!==directoryId||d.action!=='upsert')fail('ProtocolCorrupt');
+   routeData(r.data,date);if(!directoryData(d.data).dates.includes(date))fail('ProtocolCorrupt');
+  }
+  return request;
+ }
+ function savedPlan(kind,input,operationId,date,prepare){
+  const fingerprint=hash({kind,input}),key=hash([scope.principalId,operationId]),id='day-plan:'+key;
+  let entity=unwrap(protocol.read('settings',id)).entity;
+  if(!entity){
+   const data={format:'sync-day-plan/v1',kind,fingerprint,request:prepare()};planValue(data,kind,fingerprint,operationId,date);
+   const reserved=unwrap(protocol.execute({operationId:'day-reserve-'+key,changes:[{collection:'settings',id,baseVersion:null,action:'upsert',data}]}));
+   if(reserved.status!=='committed')fail('CommitBlocked');entity=unwrap(protocol.read('settings',id)).entity;
+  }
+  if(!entity||entity.deleted)fail('ProtocolCorrupt');return planValue(entity.data,kind,fingerprint,operationId,date);
+ }
+ const upsert=(collection,id,baseVersion,data)=>({collection,id,baseVersion,action:'upsert',data});
+ function commit(request){const result=unwrap(protocol.execute(request));if(result.status==='conflict')fail('ConflictError');return {...result,scope:copy(scope)};}
+ const delta=record=>({delta:true,entries:[],commonIncluded:false,commonUpserts:{days:[record]}});
+ function save(payload){
+  const values=dayValues_(payload),version=payload.updatedAt||'';if(typeof version!=='string')fail('DataError');
+  const input={values,version},operationId=payload.operationId===undefined?'day-edit-'+hash(input):payload.operationId;
+  if(!validId(operationId))fail('DataError');const index=directory();
+  if(!index.dates.includes(values.date)){
+   if(unwrap(protocol.read('settings',routeId(values.date))).entity!==null||unwrap(writer.read(values.date)).version!==null)fail('CommitBlocked');
+   return source.saveLegacy(payload);
+  }
+  const descriptor=route(values.date);checkSource(values.date,descriptor);
+  const request=savedPlan('edit',input,operationId,values.date,()=>{
+   const current=unwrap(writer.read(values.date));if(!current.day||current.deleted)fail('CommitBlocked');
+   const day=syncDaySnapshot_({...current.day,...values});
+   const baseVersion=version===descriptor.legacyVersion&&current.version===descriptor.version?descriptor.version:/^commit-[1-9][0-9]{0,15}$/.test(version)?version:null;
+   return syncPlanDayOperation_({operationId,baseVersion,day});
+  });
+  checkSource(values.date,descriptor);const ack=commit(request);checkSource(values.date,descriptor);
+  return {...request.changes[0].data.record,updatedAt:ack.versions[0].version};
+ }
+ return Object.freeze({
+  preview(date){return run(()=>{if(typeof date!=='string'||!validDate_(date))fail('DataError');const row=rawOne(date);const day=row?snapshot(row):syncDaySnapshot_({...Object.fromEntries(DAY_HEADERS.filter(key=>key!=='updatedAt').map(key=>[key,''])),date});return {date,legacy:row,sourceDigest:hash(row),day,migrated:directory().dates.includes(date)};});},
+  migrate(input){return run(()=>{
+   if(!fields(input,['operationId','date','expectedLegacy'])||!validId(input.operationId)||typeof input.date!=='string'||!validDate_(input.date))fail('DataError');
+   const expected=rawRecord(input.expectedLegacy,input.date),sourceDigest=hash(expected);
+   const request=savedPlan('migrate',{date:input.date,expected},input.operationId,input.date,()=>{
+    if(hash(rawOne(input.date))!==sourceDigest)fail('CommitBlocked');const index=directory();
+    if(index.dates.includes(input.date)||index.dates.length>=128||unwrap(writer.read(input.date)).version!==null)fail('CommitBlocked');
+    const day=expected?snapshot(expected):syncDaySnapshot_({...Object.fromEntries(DAY_HEADERS.filter(key=>key!=='updatedAt').map(key=>[key,''])),date:input.date});
+    return {operationId:input.operationId,changes:[syncPlanDayOperation_({operationId:input.operationId,baseVersion:null,day}).changes[0],upsert('settings',routeId(input.date),null,{format:'sync-day-route/v1',date:input.date,sourceDigest,legacyVersion:expected?.updatedAt||''}),upsert('settings',directoryId,index.version,{format:'sync-day-routing/v1',dates:[...index.dates,input.date].sort()})]};
+   });
+   if(hash(rawOne(input.date))!==sourceDigest)fail('CommitBlocked');const ack=commit(request);if(hash(rawOne(input.date))!==sourceDigest)fail('CommitBlocked');return ack;
+  });},
+  saveLegacy(payload){return run(()=>delta(save(payload)));},
+  saveBatch(days){return run(()=>{
+   if(!Array.isArray(days)||!days.length||days.length>10||traceBytes_(JSON.stringify(days))>500000||days.some(day=>!day||!validDate_(day.date))||new Set(days.map(day=>day.date)).size!==days.length)fail('DataError');
+   const records=[],results=[];let stopped=false;
+   for(const payload of days){
+    try{dayValues_(payload);}catch(ignore){results.push({date:payload.date,status:'invalid',error:'Campi della giornata non validi.'});continue;}
+    if(stopped){results.push({date:payload.date,status:'notAttempted',error:'Invio interrotto. Riprova.'});continue;}
+    try{records.push(save(payload));results.push({date:payload.date,status:'saved'});}catch(error){const conflict=error.name==='ConflictError';if(!conflict)stopped=true;results.push({date:payload.date,status:conflict?'conflict':'error',error:conflict?'Giornata modificata altrove. Conserva la bozza e aggiorna.':'Salvataggio non confermato. La bozza deve essere conservata.'});}
+   }
+   return {delta:true,entries:[],commonIncluded:false,commonUpserts:{days:records},results,errors:results.filter(result=>result.status!=='saved')};
+  });},
+  readRows(ranges=null){return run(()=>{
+   if(ranges!==null&&(!Array.isArray(ranges)||!ranges.length||ranges.length>10||ranges.some(range=>!range||typeof range.from!=='string'||typeof range.to!=='string'||!validDate_(range.from)||!validDate_(range.to)||range.from>range.to||(Date.parse(range.to)-Date.parse(range.from))/86400000>400)))fail('DataError');
+   const index=directory(),rows=source.readRows(ranges);if(!Array.isArray(rows))fail('ProtocolCorrupt');
+   const selected=index.dates.filter(date=>ranges===null||ranges.some(range=>date>=range.from&&date<=range.to)),replacements=new Map();
+   for(const date of selected){const descriptor=route(date);checkSource(date,descriptor,rows.filter(row=>row.date===date));const current=unwrap(writer.read(date));if(current.version===null)fail('ProtocolCorrupt');replacements.set(date,current.day?{...current.day,updatedAt:current.version}:null);}
+   const out=[];for(const row of rows){if(replacements.has(row.date)){const replacement=replacements.get(row.date);if(replacement)out.push(replacement);replacements.delete(row.date);}else out.push(row);}
+   for(const row of replacements.values())if(row)out.push(row);return out;
+  });}
  });
 }
 function syncCommitProtocol_(store,trustedScope){
@@ -762,7 +898,7 @@ function syncSheetsCommitStore_(indexSheet,blockSheet,trustedArchive,services={}
  const encode=services.encode||function(text){return Utilities.base64Encode(text,Utilities.Charset.UTF_8);};
  const decode=services.decode||function(text){return Utilities.newBlob(Utilities.base64Decode(text)).getDataAsString('UTF-8');};
  const flush=services.flush||function(){SpreadsheetApp.flush();},uuid=services.uuid||function(){return Utilities.getUuid();};
- const lock=services.withLock||function(fn){const handle=LockService.getScriptLock();if(!handle.tryLock(0))fail('BusyError');try{return fn();}finally{handle.releaseLock();}};
+ const lock=services.withLock||function(fn){if(APP_LOCK_DEPTH>0)return fn();const handle=LockService.getScriptLock();if(!handle.tryLock(0))fail('BusyError');try{return fn();}finally{handle.releaseLock();}};
  let active=false;
  const guard=()=>{if(!active||services.enabled?.()!==true)fail('ProtocolUnavailable');if(services.authorize?.(copy(archive))!==true)fail('ScopeChanged');};
  const hash=text=>{const result=digest(text);if(typeof result!=='string'||!/^[a-f0-9]{64}$/.test(result))fail('ProtocolCorrupt');return result;};

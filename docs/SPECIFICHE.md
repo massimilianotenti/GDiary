@@ -145,3 +145,9 @@ Seguito del pacchetto 8: [primo writer interno delle riflessioni giornaliere](VE
 implementato con snapshot completi, versioni canoniche, retry/conflitti e
 lettore con recupero. È una componente server verificata sui mock; non
 introduce nuove funzioni nell'interfaccia o salvataggi offline.
+
+Seguito del pacchetto 8: [ponte Days e API compatibili](VERIFICA-MIGRAZIONE-GIORNI.md)
+verificato sulla Demo con iniezione sintetica. Mantiene le bozze pre-migrazione,
+salvataggi parziali, formattazione ed esiti per data; le letture complete e per
+periodo usano lo stesso routing. L'interruttore server resta null, senza
+migrazioni automatiche o nuove opzioni dell'interfaccia.

@@ -206,3 +206,10 @@ syncDayWriter_ applica snapshot completi tramite il nucleo, con ACK legato
 allo scope e lettore che recupera i prepare e valida lo schema di dominio.
 Nessuna RPC o instradamento di saveDay/saveDays: la migrazione dei writer e
 dei lettori per periodo resta aperta.
+
+Seguito implementato: [ponte di migrazione Days e routing dei lettori](VERIFICA-MIGRAZIONE-GIORNI.md).
+Il gateway prepara piani durevoli delle patch, pubblica insieme giorno/route/
+indice e verifica la preimmagine legacy congelata. saveDay/saveDays e letture
+complete/per periodo hanno un punto di iniezione server, ancora null; nessuna
+migrazione reale o attivazione automatica. Controller persistente e rollback
+coerente restano aperti, insieme a capacità/compattazione del registro.

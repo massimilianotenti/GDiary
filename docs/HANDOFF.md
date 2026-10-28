@@ -1,5 +1,27 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Ponte Days e lettori coerenti — 28 ottobre, pacchetto 8 parziale
+
+syncDayMigrationGateway_ e source esplicito della tabella Days: confronto
+dell'intera preimmagine, migrazione atomica di giorno/descrittore/indice e
+riga legacy congelata. Piani durevoli delle patch prima del commit, retry con
+snapshot/ACK originali, compatibilità delle bozze pre-migrazione e conflitti
+stabili. saveDay/saveDays, letture complete e finestre Diario/Settimana/Abitudini
+instradati dietro DAY_COMMIT_GATEWAY=null; writer diretto Days bloccato quando
+il gateway è iniettato. Nessuna nuova RPC, apertura o attivazione automatica.
+test:day-migration in npm test: 44 interruzioni del nucleo, 396 delle chiamate
+Sheets simulate, API effettive sulla Demo e 50.000 righe estranee per periodo.
+Build, npm test, test:day-migration, test:release e test:tracing superati;
+Demo/staging dei sei file rigenerati, Index senza differenze frontend.
+[Contratto, limiti e seguito](VERIFICA-MIGRAZIONE-GIORNI.md).
+Migrazione attiva solo nelle fixture, capacità manifest false. Non riportare
+il routing a null come rollback dopo una futura migrazione reale: mancano
+ancora controller persistente, binding autorizzato e provisioning. I piani
+aggiungono un commit per operazione e consumano il budget dell'head.
+Prossimo incremento: preflight capacità e compattazione recuperabile, poi
+controller persistente e collaudo browser della migrazione attiva.
+Nessun deploy o dato reale; ultimo online Apps Script 75.
+
 ## Primo writer canonico giornaliero — 28 ottobre, pacchetto 8 parziale
 
 Servizio interno syncDayWriter_ con planner puro e lettore di dominio,

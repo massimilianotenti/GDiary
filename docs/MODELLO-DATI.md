@@ -199,3 +199,11 @@ Entità days identificata dalla data, data:{format:'sync-day/v1',record:{...}};
 record contiene tutti i campi DAY_HEADERS escluso updatedAt. Testi e JSON
 rich sono stringhe; versione commit-N e cursore appartengono all'envelope
 del protocollo. Non migra o modifica lo schema della tabella Days esistente.
+
+Seguito del pacchetto 8: [metadati interni di migrazione Days](VERIFICA-MIGRAZIONE-GIORNI.md).
+Nella collezione logica settings: day-routing-v1 elenca fino a 128 date;
+day-route:date conserva sourceDigest/legacyVersion; day-plan:hash conserva
+input fingerprint e request completa immutabile. Sono dati infrastrutturali,
+non preferenze. Per date instradate, updatedAt delle risposte legacy contiene
+la versione opaca commit-N. Schema fisico Days invariato; riga originaria
+congelata. Applicazione reale ancora disabilitata.

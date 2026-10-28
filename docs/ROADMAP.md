@@ -86,3 +86,8 @@ Seguito del pacchetto 8: [primo writer interno delle riflessioni giornaliere](VE
 con planner e lettore canonico verificati sul nucleo e sull'adattatore Sheets
 simulato. Ancora senza migrazione di Days o instradamento dei lettori
 applicativi; manifest e capacità reali restano disabilitati.
+
+Seguito: [ponte di migrazione Days con piani durevoli e routing completo/per periodo](VERIFICA-MIGRAZIONE-GIORNI.md)
+implementato e verificato sulle fixture, con iniezione server ancora null.
+Righe legacy congelate e guardie contro divergenze/bypass; prossimo incremento
+su capacità/compattazione, poi controller persistente e collaudo browser attivo.

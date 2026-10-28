@@ -499,3 +499,9 @@ con planner puro, snapshot completo e lettore con barriera di recupero,
 verificato su store sintetico e adattatore Sheets simulato. Il passaggio
 di saveDay/saveDays e dei lettori applicativi al modello canonico resta
 da implementare; nessuna capacità reale abilitata.
+
+Pacchetto 8, seguito: [ponte Days e lettori coerenti](../VERIFICA-MIGRAZIONE-GIORNI.md)
+implementati con piani durevoli delle patch, confronto della preimmagine,
+migrazione atomica di giorno/route/indice e guardie nei writer legacy. Iniezione
+server null nei sorgenti; solo fixture sintetiche. Restano capacità/compattazione,
+controller persistente e collaudo browser del routing attivo.

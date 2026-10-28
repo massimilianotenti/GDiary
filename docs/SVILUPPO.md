@@ -114,3 +114,9 @@ interno delle riflessioni e il relativo lettore: snapshot completo, rich,
 retry/conflitti, 20 interruzioni del nucleo e 165 delle chiamate Sheets simulate,
 riavvio V8 e copia generata in Demo.html. Non migra o abilita saveDay/saveDays.
 [Contratto e limiti](VERIFICA-WRITER-GIORNALIERO-CANONICO.md).
+
+`npm run test:day-migration` (anche in npm test) verifica il ponte Days,
+44 interruzioni delle unità, 396 delle chiamate Sheets simulate e gli ingressi
+effettivi saveDay/saveDays e letture complete/per periodo sulla Demo in V8.
+L'iniezione server resta null nei sorgenti: migrazione attiva soltanto nelle
+fixture. [Contratto, capacità e seguito](VERIFICA-MIGRAZIONE-GIORNI.md).
