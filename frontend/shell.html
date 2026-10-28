@@ -926,7 +926,7 @@ async function loadContinuous(c,more=false){
     const result=await loader({cache:requestedTasks?null:journalPageCache,fetchPage:value=>api('getJournalPage',value,navContext())}).load(pageRequest,{
      isCurrent:current,onRemote:value=>{response=value;},
      onCached:cached=>{
-      if(session.loaded||dirtyMain||dirtyDetail||cursor)return;
+      if(dirtyMain||dirtyDetail)return;
       localScope=cached.scope;localPreview=node('section','','journal-local-preview');localPreview.setAttribute('aria-label','Anteprima della copia locale');
       localPreview.append(node('p','Copia locale del '+new Date(cached.savedAt).toLocaleString('it-IT')+' · verifica su Google in corso.','hint'));
       // Preview only: no editor, IDs, action buttons or canonical merge.

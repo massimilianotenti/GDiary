@@ -90,3 +90,9 @@ privacy e bozze. [Contratto e limiti](VERIFICA-ANTEPRIMA-LOCALE-DIARIO.md).
 ensureCommon, con cataloghi/slice inventati, CAS, quota, calendario, bozze,
 invalidazione indipendente delle anteprime e riavvio Chromium.
 [Contratto e limiti](VERIFICA-DATI-COMUNI-LOCALI.md).
+
+
+`npm run test:local-pages` verifica più pagine del diario, indice limitato,
+invalidazioni/CAS, compatibilità del descrittore singolo, riavvio e anteprima
+delle continuazioni nella shell senza perdere editor, privacy, bozze e selezione.
+[Contratto e limiti](VERIFICA-PAGINE-LOCALI-DIARIO.md).

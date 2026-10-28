@@ -478,3 +478,8 @@ Pacchetto 7, seguito: [cataloghi e slice del diario nella copia locale](../VERIF
 implementati, ensureCommon collegata dietro interruttore spento. Ultimo periodo
 comune e ultima pagina sono copie distinte; coerenza remota fra RPC, riapertura
 completa e abilitazione reale restano da sviluppare/collaudare.
+
+
+Pacchetto 7, seguito: [indice delle pagine locali del diario](../VERIFICA-PAGINE-LOCALI-DIARIO.md)
+implementato con limite 16 per scope e anteprima delle continuazioni. Rimangono
+periodo comune singolo, bootstrap coerente, altre viste e abilitazione reale.

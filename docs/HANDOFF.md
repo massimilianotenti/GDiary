@@ -1,5 +1,23 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Più pagine locali del diario — 28 ottobre, pacchetto 7 parziale
+
+Indice limitato a 16 pagine per scope, chiavi mese/progetto/cursore, ricostruzione
+atomica dei soli 25 metadati/corpi richiesti. Prima pagina conservata dopo le
+continuazioni; totale/confini cambiati e ID sovrapposti invalidano le pagine
+interessate. CAS e aggiornamento indice atomici; esclusione dei descrittori
+senza cancellare dati o bozze. Compatibilità con il descrittore singolo precedente,
+nessuna migrazione/reset dello schema. Anteprima anche sul caricamento successivo,
+separata dagli editor già aperti, con privacy/bozze/focus/selezione preservati.
+Prova diagnostica estesa con pagesReopened; nuovo test:local-pages.
+Build, npm test, test:local-pages, test:local-views, test:local-common,
+test:repository, test:release, test:progressive, test:identity e test:tracing
+superati; Index/Demo e sei file di staging rigenerati.
+[Contratto, verifiche e limiti](VERIFICA-PAGINE-LOCALI-DIARIO.md).
+Interruttori di produzione ancora null, cacheReady:false, nessun deploy o dato
+reale. Periodo comune ancora singolo; fotografia remota completa e abilitazione
+reale restano aperte. Ultimo online documentato Apps Script 75.
+
 ## Dati comuni locali — 28 ottobre, pacchetto 7 ancora parziale
 
 Nuovo common-read-cache per cataloghi e slice del diario con copertura esatta,

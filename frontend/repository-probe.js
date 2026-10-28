@@ -13,7 +13,7 @@ export function createRepositoryProbe(environment=globalThis){
  const check=result=>{if(!result.ok)throw Object.assign(new Error(result.error),{name:result.error});return result.value;};
  const safe=error=>['QuotaExceededError','SecurityError','NotSupportedError','VersionError','AbortError','TimeoutError','BlockedError','ConflictError','SchemaError'].includes(error?.name)?error.name:'StorageError';
  async function run(){return exclusive(async()=>{
-  const report={format:'gdiary-repository-probe/v1',ok:false,previousState:false,atomic:false,isolated:false,draftPreserved:false,reopened:false,viewReopened:false,commonReopened:false};let repo,scope=A;
+  const report={format:'gdiary-repository-probe/v1',ok:false,previousState:false,atomic:false,isolated:false,draftPreserved:false,reopened:false,viewReopened:false,commonReopened:false,pagesReopened:false};let repo,scope=A;
   const started=environment.performance?.now?.()??Date.now();
   const open=()=>createLocalRepository({identity:{getScope:()=>scope,status:()=>({verified:true,cacheReady:true})},enabled:()=>true,environment,databaseName:DB});
   const sample=(revision,text=TEXT)=>({expectedRevision:revision,cursor:'synthetic-checkpoint',entries:[{id:ENTRY,updatedAt:VERSION,text}],contents:[{id:ENTRY,version:VERSION,body:text,rich:[{kind:'p',runs:[{text,bold:true}]}]}]});
@@ -29,7 +29,9 @@ export function createRepositoryProbe(environment=globalThis){
    const identity={getScope:()=>scope,status:()=>({verified:true,cacheReady:true})},request={month:'2026-10',project:'',cursor:''};
    let cache=createJournalReadCache({repository:repo,identity,enabled:()=>true});
    const prepared=await cache.prepare(request);if(!prepared.ok)throw Object.assign(new Error(prepared.error),{name:prepared.error});
-   const saved=await cache.save(prepared.ticket,{month:'2026-10',entries:[{id:ENTRY,date:'2026-10-01',updatedAt:VERSION,text:'Pagina fittizia',body:TEXT,rich:[{kind:'p',runs:[{text:TEXT,bold:true}]}]}],total:1,nextCursor:'',nextEntry:null,contentsIncluded:true});if(!saved.ok)throw Object.assign(new Error(saved.error),{name:saved.error});
+   const saved=await cache.save(prepared.ticket,{month:'2026-10',entries:[{id:ENTRY,date:'2026-10-01',updatedAt:VERSION,text:'Pagina fittizia',body:TEXT,rich:[{kind:'p',runs:[{text:TEXT,bold:true}]}]}],total:2,nextCursor:ENTRY,nextEntry:{date:'2026-10-01',position:2},contentsIncluded:true});if(!saved.ok)throw Object.assign(new Error(saved.error),{name:saved.error});
+   const nextRequest={...request,cursor:ENTRY},nextTicket=await cache.prepare(nextRequest);if(!nextTicket.ok)throw Object.assign(new Error(nextTicket.error),{name:nextTicket.error});
+   const nextSaved=await cache.save(nextTicket.ticket,{month:'2026-10',entries:[{id:ENTRY+'-next',date:'2026-10-01',updatedAt:VERSION,text:'Seconda pagina fittizia',body:TEXT,rich:[{kind:'p',runs:[{text:TEXT}]}]}],total:2,nextCursor:'',nextEntry:null,contentsIncluded:true});if(!nextSaved.ok)throw Object.assign(new Error(nextSaved.error),{name:nextSaved.error});
    const commonRequest={kind:'journal',month:'2026-10',today:'2026-10-01'};
    let commonCache=createCommonReadCache({repository:repo,identity,enabled:()=>true});
    const commonTicket=await commonCache.prepare(commonRequest);if(!commonTicket.ok)throw Object.assign(new Error(commonTicket.error),{name:commonTicket.error});
@@ -37,8 +39,9 @@ export function createRepositoryProbe(environment=globalThis){
    repo.close();repo=open();report.reopened=check(await repo.getContent(ENTRY)).body===TEXT;
    cache=createJournalReadCache({repository:repo,identity,enabled:()=>true});
    const page=await cache.read(request);report.viewReopened=page.ok&&page.hit&&page.stale&&page.response.entries[0].rich[0].runs[0].bold===true;
+   const nextPage=await cache.read(nextRequest);report.pagesReopened=report.viewReopened&&nextPage.ok&&nextPage.hit&&nextPage.response.entries[0].id===ENTRY+'-next';
    commonCache=createCommonReadCache({repository:repo,identity,enabled:()=>true});const common=await commonCache.read(commonRequest);report.commonReopened=common.ok&&common.hit&&common.stale&&common.response.commonSlices.days.rows[0].intention===TEXT;
-   report.ok=report.atomic&&report.isolated&&report.draftPreserved&&report.reopened&&report.viewReopened&&report.commonReopened;
+   report.ok=report.atomic&&report.isolated&&report.draftPreserved&&report.reopened&&report.viewReopened&&report.commonReopened&&report.pagesReopened;
   }catch(error){report.error=safe(error);}finally{repo?.close();report.durationMs=Math.max(0,Math.round((environment.performance?.now?.()??Date.now())-started));}
   return report;
  });}

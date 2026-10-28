@@ -1,4 +1,5 @@
-// One bounded, explicitly stale journal page. No automatic opening, RPC,
+import {journalPageDescriptors,JOURNAL_PAGE_LIMIT,JOURNAL_INDEX_FORMAT} from './journal-page-index.js';
+// Bounded, explicitly stale journal pages. No automatic opening, RPC,
 // global storage, common-state copy or permission to enable real diary storage.
 const FORMAT='journal-page/v1';
 const PREPARE_BUDGET_MS=250;
@@ -33,7 +34,7 @@ function normalizeResponse(request,response){
 }
 
 export function createJournalReadCache({repository,identity,enabled=()=>false,now=()=>Date.now()}={}){
- const tickets=new WeakSet();
+ const tickets=new WeakMap();
  function authorize(){if(enabled()!==true)throw fail('NotEnabledError');if(identity?.status().verified!==true||identity.status().cacheReady!==true)throw fail('IdentityError');const scope=identity.getScope();if(!scope)throw fail('IdentityError');return clone(scope);}
  function guard(scope){if(!sameScope(authorize(),scope))throw fail('ScopeChangedError');}
  const result=async action=>{try{return await action();}catch(error){return {ok:false,error:safe(error)};}};
@@ -43,19 +44,34 @@ export function createJournalReadCache({repository,identity,enabled=()=>false,no
   prepare:request=>result(async()=>{
    const scope=authorize(),normalized=normalizeRequest(request),meta=checked(await repository.getMeta());guard(scope);
    if(!sameScope(scope,meta.scope))throw fail('ScopeChangedError');
-   const ticket=Object.freeze({request:Object.freeze(normalized),scope:Object.freeze(scope),revision:meta.value.revision});tickets.add(ticket);
+   const pages=clone(journalPageDescriptors(meta.value.coverage));
+   const ticket=Object.freeze({request:Object.freeze(normalized),scope:Object.freeze(scope),revision:meta.value.revision});tickets.set(ticket,pages);
    return {ok:true,ticket};
   }),
   save:(ticket,response)=>result(async()=>{
-   if(!ticket||!tickets.delete(ticket))throw fail('DataError');guard(ticket.scope);
+   if(!ticket||!tickets.has(ticket))throw fail('DataError');const previous=tickets.get(ticket);tickets.delete(ticket);guard(ticket.scope);
    const page=normalizeResponse(ticket.request,clone(response)),savedAt=now();
    if(!Number.isSafeInteger(savedAt)||savedAt<0)throw fail('DataError');
-   const saved=checked(await repository.applyRemoteBatch({expectedRevision:ticket.revision,entries:page.entries,contents:page.contents,coverage:{journalPage:{format:FORMAT,key:keyOf(ticket.request),revision:ticket.revision+1,savedAt,payload:page.payload,items:page.entries.map(entry=>({id:entry.id,version:entry.updatedAt}))}}}));
+   const key=keyOf(ticket.request),incoming=new Set(page.entries.map(entry=>entry.id));
+   const items=page.entries.map(entry=>({id:entry.id,version:entry.updatedAt}));
+   const oldFirst=previous.find(view=>view.key===key&&view.revision===ticket.revision);
+   const sameFirst=oldFirst&&JSON.stringify(oldFirst.items)===JSON.stringify(items)&&oldFirst.payload?.total===page.payload.total&&oldFirst.payload?.nextCursor===page.payload.nextCursor&&JSON.stringify(oldFirst.payload?.nextEntry)===JSON.stringify(page.payload.nextEntry);
+   const retained=previous.filter(view=>{
+    if(view.revision!==ticket.revision||view.key===key||view.items.some(item=>incoming.has(item.id)))return false;
+    const request=JSON.parse(view.key),samePeriod=request.month===ticket.request.month&&request.project===ticket.request.project;
+    // A changed first-page boundary begins a new acquisition of this period.
+    // Identical membership/versions preserve stale continuation previews.
+    // A changed total invalidates them too. Never infer a
+    // coherent whole-month snapshot from independent legacy RPCs.
+    return !samePeriod||(ticket.request.cursor!==''||sameFirst)&&view.payload?.total===page.payload.total;
+   }).map(view=>({...view,revision:ticket.revision+1}));
+   const descriptor={format:FORMAT,key,revision:ticket.revision+1,savedAt,payload:page.payload,items};
+   const saved=checked(await repository.applyRemoteBatch({expectedRevision:ticket.revision,entries:page.entries,contents:page.contents,coverage:{journalPage:null,journalPages:{format:JOURNAL_INDEX_FORMAT,pages:[...retained,descriptor].slice(-JOURNAL_PAGE_LIMIT)}}}));
    guard(ticket.scope);if(!sameScope(ticket.scope,saved.scope))throw fail('ScopeChangedError');
    return {ok:true};
   }),
   read:request=>result(async()=>{
-   const scope=authorize(),key=keyOf(request),snapshot=checked(await repository.readRemoteView());guard(scope);
+   const scope=authorize(),key=keyOf(request),snapshot=checked(await repository.readRemoteView(key));guard(scope);
    if(!sameScope(scope,snapshot.scope))throw fail('ScopeChangedError');
    if(!snapshot.value||snapshot.value.view.key!==key)return {ok:true,hit:false};
    const {view,entries}=snapshot.value;

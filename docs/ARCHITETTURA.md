@@ -182,3 +182,9 @@ Seguito del pacchetto 7: [dati comuni nella copia locale](VERIFICA-DATI-COMUNI-L
 implementati dietro interruttore spento. Cataloghi e slice del diario con
 copertura esatta e lettura atomica per ID; anteprime pagina/periodo indipendenti.
 Riapertura completa, bootstrap coerente e copia reale restano futuri.
+
+
+Seguito del pacchetto 7: [indice limitato a 16 pagine del diario](VERIFICA-PAGINE-LOCALI-DIARIO.md)
+implementato dietro interruttore spento, con lettura atomica mirata e anteprima
+anche delle continuazioni. Sostituisce il solo descrittore dell'ultima pagina;
+non costituisce una fotografia remota completa o un editor offline.

@@ -1,4 +1,5 @@
-// Repository foundation. No automatic opening and no application caller yet.
+import {journalPageDescriptors} from './journal-page-index.js';
+// Repository foundation. No automatic opening or real-data initializer.
 // The current identity client reports cacheReady:false, so real diary storage
 // remains closed. Synthetic probes use their own database and invented scope.
 const DB_NAME='gdiary-local-v1',VERSION=1,TIMEOUT=5000;
@@ -103,9 +104,9 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
   listDrafts:()=>list('drafts','byScope'),
   // Page membership, metadata and matching bodies must come from one read
   // transaction. Separate getMeta/getEntry/getContent calls can mix revisions.
-  readRemoteView:()=>result(()=>execute('readonly',['archiveMeta','entries','contents'],({scope,tx,request,done})=>{
+  readRemoteView:key=>result(()=>execute('readonly',['archiveMeta','entries','contents'],({scope,tx,request,done})=>{
    request(tx.objectStore('archiveMeta').get(scopeKey(scope)),stored=>{
-    const meta=validMeta(stored,scope),view=meta.coverage?.journalPage;
+    const meta=validMeta(stored,scope),pages=journalPageDescriptors(meta.coverage),view=key===undefined?pages.at(-1):pages.find(page=>page.key===key);
     if(!view||view.format!=='journal-page/v1'||view.revision!==meta.revision){done(null);return;}
     if(typeof view.key!=='string'||!Array.isArray(view.items)||view.items.length>25||new Set(view.items.map(item=>item?.id)).size!==view.items.length||view.items.some(item=>!id(item?.id)||!version(item?.version)))throw fail('SchemaError');
     const entries=new Array(view.items.length);let remaining=view.items.length*2,missing=false;
@@ -160,6 +161,7 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
      const entryChanges=batch.entries.length||batch.contents.length||batch.deletedEntryIds.length;
      const commonChanges=Object.values(batch.commonUpserts).some(rows=>rows.length)||Object.values(batch.commonRemovals).some(ids=>ids.length)||batch.deletedEntryIds.length;
      for(const [key,changed]of [['journalPage',entryChanges],['commonJournal',commonChanges]])if(!Object.hasOwn(batch.coverage||{},key)&&!changed&&coverage[key]?.revision===previous.revision)coverage[key]={...coverage[key],revision:previous.revision+1};
+     if(!Object.hasOwn(batch.coverage||{},'journalPages')&&!entryChanges&&coverage.journalPages)coverage.journalPages={...coverage.journalPages,pages:journalPageDescriptors(coverage).map(page=>page.revision===previous.revision?{...page,revision:previous.revision+1}:page)};
      const next={...previous,revision:previous.revision+1,cursor:batch.cursor===undefined?previous.cursor:batch.cursor,coverage};
      meta.put(next);done({revision:next.revision});
     });
