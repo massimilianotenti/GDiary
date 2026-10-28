@@ -120,3 +120,9 @@ riavvio V8 e copia generata in Demo.html. Non migra o abilita saveDay/saveDays.
 effettivi saveDay/saveDays e letture complete/per periodo sulla Demo in V8.
 L'iniezione server resta null nei sorgenti: migrazione attiva soltanto nelle
 fixture. [Contratto, capacità e seguito](VERIFICA-MIGRAZIONE-GIORNI.md).
+
+`npm run test:commit-capacity` (anche in npm test) verifica preflight dei
+riferimenti, confini 510/511/512, budget completo del ponte Days, dry-run e
+compattazione recuperabile di head/entità con 182 interruzioni RPC/prefisso.
+Non riduce lo spazio dei payload e non esegue manutenzione reale.
+[Contratto, limiti e seguito](VERIFICA-CAPACITA-COMMIT.md).

@@ -1,5 +1,25 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Capacità e compattazione riferimenti — 28 ottobre, pacchetto 8 parziale
+
+Commit del ponte Days completato: 4a219f6. Nuovo preflightWrites nell'adattatore
+Sheets e budget prima del prepare nel nucleo; il gateway verifica insieme
+prenotazione e operazione. Guardia di write prima dei frammenti impedisce il
+riferimento 513. compactReferences: dry-run e lotti fino a 128 ritiri di chiavi
+head/entità superate, mantenendo esattamente l'ultima revisione verificata.
+Nessuna rimozione di payload, commit, ricevute o tombstone; head pendente
+preservato e recuperabile. Esecuzione richiede maintenanceEnabled esplicito,
+assente per default; nessuna nuova RPC o manutenzione automatica.
+test:commit-capacity incluso in npm test: 182 interruzioni, confini 510/511/512,
+budget aggregato Days, recupero pendente, isolamento e guardie. Build, npm test,
+test:release e test:tracing superati; Demo/staging sei file rigenerati, Index
+senza differenze frontend. [Contratto e limiti](VERIFICA-CAPACITA-COMMIT.md).
+Compattati solo i riferimenti attivi: storico fisico ancora in crescita, nessuna
+retention o promessa di latenza Google. DAY_COMMIT_GATEWAY=null e capacità
+manifest false. Prossimo incremento: controller persistente routing Days con
+binding autorizzato e rollback coerente, poi collaudo browser attivo.
+Nessun deploy, compattazione reale o dato reale; ultimo online Apps Script 75.
+
 ## Ponte Days e lettori coerenti — 28 ottobre, pacchetto 8 parziale
 
 syncDayMigrationGateway_ e source esplicito della tabella Days: confronto

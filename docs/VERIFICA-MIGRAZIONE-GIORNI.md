@@ -160,3 +160,8 @@ Prossimo incremento: controllo della capacità e compattazione recuperabile,
 poi controller persistente del routing e collaudo browser della migrazione
 attiva. Il pacchetto 8 rimane parziale; le altre mutazioni non sono ancora
 registrate. Online resta Apps Script 75.
+
+Seguito implementato: [preflight del budget e compattazione recuperabile dei riferimenti](VERIFICA-CAPACITA-COMMIT.md).
+Il ponte controlla ora entrambi i commit prima della prenotazione. La
+manutenzione riduce i riferimenti attivi di head/entità senza eliminare
+payload, piani, ricevute o commit; controller persistente ancora futuro.

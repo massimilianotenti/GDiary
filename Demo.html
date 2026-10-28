@@ -976,6 +976,11 @@ function syncDayWriter_(store,trustedScope){
   }
  });
 }
+// Conservative logical-write budget; retries and conflict receipts may need
+// fewer references, but must never need more for a newly prepared commit.
+function syncCommitWriteBudget_(request,principalId,sequence){
+ return [{kind:'head',id:'head',writes:2},...request.changes.map(change=>({kind:'entity',id:[change.collection,change.id],writes:1})),{kind:'commit',id:sequence,writes:1},{kind:'receipt',id:[principalId,request.operationId],writes:1},{kind:'operation',id:[principalId,request.operationId],writes:1}];
+}
 // Raw Days access for the server-owned migration gateway. No table creation,
 // no routing recursion, and no request-wide cached preimages.
 function syncDaySheetSource_(sheet){
@@ -1043,7 +1048,12 @@ function syncDayMigrationGateway_(store,trustedScope,source){
   let entity=unwrap(protocol.read('settings',id)).entity;
   if(!entity){
    const data={format:'sync-day-plan/v1',kind,fingerprint,request:prepare()};planValue(data,kind,fingerprint,operationId,date);
-   const reserved=unwrap(protocol.execute({operationId:'day-reserve-'+key,changes:[{collection:'settings',id,baseVersion:null,action:'upsert',data}]}));
+   const reservation={operationId:'day-reserve-'+key,changes:[{collection:'settings',id,baseVersion:null,action:'upsert',data}]};
+   if(typeof store.preflightWrites==='function'){
+    const sequence=unwrap(protocol.recover()).committedThrough;
+    if(!store.preflightWrites([...syncCommitWriteBudget_(reservation,scope.principalId,sequence+1),...syncCommitWriteBudget_(data.request,scope.principalId,sequence+2)]).available)fail('ProtocolUnavailable');
+   }
+   const reserved=unwrap(protocol.execute(reservation));
    if(reserved.status!=='committed')fail('CommitBlocked');entity=unwrap(protocol.read('settings',id)).entity;
   }
   if(!entity||entity.deleted)fail('ProtocolCorrupt');return planValue(entity.data,kind,fingerprint,operationId,date);
@@ -1201,10 +1211,12 @@ function syncCommitProtocol_(store,trustedScope){
    const before=request.changes.map(change=>entityValue(store.readEntity(change.collection,change.id),change.collection,change.id,head.committedThrough));
    const conflicts=request.changes.flatMap((change,index)=>{const actual=before[index]?.version??null;return actual!==change.baseVersion||change.action==='delete'&&(!before[index]||before[index].deleted)?[{collection:change.collection,id:change.id,expectedVersion:change.baseVersion,actualVersion:actual}]:[];});
    if(conflicts.length){
+    if(typeof store.preflightWrites==='function'&&!store.preflightWrites([{kind:'receipt',id:[scope.principalId,request.operationId],writes:1}]).available)fail('ProtocolUnavailable');
     const response={status:'conflict',operationId:request.operationId,sequence:null,conflicts},receipt=seal({format:'sync-receipt/v1',archive,principalId:scope.principalId,operationId:request.operationId,fingerprint,response});
     checkedWrite(value=>store.writeReceipt(scope.principalId,request.operationId,value),()=>store.readReceipt(scope.principalId,request.operationId),receipt);return response;
    }
    if(head.committedThrough>=Number.MAX_SAFE_INTEGER-1)fail('ProtocolUnavailable');
+   if(typeof store.preflightWrites==='function'&&!store.preflightWrites(syncCommitWriteBudget_(request,scope.principalId,head.committedThrough+1)).available)fail('ProtocolUnavailable');
    const pending=seal({sequence:head.committedThrough+1,principalId:scope.principalId,request,fingerprint,before});if(syncCommitCanonical_(pending).length>131072)fail('DataError');
    const prepared={...head,pending};saveHead(prepared);recoverLocked(prepared);
    return receiptValue(store.readReceipt(scope.principalId,request.operationId),scope.principalId,request.operationId).response;
@@ -1286,9 +1298,10 @@ function syncSheetsCommitStore_(indexSheet,blockSheet,trustedArchive,services={}
  }
  function read(kind,id,operation){guard();return load(latest(references(find(1,key(kind,id)),key(kind,id),operation)));}
  function write(kind,id,value,operation='',immutable=false){
-  guard();if(!same(value.archive,archive))fail('ScopeChanged');const lookup=key(kind,id),refs=references(find(1,lookup),lookup,operation),prior=latest(refs),raw=syncCommitCanonical_(value);
+  guard();if(!same(value.archive,archive))fail('ScopeChanged');const lookup=key(kind,id),matched=find(1,lookup),refs=references(matched,lookup,operation),prior=latest(refs),raw=syncCommitCanonical_(value);
   if(raw.length>262144)fail('DataError');
   if(prior){const previous=load(prior);if(same(previous,value))return;if(immutable)fail('OperationMismatch');if(prior.revision>=Number.MAX_SAFE_INTEGER-1)fail('ProtocolUnavailable');}
+  if(matched.length>=512)fail('ProtocolUnavailable');
   const generation='g:'+uuid();if(!/^g:[a-zA-Z0-9-]{10,80}$/.test(generation))fail('ProtocolCorrupt');
   const encoded=encode(raw);if(unpack(encoded)!==raw)fail('ProtocolCorrupt');
   const parts=[];for(let offset=0;offset<encoded.length;offset+=8192)parts.push([generation,'n:'+parts.length,'b1:'+encoded.slice(offset,offset+8192)]);
@@ -1300,8 +1313,42 @@ function syncSheetsCommitStore_(indexSheet,blockSheet,trustedArchive,services={}
   if(indexSheet.getRange(row,4).getDisplayValues()[0][0]!==marker)fail('ProtocolCorrupt');
   const published=latest(references(find(1,lookup),lookup,operation));if(!published||published.revision!==ref.revision||published.digest!==ref.digest||!same(load(published),value))fail('ProtocolCorrupt');
  }
+ function budgetKey(item){
+  if(!item||Object.keys(item).sort().join(',')!=='id,kind,writes'||!Number.isSafeInteger(item.writes)||item.writes<1||item.writes>512)fail('DataError');
+  const id=item.id,pair=Array.isArray(id)&&id.length===2&&id.every(value=>typeof value==='string'&&value.length>0&&value.length<=200);
+  if(!(item.kind==='head'&&id==='head'||item.kind==='entity'&&pair||item.kind==='commit'&&Number.isSafeInteger(id)&&id>0||['receipt','operation'].includes(item.kind)&&pair))fail('DataError');
+  return {lookup:key(item.kind,id),column:item.kind==='operation'?2:1};
+ }
+ function preflightWrites(items){
+  guard();if(!Array.isArray(items)||!items.length||items.length>100)fail('DataError');const grouped=new Map();
+  for(const item of items){const {lookup,column}=budgetKey(item),prior=grouped.get(lookup);grouped.set(lookup,{kind:item.kind,key:lookup,column,required:(prior?.required||0)+item.writes});}
+  const keys=[...grouped.values()].map(({column,...item})=>{const used=find(column,item.key).length;return {...item,used,remaining:512-used,available:used+item.required<=512};});
+  return {limit:512,available:keys.every(item=>item.available),keys};
+ }
+ function compactReferences(input){
+  guard();if(!input||Object.keys(input).sort().join(',')!=='dryRun,id,kind,limit'||!['head','entity'].includes(input.kind)||typeof input.dryRun!=='boolean'||!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>128)fail('DataError');
+  const {lookup}=budgetKey({kind:input.kind,id:input.id,writes:1}),matched=find(1,lookup),refs=references(matched,lookup,''),keep=latest(refs);
+  if(!keep)fail('ProtocolUnavailable');const preserved=load(keep);
+  // Only mutable head/entity keys have no operation alias. Retain the exact
+  // latest published row, including a pending recovery head, without moving it.
+  for(const row of matched)if(indexSheet.getRange(row,2).getDisplayValues()[0][0]!=='')fail('ProtocolCorrupt');
+  const obsolete=matched.filter(row=>row!==keep.row),planned=obsolete.slice(0,input.limit);
+  const report={kind:input.kind,matched:matched.length,eligible:obsolete.length,planned:planned.length,retired:0,remaining:matched.length,hasMore:obsolete.length>0};
+  if(input.dryRun)return report;
+  const maintenanceGuard=()=>{guard();if(services.maintenanceEnabled?.()!==true)fail('ProtocolUnavailable');};
+  maintenanceGuard();
+  for(const row of planned){
+   maintenanceGuard();
+   const marker='retired:'+hash(syncCommitCanonical_([lookup,row,keep.digest]));
+   indexSheet.getRange(row,1).setNumberFormat('@').setValue(marker);flush();maintenanceGuard();
+   if(indexSheet.getRange(row,1).getDisplayValues()[0][0]!==marker)fail('ProtocolCorrupt');report.retired++;
+  }
+  if(!same(read(input.kind,input.id,''),preserved))fail('ProtocolCorrupt');
+  report.remaining=find(1,lookup).length;report.hasMore=report.remaining>1;return report;
+ }
  return Object.freeze({
   digest:hash,
+  preflightWrites,compactReferences,
   withLock(fn){if(active)fail('BusyError');if(services.enabled?.()!==true)fail('ProtocolUnavailable');return lock(()=>{active=true;try{guard();headers(indexSheet,SYNC_SHEET_INDEX_HEADERS);headers(blockSheet,SYNC_SHEET_BLOCK_HEADERS);return fn();}finally{active=false;}});},
   readHead:()=>read('head','head',''),writeHead:value=>write('head','head',value),
   readEntity:(collection,id)=>read('entity',[collection,id],''),writeEntity:(collection,id,value)=>write('entity',[collection,id],value),

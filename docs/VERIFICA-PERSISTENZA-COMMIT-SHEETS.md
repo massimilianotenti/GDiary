@@ -150,3 +150,10 @@ proiezione o migrazione dei dati canonici e gateway dei relativi lettori;
 poi copertura di tutte le mutazioni legacy, binding delle risposte allo scope
 e consumo del feed nel repository. Prima di un uso continuativo vanno risolti
 compattazione e budget del registro. L'applicazione mantiene i salvataggi attuali.
+
+Seguito implementato: [preflight e compattazione recuperabile dei riferimenti](VERIFICA-CAPACITA-COMMIT.md).
+write non può più creare il riferimento 513. La manutenzione esplicita può
+ritirare vecchie chiavi head/entità in lotti mantenendo la riga corrente:
+questa è l'unica modifica in sede di righe indice già esistenti. Payload,
+commit e ricevute rimangono conservati; nessuna cancellazione fisica o
+attivazione reale. Controller persistente e provisioning restano futuri.

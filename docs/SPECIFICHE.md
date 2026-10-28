@@ -151,3 +151,8 @@ verificato sulla Demo con iniezione sintetica. Mantiene le bozze pre-migrazione,
 salvataggi parziali, formattazione ed esiti per data; le letture complete e per
 periodo usano lo stesso routing. L'interruttore server resta null, senza
 migrazioni automatiche o nuove opzioni dell'interfaccia.
+
+Seguito: [controllo della capacità e compattazione dei riferimenti](VERIFICA-CAPACITA-COMMIT.md)
+implementati come servizi interni, verificati sui mock. Rifiuto prima del
+prepare se manca il budget; manutenzione esplicita senza perdita di dati
+canonici, ricevute o feed. Nessuna nuova opzione utente o pulizia automatica.

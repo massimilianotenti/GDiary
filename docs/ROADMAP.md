@@ -91,3 +91,8 @@ Seguito: [ponte di migrazione Days con piani durevoli e routing completo/per per
 implementato e verificato sulle fixture, con iniezione server ancora null.
 Righe legacy congelate e guardie contro divergenze/bypass; prossimo incremento
 su capacità/compattazione, poi controller persistente e collaudo browser attivo.
+
+Seguito: [capacità e compattazione dei riferimenti attivi](VERIFICA-CAPACITA-COMMIT.md)
+implementate con preflight, dry-run e ripresa dopo interruzione. Nessun recupero
+di spazio fisico o retention; prossimo incremento sul controller persistente
+del routing Days e sul collaudo browser attivo. Capacità reali ancora false.

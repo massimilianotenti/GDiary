@@ -207,3 +207,9 @@ input fingerprint e request completa immutabile. Sono dati infrastrutturali,
 non preferenze. Per date instradate, updatedAt delle risposte legacy contiene
 la versione opaca commit-N. Schema fisico Days invariato; riga originaria
 congelata. Applicazione reale ancora disabilitata.
+
+Seguito: [capacità e ritiro dei riferimenti](VERIFICA-CAPACITA-COMMIT.md).
+Schema dei due fogli invariato. Le sole vecchie chiavi head/entità selezionate
+dalla manutenzione diventano retired:hash; la riga della revisione corrente
+e tutti i payload restano invariati. Le righe ritirate escono dai lookup
+delle chiavi k:hash, senza eliminazione fisica o reset delle versioni.

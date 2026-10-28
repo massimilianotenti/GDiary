@@ -213,3 +213,9 @@ indice e verifica la preimmagine legacy congelata. saveDay/saveDays e letture
 complete/per periodo hanno un punto di iniezione server, ancora null; nessuna
 migrazione reale o attivazione automatica. Controller persistente e rollback
 coerente restano aperti, insieme a capacità/compattazione del registro.
+
+Seguito: [preflight e compattazione recuperabile dei riferimenti](VERIFICA-CAPACITA-COMMIT.md).
+Budget delle scritture prima del prepare e aggregato per il ponte Days;
+ritiro esplicito e limitato delle chiavi head/entità superate, mantenendo
+l'ultima riga pubblicata. Payload e record immutabili conservati, nessuna
+retention o attivazione automatica; controller del routing ancora futuro.

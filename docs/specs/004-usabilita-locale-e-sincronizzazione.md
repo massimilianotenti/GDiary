@@ -505,3 +505,8 @@ implementati con piani durevoli delle patch, confronto della preimmagine,
 migrazione atomica di giorno/route/indice e guardie nei writer legacy. Iniezione
 server null nei sorgenti; solo fixture sintetiche. Restano capacità/compattazione,
 controller persistente e collaudo browser del routing attivo.
+
+Pacchetto 8, seguito: [preflight e compattazione dei riferimenti attivi](../VERIFICA-CAPACITA-COMMIT.md)
+implementati con budget aggregato Days e 182 interruzioni simulate. Non
+eliminano payload o record immutabili; controller persistente del routing,
+retention e recupero dello spazio fisico rimangono aperti.
