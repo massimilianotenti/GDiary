@@ -84,3 +84,9 @@ Vedere [contratto e limiti](VERIFICA-REPOSITORY-LOCALE.md).
 `npm run test:local-views` verifica adattatore pagine, loader e collegamento
 alla shell con dati inventati, inclusi riavvio Chromium, CAS, risposte tardive,
 privacy e bozze. [Contratto e limiti](VERIFICA-ANTEPRIMA-LOCALE-DIARIO.md).
+
+
+`npm run test:local-common` verifica adattatore dei dati comuni e ponte
+ensureCommon, con cataloghi/slice inventati, CAS, quota, calendario, bozze,
+invalidazione indipendente delle anteprime e riavvio Chromium.
+[Contratto e limiti](VERIFICA-DATI-COMUNI-LOCALI.md).

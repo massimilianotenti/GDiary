@@ -294,6 +294,9 @@ const button=(text,fn,cls)=>{const b=node('button',text,cls);b.type='button';b.o
 function dateAdd(date,n){const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
 function monday(date){const d=new Date(date+'T12:00:00Z');return dateAdd(date,-((d.getUTCDay()+6)%7));}
 let privacyShown=false,privacyLastActivity=Date.now();const privacyEditing=new Set();
+// Reserved for the verified/consented local-storage integration. Tests inject
+// a synthetic cache; production keeps this null and does not open IndexedDB.
+let commonViewCache=null;
 function privateTags(){return state.settings?.privateTags||['privato'];}
 function privateEntry(e){return !!e&&entryTags(e).map(t=>t.trim().replace(/^#/,'').toLowerCase().normalize('NFC').replace(/\s+/g,'-')).some(t=>privateTags().includes(t));}
 function privacyVisible(e){return privacyShown||!privateEntry(e);}
@@ -323,7 +326,7 @@ function files(e){return state.files.filter(f=>f.entryId===e.id);}
 function message(s,error=false){if(error&&!privacyShown){const hidden=[...state.entries,...(window.privacyAllBlocks||[])].filter(e=>privateEntry(e)&&!privacyEditing.has(e.clientId));if(hidden.some(e=>{const title=e.text||e.title||String(e.body||'').split('\n')[0];return title?.length>2&&s.includes(title.slice(0,40));}))s='Operazione non completata. Mostra private per controllare la bozza.';}$('message').textContent=s;$('message').className=error?'error':'';const dialog=document.querySelector('dialog[open]');if(dialog){let notice=dialog.querySelector('.dialog-error');if(!notice){notice=node('p','','form-error dialog-error');notice.setAttribute('role','alert');dialog.prepend(notice);}notice.textContent=error?s:'';notice.hidden=!error;if(error)notice.scrollIntoView({block:'nearest'});}}
 function api(name,arg,traceContext={}){
  const enabled=performanceTracingEnabled()&&name!=='getAppChangelog',generation=traceGeneration,traceId=enabled?newTraceId():'',started=enabled?performance.now():0;
- arg={...(arg||{}),context:{view,month,project,date:day,week,query,tag:selectedTag,catalogFresh:['getState','getCommonState'].includes(name)&&!forceCommon&&catalogReadAt>0&&Date.now()-catalogReadAt<60000,incrementalCommon:true,commonWindow:['journal','week','habits'].includes(view)?view:view==='day'?'':'catalogs',deferCommon:name==='getState'&&view==='journal'&&!state.today,commonFresh:name==='getState'&&!forceCommon&&commonCoversView()}};
+ arg={...(arg||{}),context:{view,month,project,date:day,week,query,tag:selectedTag,catalogFresh:['getState','getCommonState'].includes(name)&&!(commonViewCache&&name==='getCommonState'&&view==='journal'&&!taskDiary)&&!forceCommon&&catalogReadAt>0&&Date.now()-catalogReadAt<60000,incrementalCommon:true,commonWindow:['journal','week','habits'].includes(view)?view:view==='day'?'':'catalogs',deferCommon:name==='getState'&&view==='journal'&&!state.today,commonFresh:name==='getState'&&!forceCommon&&commonCoversView()}};
  const action=enabled&&activeTraceAction&&['saveJournalPage','saveDay','saveDays'].includes(name)?activeTraceAction:null;
  const summary=enabled?{...traceRequestSummary(arg),...traceContext,requestBytes:traceBytes(arg),...(action?{actionId:action.id,batchIndex:++action.started}: {})}:null;
  return new Promise((resolve,reject)=>{
@@ -354,14 +357,43 @@ async function ensureCommon(){
  if(commonCoversView())return;
  if(commonFlight){await commonFlight;if(commonCoversView())return;return ensureCommon();}
  const originalGeneration=commonGeneration,revision=commonWriteRevision;
+ const requestedView=view,requestedMonth=month,requestedToday=state.today,epoch=navigationEpoch;
+ const cache=requestedView==='journal'&&!taskDiary?commonViewCache:null;
+ let preview=null,previewScope=null;
+ const current=()=>commonGeneration===originalGeneration&&commonWriteRevision===revision&&view===requestedView&&month===requestedMonth&&state.today===requestedToday&&navigationEpoch===epoch;
  commonFlight=(async()=>{try{
-  const result=await api('getCommonState');
+  let result;
+  if(cache&&window.BulletJournalVue?.createJournalPageLoader){
+   $('content').querySelectorAll('.common-local-preview').forEach(old=>old.remove());
+   const loaded=await window.BulletJournalVue.createJournalPageLoader({cache,fetchPage:()=>api('getCommonState')}).load({kind:'journal',month:requestedMonth,today:requestedToday},{
+    isCurrent:current,onRemote:value=>{result=value;},onCached:cached=>{
+     if(busy||dirtyMain||dirtyDetail||query)return;
+     previewScope=cached.scope;preview=renderCommonLocalPreview(cached);$('content').append(preview);
+    }
+   });
+   if(loaded.outcome==='cancelled')return;
+  }else result=await api('getCommonState');
+  preview?.remove();preview=null;
   // An acknowledged save or a newer complete read wins over this request.
   if(commonGeneration!==originalGeneration||commonWriteRevision!==revision)return;
   acceptCommon(result);
   if(!busy&&!dirtyMain&&!dirtyDetail&&!query){render();rememberView();message('Dati aggiornati · '+new Date().toLocaleTimeString('it-IT'));}
   else if(!busy&&view==='journal'&&continuousMode&&continuousSession?.loaded&&!query)renderContinuous($('content'));
- }finally{commonFlight=null;}})();return commonFlight;
+ }catch(error){if(preview)preview.querySelector('.hint').textContent='Dati comuni della copia locale · verifica su Google non riuscita.';throw error;}
+ finally{if(!current()||previewScope&&!cache?.isCurrent(previewScope))preview?.remove();commonFlight=null;}})();return commonFlight;
+}
+function renderCommonLocalPreview(cached){
+ const result=cached.response,section=node('section','','common-local-preview');section.setAttribute('aria-label','Anteprima locale delle riflessioni e pratiche');
+ section.append(node('p','Riflessioni e pratiche · copia locale del '+new Date(cached.savedAt).toLocaleString('it-IT')+' · verifica su Google in corso.','hint'));
+ result.goals.filter(goal=>goal.cycle===cycleFor(result.month+'-01')).forEach(goal=>section.append(node('h3',goal.title)));
+ result.commonSlices.days.rows.filter(row=>row.date.startsWith(result.month+'-')&&(row.intention||row.reflection)).forEach(row=>{
+  const article=node('article');article.append(node('h3',dateLabel(row.date,false)));
+  for(const field of ['intention','reflection'])if(row[field]){const text=node('p');renderExcerpt(text,{body:row[field],rich:dailyRich(row,field)});article.append(text);}
+  section.append(article);
+ });
+ const focus=result.commonSlices.weeks.rows[0]?.focus;if(focus)section.append(node('h3','Focus della settimana'),node('p',focus));
+ result.habits.filter(habit=>habit.archived!=='yes'&&result.goals.some(goal=>goal.id===habit.goalId&&goal.cycle===cycleFor(result.month+'-01'))).forEach(habit=>section.append(node('p',habit.title)));
+ return section;
 }
 function cacheKey(){return JSON.stringify([view,view==='journal'?continuousKey():'',view==='projects'?project:view==='tags'?selectedTag:'',view==='day'?day:'',view==='week'?week:'']);}
 function deriveCachedView(){

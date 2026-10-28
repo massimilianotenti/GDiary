@@ -4,6 +4,7 @@ export {storageProbe} from './storage-probe.js';
 export {createArchiveIdentityClient} from './archive-identity.js';
 export {createLocalRepository} from './local-repository.js';
 export {createJournalReadCache,createJournalPageLoader} from './journal-read-cache.js';
+export {createCommonReadCache} from './common-read-cache.js';
 export {repositoryProbe,createRepositoryProbe} from './repository-probe.js';
 import './diary.css';
 import './pleasant.css';

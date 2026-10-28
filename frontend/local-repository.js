@@ -118,6 +118,20 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
     });
    });
   })),
+  readRemoteCommonView:()=>result(()=>execute('readonly',['archiveMeta','commonRecords'],({scope,tx,request,done})=>{
+   request(tx.objectStore('archiveMeta').get(scopeKey(scope)),stored=>{
+    const meta=validMeta(stored,scope),view=meta.coverage?.commonJournal;
+    if(!view||view.format!=='common-journal/v1'||view.revision!==meta.revision){done(null);return;}
+    if(typeof view.key!=='string'||!Array.isArray(view.items)||view.items.length>500||new Set(view.items.map(item=>JSON.stringify([item?.collection,item?.id]))).size!==view.items.length||view.items.some(item=>!['projects','goals','habits','days','weeks','habitLogs'].includes(item?.collection)||!id(item.id)||!version(item.version)))throw fail('SchemaError');
+    const records=new Array(view.items.length);let remaining=records.length,missing=false;
+    if(!remaining){done({view,records});return;}
+    view.items.forEach((item,index)=>request(tx.objectStore('commonRecords').get([...scopeKey(scope),item.collection,item.id]),row=>{
+     if(!row||row.version!==item.version||row.data?.[KEYS[item.collection]]!==item.id||row.data?.updatedAt!==item.version)missing=true;
+     else records[index]={collection:item.collection,data:row.data};
+     if(--remaining===0)done(missing?null:{view,records});
+    }));
+   });
+  })),
   listRecoveryDrafts:()=>result(async()=>{const scope=authorize(),response=await list('drafts','byOwner',scope=>[scope.archiveId,scope.principalId]);if(!response.ok)throw fail(response.error);guard(scope);return response.value.filter(r=>r.epoch!==scope.epoch);}),
   applyRemoteBatch:input=>result(async()=>{
    const batch=validateBatch(input);
@@ -140,7 +154,13 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
      for(const [collection,ids]of Object.entries(batch.commonRemovals))for(const idValue of ids)common.delete([...scopeKey(scope),collection,idValue]);
      for(const idValue of batch.deletedEntryIds){entries.delete([...scopeKey(scope),idValue]);contents.delete([...scopeKey(scope),idValue]);}
      if(batch.deletedEntryIds.length){const deleted=new Set(batch.deletedEntryIds);request(common.index('byScope').openCursor(environment.IDBKeyRange.only(scopeKey(scope))),function walk(cursor){if(!cursor)return;if(['files','taskPlans'].includes(cursor.value.collection)&&deleted.has(cursor.value.data.entryId))cursor.delete();cursor.continue();});}
-     const next={...previous,revision:previous.revision+1,cursor:batch.cursor===undefined?previous.cursor:batch.cursor,coverage:{...previous.coverage,...(batch.coverage||{})}};
+     const coverage={...previous.coverage,...(batch.coverage||{})};
+     // An unrelated read must not evict another valid preview. Mutations of
+     // its own stores still invalidate the entire descriptor conservatively.
+     const entryChanges=batch.entries.length||batch.contents.length||batch.deletedEntryIds.length;
+     const commonChanges=Object.values(batch.commonUpserts).some(rows=>rows.length)||Object.values(batch.commonRemovals).some(ids=>ids.length)||batch.deletedEntryIds.length;
+     for(const [key,changed]of [['journalPage',entryChanges],['commonJournal',commonChanges]])if(!Object.hasOwn(batch.coverage||{},key)&&!changed&&coverage[key]?.revision===previous.revision)coverage[key]={...coverage[key],revision:previous.revision+1};
+     const next={...previous,revision:previous.revision+1,cursor:batch.cursor===undefined?previous.cursor:batch.cursor,coverage};
      meta.put(next);done({revision:next.revision});
     });
    });

@@ -1,5 +1,22 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Dati comuni locali — 28 ottobre, pacchetto 7 ancora parziale
+
+Nuovo common-read-cache per cataloghi e slice del diario con copertura esatta,
+appartenenza per ID/versione e transazioni atomiche. Ticket prima della RPC,
+CAS, anteprime indipendenti per pagina/periodo; mutazioni pertinenti invalidano
+la copertura senza perdere bozze. Limite 500 record/4 MiB, niente cataloghi
+troncati o versioni inventate. Privacy, voci, TaskPlans e tracing esclusi.
+ensureCommon collegata dietro commonViewCache=null, copia reale ancora spenta.
+Anteprima sola lettura, nessun merge locale nello stato canonico; bozze
+preservate e risposte superate dopo salvataggi scartate nel percorso cache.
+Prova diagnostica sintetica estesa con commonReopened; nuovo test:local-common.
+Build, npm test, test:local-common, test:local-views, test:repository, test:release,
+test:common-window, test:common-periods, test:identity e test:tracing superati.
+Index/Demo e sei file di staging rigenerati.
+[Contratto, verifiche e limiti](VERIFICA-DATI-COMUNI-LOCALI.md).
+Nessun deploy o dato reale; ultimo online documentato resta Apps Script 75.
+
 ## Anteprima locale diario — 28 ottobre, pacchetto 7 ancora parziale
 
 Adattatore getJournalPage con ticket/revisione catturati prima della RPC,

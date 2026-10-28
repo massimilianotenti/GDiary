@@ -30,7 +30,8 @@
     "test:worker-chunks": "node tests/verify-worker-chunks.cjs && node tests/verify-worker-chunks-browser.cjs",
     "test:identity": "node tests/verify-archive-identity.cjs && node tests/verify-archive-identity-browser.cjs",
     "test:repository": "node tests/verify-local-repository.cjs && node tests/verify-repository-probe.cjs",
-    "test:local-views": "node tests/verify-journal-read-cache.cjs"
+    "test:local-views": "node tests/verify-journal-read-cache.cjs",
+    "test:local-common": "node tests/verify-common-read-cache.cjs"
   },
   "dependencies": {
     "vue": "3.5.44"

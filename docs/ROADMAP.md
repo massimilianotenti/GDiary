@@ -57,3 +57,9 @@ Seguito del pacchetto 7: [adattatore e anteprima locale del diario](VERIFICA-ANT
 implementati dietro interruttore spento. Ultima pagina ordinaria, lettura atomica,
 preview distinta dalla risposta canonica; copia reale e riapertura completa
 ancora disabilitate.
+
+
+Seguito del pacchetto 7: [dati comuni nella copia locale](VERIFICA-DATI-COMUNI-LOCALI.md)
+implementati dietro interruttore spento. Cataloghi e slice del diario con
+copertura esatta e lettura atomica per ID; anteprime pagina/periodo indipendenti.
+Riapertura completa, bootstrap coerente e copia reale restano futuri.

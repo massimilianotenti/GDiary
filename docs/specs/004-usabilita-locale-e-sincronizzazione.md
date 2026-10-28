@@ -472,3 +472,9 @@ Pacchetto 7 parziale: [fondamenta repository e prova sintetica](../VERIFICA-REPO
 Pacchetto 7, seguito del 28 ottobre: [adattatore e anteprima dell'ultima pagina](../VERIFICA-ANTEPRIMA-LOCALE-DIARIO.md)
 implementati e collegati alla shell dietro interruttore spento. Non chiude il
 pacchetto: dati comuni, riapertura completa e abilitazione reale restano futuri.
+
+
+Pacchetto 7, seguito: [cataloghi e slice del diario nella copia locale](../VERIFICA-DATI-COMUNI-LOCALI.md)
+implementati, ensureCommon collegata dietro interruttore spento. Ultimo periodo
+comune e ultima pagina sono copie distinte; coerenza remota fra RPC, riapertura
+completa e abilitazione reale restano da sviluppare/collaudare.
