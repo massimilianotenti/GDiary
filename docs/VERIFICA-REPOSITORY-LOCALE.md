@@ -21,7 +21,9 @@ completamento della transazione. Il cursore è un checkpoint opaco, non un feed
 server implementato. La revisione locale non sostituisce le versioni server.
 Un nuovo metadato invalida il corpo con versione diversa; le cancellazioni
 rimuovono anche allegati e piani locali collegati, preservando bozze e outbox.
-Le bozze hanno revisione CAS indipendente. Svuotare la copia remota non elimina
+Le bozze hanno revisione CAS indipendente; scrittura o cancellazione generica di
+una bozza nota/task invalida atomicamente anche la revisione della ricerca.
+Svuotare la copia remota non elimina
 lavoro locale o altri scope. Errori restituiti con codici fissi, senza contenuti.
 
 Cambio identità durante una transazione causa abort; schemi incompatibili,

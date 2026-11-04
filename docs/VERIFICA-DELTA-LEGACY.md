@@ -86,8 +86,11 @@ ricerca e modifica tutte le voci coinvolte. Il costo e la risposta sono quindi
 proporzionali alle voci convertite: non è una paginazione o un nuovo indice.
 Nessun tempo Google è stato misurato in questa tranche.
 
-Non si promettono atomicità della conversione o ricevute operationId. Un errore
-durante una conversione può richiedere rilettura e nuova anteprima, come prima.
+Per il solo fallback legacy di questo rapporto non si promettono atomicità
+della conversione o ricevute operationId. Il seguito canonico instrada invece
+Entries e Projects nello stesso commit recuperabile:
+[conversione progetto→tag canonica](VERIFICA-CONVERSIONE-PROGETTO-TAG-ENTRIES.md).
+Un errore nel percorso legacy può ancora richiedere rilettura e nuova anteprima.
 Non viene modificato il coordinamento dei writer Docs né alleggerito il lock
 remoto della cancellazione. Il seguito [cancellazione incrementale](VERIFICA-CANCELLAZIONE-DELTA.md)
 converte ora anche deleteNote e il caso di voce già assente, mantenendo il

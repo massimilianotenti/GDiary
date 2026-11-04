@@ -3,7 +3,7 @@ const backend=fs.readFileSync(path.resolve(__dirname,'../Demo.html'),'utf8').mat
 const ctx={window:{},document:{addEventListener(){}},setTimeout,console};vm.createContext(ctx);vm.runInContext(backend,ctx);
 vm.runInContext(`{
  const check=(v,m)=>{if(!v)throw Error(m);},same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
- const first=getSyncManifest();check(first.identityVerified&&!first.capabilities.localReadCache&&!first.capabilities.operations,'identity verified without storage permission');
+ const first=getSyncManifest();check(first.identityVerified&&!first.capabilities.localReadCache&&!first.capabilities.operations,'identity verified without storage permission');check(first.cursor===null&&first.highWater===null,'no feed checkpoint is claimed before a persistent routing ledger is registered');
  check(!same(first.archiveId,first.principalId)&&first.epoch,'separate archive/principal/epoch');
  const propsBefore=JSON.stringify(mockProps),usersBefore=JSON.stringify([...mockUserProperties]);
  check(same(first,getSyncManifest({archiveId:'client-forged-id',principalId:'client-forged-user',deploymentUrl:'another-url'})),'client hints/URL do not select identity');

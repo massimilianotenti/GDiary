@@ -1,0 +1,27 @@
+const fs=require('fs'),vm=require('vm'),path=require('path'),assert=require('assert');
+const {createCommitStore}=require('./helpers/recoverable-commit-store.cjs');
+const scope={archiveId:'synthetic-catalog-app-archive',principalId:'synthetic-catalog-app-principal',epoch:'synthetic-catalog-app-epoch'},adapter=createCommitStore(scope);
+const ctx=vm.createContext({window:{},document:{addEventListener(){}},setTimeout,console,syntheticStore:adapter.store,syntheticScope:scope,syntheticAdapter:adapter});
+vm.runInContext(fs.readFileSync(path.resolve(__dirname,'../Demo.html'),'utf8').match(/<script>([\s\S]*?)<\/script>/)[1],ctx);
+let lockDepth=0;const rootStore=adapter.store,sharedStore={...rootStore,withLock(fn){if(lockDepth){lockDepth++;try{return fn();}finally{lockDepth--;}}return rootStore.withLock(()=>{lockDepth=1;try{return fn();}finally{lockDepth=0;}});}};ctx.syntheticStore=sharedStore;
+vm.runInContext(`{
+ setup();
+ const check=(v,m)=>{if(!v)throw Error(m);},copy=v=>JSON.parse(JSON.stringify(v));
+ const goal=saveGoal({title:'Obiettivo',cycle:'2026-Q4',target:3,progress:0,description:'Dettaglio',updatedAt:'',context:{incrementalCommon:true}}).commonUpserts.goals[0];
+ CATALOG_COMMIT_GATEWAY=syncCatalogMigrationGateway_(syntheticStore,syntheticScope,syncCatalogSheetSource_(mockSheets.Goals,mockSheets.Habits));
+ const migrated=CATALOG_COMMIT_GATEWAY.preview('goals',goal.id);CATALOG_COMMIT_GATEWAY.migrate({operationId:'synthetic-catalog-app-goal-migration',collection:'goals',id:goal.id,expectedLegacy:migrated.legacy});
+ const savedGoal=saveGoal({...goal,title:'Obiettivo aggiornato',context:{incrementalCommon:true}}).commonUpserts.goals[0];check(savedGoal.updatedAt==='commit-4','edit goal through Demo API after migration');
+ const replay=saveGoal({...goal,title:'Obiettivo aggiornato',context:{incrementalCommon:true}}).commonUpserts.goals[0];check(JSON.stringify(replay)===JSON.stringify(savedGoal),'goal edit replay keeps original ACK');
+ const distinct=saveGoal({title:'Obiettivo',cycle:'2026-Q4',target:3,progress:0,description:'Dettaglio',requestId:'synthetic-goal-create-another',context:{incrementalCommon:true}}).commonUpserts.goals[0];check(distinct.id!==goal.id,'different create intent preserves duplicate user entry');
+ const habit=saveHabit({goalId:goal.id,title:'Pratica',days:'weekly:3',start:'2026-10-01',steps:'Prima\\nSeconda',requestId:'synthetic-habit-create-intent',context:{incrementalCommon:true}}).commonUpserts.habits[0];
+ check(habit.updatedAt==='commit-8'&&JSON.parse(habit.steps).length===2,'create linked habit through Demo API: '+JSON.stringify(habit));
+ const full=getState({context:{view:'settings'}});check(full.goals.some(g=>g.id===goal.id&&g.title==='Obiettivo aggiornato')&&full.habits.some(h=>h.id===habit.id),'full reader overlays canonical catalog');
+ const log=setHabitLog({habitId:habit.id,date:'2026-10-28',status:'pending',checked:[],habitUpdatedAt:habit.updatedAt,updatedAt:''}).commonUpserts.habitLogs[0];
+ HABIT_LOG_COMMIT_GATEWAY=syncHabitLogMigrationGateway_(syntheticStore,syntheticScope,syncHabitLogSheetSource_(mockSheets.HabitLogs,mockSheets.Habits,mockSheets.Goals));
+ const preview=HABIT_LOG_COMMIT_GATEWAY.preview(log.key);HABIT_LOG_COMMIT_GATEWAY.migrate({operationId:'synthetic-catalog-app-log-migration',key:log.key,expectedLegacy:preview.legacy,expectedCatalog:preview.catalog,record:preview.record});
+ const edited=saveHabit({...habit,steps:'Seconda\\nPrima',context:{incrementalCommon:true}}).commonUpserts.habits[0];
+ const updatedLog=setHabitLog({habitId:habit.id,date:'2026-10-28',status:'pending',checked:[],habitUpdatedAt:edited.updatedAt,updatedAt:log.updatedAt}).commonUpserts.habitLogs[0];
+ check(JSON.stringify(JSON.parse(updatedLog.checklist).steps)===JSON.stringify(JSON.parse(habit.steps)),'historical checklist survives canonical habit edit');
+ check(CATALOG_COMMIT_GATEWAY.readRows('habits').some(h=>h.id===habit.id&&h.updatedAt===edited.updatedAt),'catalog reader sees canonical edit');
+ console.log('Catalog migration app: Demo goal/habit save APIs, explicit intent and distinct identity, full reader overlay and HabitLogs historical checklist across catalog edit OK.');
+}`,ctx);

@@ -1,0 +1,21 @@
+const assert=require('assert'),{createDayRoutingServer}=require('./helpers/day-routing-server.cjs');
+const context={incrementalCommon:true},server=createDayRoutingServer(),{ctx,entryController}=server;
+function head(value){const manifest=value.ctx.getSyncManifest();let cursor={format:'sync-cursor/v1',archiveId:manifest.archiveId,epoch:manifest.epoch,principalId:manifest.principalId,sequence:0},page;do{page=value.ctx.getChanges({cursor,limit:5});cursor=page.cursor;}while(page.hasMore);return cursor.sequence;}
+entryController.register({entriesSheetId:18,indexSheetId:11,blockSheetId:12});entryController.setMode({mode:'active',expectedRevision:1});
+const payload={date:'2026-10-29',text:Array.from({length:13},(_,i)=>i===0?'☐ Task catturato':`Nota catturata ${i+1}`).join('\n'),requestId:'synthetic-entry-capture-13',scope:'personal',context};
+const first=ctx.addJournal(payload);assert.equal(first.entries.length,13,'captures larger than one atomic commit are split into stable batches');
+const firstIds=first.entries.map(entry=>entry.id);assert.equal(new Set(firstIds).size,13);assert(first.entries.every(entry=>entry.requestId.startsWith('page-capture-')));
+for(const id of firstIds)assert(entryController.resolve().isRouted(id),'each quick-capture Entry is routed through the ledger');
+const committedThrough=head(server),beforeReplay=server.snapshot(),replay=ctx.addJournal(payload);
+assert.deepEqual(replay.entries.map(entry=>entry.id),firstIds,'retry keeps all identities after a partial/missing ACK');
+assert.equal(head(server),committedThrough,'idempotent capture replay adds no commits');assert.equal(server.snapshot().rawSheets.Entries.length,beforeReplay.rawSheets.Entries.length,'capture retry does not stage duplicate Entries');assert.equal(server.snapshot().rawSheets.DocContent.length,beforeReplay.rawSheets.DocContent.length,'capture retry does not duplicate staged content');
+const note=ctx.addCompleteNote({date:'2026-10-28',requestId:'synthetic-entry-complete-note',title:'Nota completa canonica',body:'Corpo completo con accenti: perché, già.',scope:'personal',tags:'ricerca',rich:[{kind:'p',runs:[{text:'Corpo completo con accenti: perché, già.',bold:true}]}],context}),noteEntry=note.entries[0];
+assert(entryController.resolve().isRouted(noteEntry.id));assert.equal(entryController.resolve().readContent(noteEntry.id).body,'Corpo completo con accenti: perché, già.');
+assert.equal(entryController.resolve().read(noteEntry.id).tags,'ricerca');
+const noteHead=head(server),noteBefore=server.snapshot(),noteReplay=ctx.addCompleteNote({date:'2026-10-28',requestId:'synthetic-entry-complete-note',title:'Nota completa canonica',body:'Corpo completo con accenti: perché, già.',scope:'personal',tags:'ricerca',rich:[{kind:'p',runs:[{text:'Corpo completo con accenti: perché, già.',bold:true}]}],context});
+assert.equal(noteReplay.entries[0].id,noteEntry.id);assert.equal(head(server),noteHead,'complete-note retry is stable');assert.equal(server.snapshot().rawSheets.Entries.length,noteBefore.rawSheets.Entries.length,'complete-note retry does not stage duplicate Entries');assert.equal(server.snapshot().rawSheets.DocContent.length,noteBefore.rawSheets.DocContent.length,'complete-note retry does not duplicate body versions');
+const readonly=createDayRoutingServer(),readonlyContext={incrementalCommon:true};readonly.entryController.register({entriesSheetId:18,indexSheetId:11,blockSheetId:12});const before=JSON.stringify(readonly.snapshot());
+assert.throws(()=>readonly.ctx.addJournal({...payload,requestId:'synthetic-entry-capture-readonly',context:readonlyContext}),error=>error.name==='ProtocolUnavailable');
+assert.throws(()=>readonly.ctx.addCompleteNote({date:'2026-10-29',requestId:'synthetic-entry-complete-readonly',title:'Bloccata',body:'Non scrivere',scope:'personal',context:readonlyContext}),error=>error.name==='ProtocolUnavailable');
+assert.equal(JSON.stringify(readonly.snapshot()),before,'readOnly create attempts reserve no canonical or legacy data');
+console.log('Entry create routing: quick capture in multi-commit batches, complete-note content/rich formatting, stable retry identities, canonical routes and readOnly no-write barriers OK.');

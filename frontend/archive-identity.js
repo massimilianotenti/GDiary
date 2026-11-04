@@ -6,9 +6,8 @@ export function validateArchiveManifest(value){
  if(!value||value.protocolVersion!==1||value.schemaVersion!==1||value.minClientProtocol!==1)return {verified:false,cacheReady:false,reason:'unsupportedProtocol'};
  if(value.identityVerified!==true)return {verified:false,cacheReady:false,reason:REASONS.has(value.reason)?value.reason:'identityUnavailable'};
  if(![value.archiveId,value.principalId,value.epoch].every(id=>typeof id==='string'&&ID.test(id)))return {verified:false,cacheReady:false,reason:'invalidIdentity'};
- // Current implementation cannot enable application storage, even if a server
- // mistakenly advertises it before the matching client repository is present.
- return {verified:true,cacheReady:false,scope:{archiveId:value.archiveId,principalId:value.principalId,epoch:value.epoch,protocolVersion:1,schemaVersion:1},reason:'storageUnverified'};
+ const cacheReady=value.capabilities?.localReadCache===true&&value.capabilities?.changes===true,operationsReady=value.capabilities?.operations===true;
+ return {verified:true,cacheReady,operationsReady,scope:{archiveId:value.archiveId,principalId:value.principalId,epoch:value.epoch,protocolVersion:1,schemaVersion:1},reason:cacheReady?'ready':'capabilityUnavailable'};
 }
 export function createArchiveIdentityClient(fetchManifest){
  let generation=0,scope=null,status={verified:false,cacheReady:false,reason:'notChecked'};

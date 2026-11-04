@@ -1,5 +1,9 @@
 # Sviluppo e verifiche
 
+`npm run test:repository` include la prima pagina locale modificabile, la versione di base, i blocchi di bypass e la conservazione dell'editor dopo risposte tardive.
+
+`npm run test:local-common` verifica anche anteprime di settimana e abitudini, intervalli disgiunti e migrazione IndexedDB v8→v9 con bozze e outbox conservate.
+
 Modificare frontend/shell.html, frontend/components e CSS; poi `npm run build`. Non usare Index.html come sorgente principale di modifiche dell'interfaccia. Modificare i .gs direttamente per il backend.
 
 La demo usa servizi Google simulati: tutti i test locali devono restare indipendenti dall'archivio reale. Gli accessi HTTPS sono bloccati in molte prove browser. Le suite locali non dimostrano il funzionamento del deployment autenticato.
@@ -138,3 +142,28 @@ con server HTTP/V8 temporaneo e dati sintetici. Include bozze/rich/focus,
 retry dopo ACK perso/malformato, reload, due client in conflitto, readOnly,
 tracing e layout 320/390 px. È incluso in test:e2e, non nella suite backend
 npm test. [Scenari, correzione e limiti](VERIFICA-BROWSER-ROUTING-GIORNI.md).
+
+Per il registro Weeks: `test:canonical-weeks`, `test:week-migration` e
+`test:week-controller` sono inclusi anche in npm test. Rieseguire release,
+tracing e `test:day-controller`/`test:day-browser` sul controller condiviso.
+
+`test:week-browser` esegue il percorso Weeks attivo con server locale sintetico
+e UI reale; incluso in test:e2e. Per i form eseguire anche P85/P88,
+`test:incremental`, `test:common-periods`, release e tracing.
+
+Per il prototipo HabitLogs: `test:canonical-habit-logs`,
+`test:habit-log-planner` e `test:habit-log-migration` sono inclusi in npm test.
+Per le regressioni eseguire release, ciclo, incremental, common-periods,
+tracing e browser Days/Weeks. Controller/browser HabitLogs ancora successivi.
+
+`test:habit-log-controller` è incluso in npm test; `test:habit-log-browser`
+in test:e2e. Il secondo usa server sintetico e UI reale, con cataloghi, retry,
+conflitti, readOnly e ACK malformati. Per modifiche ai controlli eseguire anche
+ciclo, P80, release, incremental, common-periods e tracing. Il test P59 build
+verifica sintassi frontend, backend unico e staging di esattamente sei file.
+
+Per il prototipo cataloghi: `test:canonical-catalogs`, `test:catalog-planner`
+e `test:routing-locks` sono inclusi in npm test. Rieseguire anche controller
+Days/Weeks/HabitLogs e relativi browser quando si modifica la composizione
+dei lock; per compatibilità applicativa usare release, ciclo, incremental,
+common-periods e tracing. Nessun Google richiesto.

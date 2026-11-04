@@ -28,7 +28,7 @@ function normalizeResponse(request,response){
   if(!row||row.editorError||row.contentLoaded===false||typeof row.body!=='string'||!Array.isArray(row.rich)||!row.date?.startsWith(request.month+'-')||request.project&&!String(row.projects||'').split(',').map(v=>v.trim()).includes(request.project))throw fail('DataError');
   const {body,rich,richUnsupported,editorAutoTitle,contentLoaded,editorError,...metadata}=row;
   entries.push(metadata);
-  contents.push({id:row.id,version:row.updatedAt,body,rich,...(richUnsupported===undefined?{}:{richUnsupported}),...(editorAutoTitle===undefined?{}:{editorAutoTitle}),...(contentLoaded===undefined?{}:{contentLoaded})});
+  contents.push({id:row.id,version:row.contentVersion||row.updatedAt,body,rich,...(richUnsupported===undefined?{}:{richUnsupported}),...(editorAutoTitle===undefined?{}:{editorAutoTitle}),...(contentLoaded===undefined?{}:{contentLoaded})});
  }
  return {entries,contents,payload:{month:request.month,total:response.total,nextCursor:response.nextCursor,nextEntry:clone(nextEntry),contentsIncluded:true}};
 }

@@ -1,5 +1,9 @@
 # Architettura corrente
 
+Nel percorso sperimentale con copia e outbox abilitate, la prima pagina del diario già verificata può essere modificata localmente mentre si attende il remoto; viene marcata come datata e incompleta. [Verifica e limiti](VERIFICA-PAGINE-LOCALI-DIARIO.md).
+
+Nel percorso locale sperimentale, le anteprime read-only dei dati comuni coprono diario, settimana e abitudini tramite descrittori scoped; IndexedDB v9 separa i nuovi descrittori dai client precedenti. [Verifica e limiti](VERIFICA-PAGINE-LOCALI-DIARIO.md).
+
 ## Componenti
 
 Interfaccia HTML/Vue → google.script.run → Apps Script → Sheets e Docs nell'archivio Drive personale. Oggi non è una PWA e non dispone di database applicativo IndexedDB né sincronizzazione offline completa.
@@ -148,6 +152,35 @@ saveDays condivide dayValues_ con saveDay, legge solo le date richieste e distin
 
 addFileLink espone fileUpserts canonici; updateEntry metadataOnly; convertProjectToTag patch dei metadati, rimozione progetto e aggiunta tag. Il client aggiorna solo le voci note, preserva contenuti e bozze e invalida le cache. Opt-in incrementalCommon, fallback completo per chiamanti legacy. [Verifica e limiti](VERIFICA-DELTA-LEGACY.md).
 
+## Allegati delle Entries canoniche — sviluppo locale SPEC-004
+
+Per un Entry instradato `addFileLink` committa la nuova entità files insieme
+all'indice `entry-files:<hash>`; il retry usa identità deterministiche. La
+risposta incrementale aggiorna la sessione e il dettaglio rilegge l'overlay
+legacy/canonico. Nessuna riga Files legacy viene riscritta e il file Drive non
+viene copiato né spostato. Il feed globale resta da completare.
+[Verifica e limiti](VERIFICA-ALLEGATI-ENTRIES.md).
+
+## Cancellazione delle Entries canoniche — sviluppo locale SPEC-004
+
+Per Entry instradati `deleteNote` verifica la versione, prepara un piano
+durabile e committa il tombstone insieme all'eventuale ritiro dell'indice
+allegati. Una sezione Docs consolidata viene rimossa solo dopo aver verificato
+i suoi marcatori; il file originale resta. ACK e retry sono stabili e la UI
+nasconde la voce anche dopo reload. La pulizia delle righe operative avviene
+dopo il commit; payload e feed immutabili sono conservati.
+[Verifica e limiti](VERIFICA-CANCELLAZIONE-ENTRIES-CANONICA.md).
+
+## Conversione progetto→tag — sviluppo locale SPEC-004
+
+Quando Projects ed Entries sono instradati e attivi, l'anteprima firma il
+progetto, le voci collegate e le dipendenze Goals. Una richiesta aggiorna gli
+snapshot Entry, i route marker necessari e il tombstone Project in un commit
+comune, con ACK ripetibile. Un Project legacy può ricevere prima una route
+semantica neutra; le Entry legacy entrano nel commit di conversione. La
+richiesta resta entro 25 cambi e 32 KiB; non è paginata.
+[Verifica e limiti](VERIFICA-CONVERSIONE-PROGETTO-TAG-ENTRIES.md).
+
 ## Cancellazione con delta — sviluppo locale
 
 deleteNote espone deletedEntryIds e alreadyAbsent con incrementalCommon; il client rimuove riferimenti in memoria e invalida sessioni/cursori, preservando gli oggetti bozza. Controlli e lock Docs restano invariati. [Verifica e limiti](VERIFICA-CANCELLAZIONE-DELTA.md).
@@ -230,3 +263,46 @@ Seguito: [collaudo browser del percorso Days attivo](VERIFICA-BROWSER-ROUTING-GI
 superato con UI reale e server V8 locale. Nessun nuovo trasporto nell'app:
 il ponte HTTP e le registrazioni sono esclusivamente fixture. readOnly conserva
 il nome d'errore del protocollo ma fornisce un messaggio comprensibile alla UI.
+
+
+Seguito del pacchetto 8: [writer canonico interno Weeks](VERIFICA-WRITER-SETTIMANALE-CANONICO.md)
+con snapshot completi e recupero verificato sulle fixture. SaveWeek e letture
+applicative restano legacy; ponte, controller e collaudo browser ancora aperti.
+
+
+Seguito Weeks: [ponte e lettori coerenti](VERIFICA-MIGRAZIONE-SETTIMANE.md) e
+[controller persistente](VERIFICA-CONTROLLER-ROUTING-SETTIMANE.md) verificati
+sulle fixture. Days e Weeks condividono il registro con binding verificato;
+modalità readOnly per dominio e nessuna registrazione reale. Collaudo browser
+Weeks e restante matrice delle mutazioni ancora aperti.
+
+
+Seguito: [collaudo browser Weeks attivo](VERIFICA-BROWSER-ROUTING-SETTIMANE.md)
+verificato con UI reale su server sintetico. Bozze per settimana nella scheda,
+versione iniziale conservata, ACK validato prima del merge ed eventi tardivi
+conservati; nessuna attivazione Google o capacità manifest.
+
+
+Seguito HabitLogs: [writer canonico](VERIFICA-WRITER-REGISTRAZIONI-CANONICO.md),
+[planner puro](VERIFICA-PLANNER-REGISTRAZIONI.md) e
+[ponte con lettori coerenti](VERIFICA-MIGRAZIONE-REGISTRAZIONI.md) implementati
+sulle fixture. Checklist storica e dipendenze dei cataloghi catturate nei piani;
+setHabitLog instradato solo con iniezione sintetica, controller persistente
+e browser attivo ancora successivi. Nessuna attivazione reale o nuova RPC.
+
+
+Seguito HabitLogs: [controller persistente](VERIFICA-CONTROLLER-REGISTRAZIONI.md)
+e [browser attivo locale](VERIFICA-BROWSER-REGISTRAZIONI.md) verificati. Binding
+esplicito dei tre fogli applicativi allo stesso registro Days/Weeks, modalità
+persistenti per dominio, ACK confrontato con identità/checklist richieste prima
+del merge. Focus e bozze del diario conservati. Nessuna nuova RPC o outbox,
+registrazione reale ancora assente; feed completo e altre mutazioni aperti.
+
+
+Seguito Goals/Habits: [writer canonico](VERIFICA-WRITER-CATALOGHI-CANONICO.md) e
+[planner delle API](VERIFICA-PLANNER-CATALOGHI.md) verificati solo sulle fixture,
+con lotti atomici, dipendenze del goal e identità delle microazioni conservate.
+[Composizione delle letture tra controller](VERIFICA-COMPOSIZIONE-LOCK-ROUTING.md)
+supportata senza consentire mutazioni annidate. API/cataloghi applicativi ancora
+legacy: ponte, lettori coerenti, controller e browser restano da completare.
+Nessuna nuova RPC o attivazione reale.

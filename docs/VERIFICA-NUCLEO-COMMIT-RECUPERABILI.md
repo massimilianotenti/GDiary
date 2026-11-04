@@ -116,9 +116,12 @@ Non è ancora stato misurato il suo costo I/O su Google.
 | saveGoal, saveHabit, deleteHabit, setHabitLog | Cataloghi, archivio abitudini e registrazioni/checklist | Legacy, non registrato |
 | saveProject, addFileLink | Progetti, allegati e collegamenti canonici | Legacy, non registrato |
 | saveReflectionSettings, savePrivacySettings | Impostazioni pertinenti e versioni | Legacy, non registrato |
-| migrateDocsBatch, getEntryDetail/prepareQueuedTask_, refreshNotePreviews | Preparazione/import Docs, riferimenti, contenuti e anteprime | Legacy, non registrato |
-| processTaskDocQueue, rebaseDocQueue | Esito Docs, contenuti/riferimenti, code e conflitti | Legacy, non registrato |
-| Futuro import delle modifiche dirette Docs | Voci/contenuti canonici riconciliati | Non implementato |
+| migrateDocsBatch | Preparazione Docs per Entries | Legacy soltanto; salta le Entries instradate, [verifica](VERIFICA-MIGRAZIONE-DOCS-ROUTING-ENTRIES.md) |
+| getEntryDetail, prepareQueuedTask_ | Lettura/accodamento Docs e riferimenti | Lettura sola per route; writer legacy bloccato per Entry instradate |
+| refreshNotePreviews | Import esplicito corpo/rich Docs e cache anteprima | Route Entries ora importano via commit; legacy resta fuori dal registro, [verifica](VERIFICA-RICONCILIAZIONE-DOCS-ENTRIES.md) |
+| processTaskDocQueue | Scrittura Docs e stato coda/anteprime | Per Entries instradate, `pending` prima e `done` dopo il salvataggio sono commit nel descriptor/feed; side effect Docs e riga UI della coda restano esterni/legacy |
+| rebaseDocQueue | Baseline/backup del conflitto e nuova coda Docs | Route Entries: commit canonico e retry stabile, [verifica](VERIFICA-REBASE-DOCS-ENTRIES.md); legacy: percorso precedente |
+| Riconciliazione Docs in background e copertura completa | Voci/contenuti canonici riconciliati | Import esplicito limitato alle prime 12 voci selezionate; background, titolo e client ancora aperti |
 
 Le scritture infrastrutturali (setup, Registry, esportazioni) richiedono una
 classificazione distinta prima dell'attivazione. I side effect di Drive/Docs

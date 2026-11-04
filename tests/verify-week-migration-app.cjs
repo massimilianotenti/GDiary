@@ -1,0 +1,54 @@
+const fs=require('fs'),vm=require('vm'),path=require('path'),assert=require('assert');
+const {createCommitStore}=require('./helpers/recoverable-commit-store.cjs');
+const scope={archiveId:'synthetic-week-app-archive',principalId:'synthetic-week-app-principal',epoch:'synthetic-week-app-epoch'};
+const adapter=createCommitStore(scope),ctx=vm.createContext({window:{},document:{addEventListener(){}},setTimeout,console,syntheticStore:adapter.store,syntheticScope:scope,syntheticAdapter:adapter});
+vm.runInContext(fs.readFileSync(path.resolve(__dirname,'../Demo.html'),'utf8').match(/<script>([\s\S]*?)<\/script>/)[1],ctx);
+vm.runInContext(`{
+ const check=(condition,message)=>{if(!condition)throw Error(message);},copy=value=>JSON.parse(JSON.stringify(value));
+ const fails=(fn,name)=>{let thrown;try{fn();}catch(error){thrown=error;}check(thrown&&thrown.name===name,'expected '+name+', got '+thrown?.name);};
+ Utilities.formatDate=(d,z,f)=>f==='yyyy-MM-dd'?'2026-10-28':d.toISOString().slice(0,10);
+ const a='2026-10-26',b='2026-11-02';
+ const payload={week:a,focus:'Focus 🌱',priorities:'Tre priorità',wins:'Una vittoria',obstacles:'Tempo',lessons:'Ascolto',next:'Avanti',energy:'3',closed:'no',updatedAt:''};
+ const one=saveWeek(payload).commonUpserts.weeks[0];
+ WEEK_COMMIT_GATEWAY=syncWeekMigrationGateway_(syntheticStore,syntheticScope,syncWeekSheetSource_(mockSheets.Weeks));
+ const other=saveWeek({...payload,week:b}).commonUpserts.weeks[0];
+ check(syntheticAdapter.snapshot().head.committedThrough===0,'unmigrated weeks remain legacy');
+ const preview=WEEK_COMMIT_GATEWAY.preview(a);check(preview.week===a&&preview.record.focus===one.focus,'preview identity and snapshot');
+ WEEK_COMMIT_GATEWAY.migrate({week:a,expectedLegacy:preview.legacy,operationId:'synthetic-week-app-migrate'});
+ const frozen=copy(mockSheets.Weeks.data);
+ const first=saveWeek({...one,wins:'Bozza prima della migrazione'}).commonUpserts.weeks[0];
+ check(first.updatedAt==='commit-4'&&first.focus===one.focus,'old draft version accepted once');
+ check(JSON.stringify(mockSheets.Weeks.data)===JSON.stringify(frozen),'canonical save freezes legacy');
+ const full=getState({context:{view:'settings'}});check(full.weeks.find(row=>row.week===a).updatedAt===first.updatedAt,'full read uses canonical');
+ for(const context of [{view:'journal',commonWindow:'journal',month:'2026-10'},{view:'week',commonWindow:'week',week:a},{view:'habits',commonWindow:'habits',week:a,date:a}]){
+  const response=getState({context});check(response.commonSlices.weeks.rows.find(row=>row.week===a)?.updatedAt===first.updatedAt,'period uses canonical: '+context.view);
+ }
+ fails(()=>saveWeek({...one,wins:'Obsoleta'}),'ConflictError');
+ fails(()=>saveRecord_('Weeks',WEEK_HEADERS,'week',{week:a,focus:'Bypass'},first.updatedAt),'ProtocolUnavailable');
+ const pending={...first,wins:'ACK perso 🌱'};
+ syntheticAdapter.fault(syntheticAdapter.metrics().writes+10,'after');fails(()=>saveWeek(pending),'StorageError');
+ const retried=saveWeek(pending),writes=syntheticAdapter.metrics().writes;
+ check(retried.commonUpserts.weeks[0].wins===pending.wins,'retry recovers snapshot');
+ check(JSON.stringify(saveWeek(pending))===JSON.stringify(retried)&&syntheticAdapter.metrics().writes===writes,'retry has original ACK and no writes');
+ const absent='2026-11-09';WEEK_COMMIT_GATEWAY.migrate({week:absent,expectedLegacy:null,operationId:'synthetic-week-app-empty'});
+ const empty=commonDateSlice_(mockSheets.Weeks,WEEK_HEADERS,'week',absent,absent).rows;
+ check(empty.length===1&&empty[0].closed==='no','canonical-only week discovered with valid default');
+ check(rows_(mockSheets.Weeks,WEEK_HEADERS).filter(row=>row.week===absent).length===1,'full read discovers canonical-only week once');
+ const slice=()=>traceApi({operation:'getState',traceId:'synthetic-week-window-trace',arg:{context:{view:'week',commonWindow:'week',week:a,deferEntries:true}}});
+ const small=slice();for(let i=0;i<50000;i++)mockSheets.Weeks.data.push(WEEK_HEADERS.map(key=>key==='week'?'2000-01-03':key==='closed'?'no':''));
+ const large=slice();check(small.ok&&large.ok&&small.diagnostics.sheetReadCells===large.diagnostics.sheetReadCells,'bounded read with 50k unrelated rows');
+ // Days and Weeks publish into one head with disjoint routing directories.
+ const day=saveDay({date:a,intention:'Giorno condiviso',updatedAt:''}).commonUpserts.days[0];
+ DAY_COMMIT_GATEWAY=syncDayMigrationGateway_(syntheticStore,syntheticScope,syncDaySheetSource_(mockSheets.Days));
+ DAY_COMMIT_GATEWAY.migrate({date:a,expectedLegacy:day,operationId:'synthetic-shared-day-migrate'});
+ const dayEdit=saveDay({date:a,updatedAt:day.updatedAt,reflection:'Aggiornamento giorno'}).commonUpserts.days[0];
+ const weekEdit=saveWeek({...retried.commonUpserts.weeks[0],wins:'Registro condiviso'}).commonUpserts.weeks[0];
+ check(Number(weekEdit.updatedAt.slice(7))===Number(dayEdit.updatedAt.slice(7))+2,'shared monotonic commit sequence');
+ check(rows_(mockSheets.Days,DAY_HEADERS).find(row=>row.date===a).reflection===dayEdit.reflection,'week edit preserves day');
+ check(rows_(mockSheets.Weeks,WEEK_HEADERS).find(row=>row.week===a).wins===weekEdit.wins,'day routing preserves week');
+ const row=mockSheets.Weeks.data.find(row=>row[0]===a);row[WEEK_HEADERS.indexOf('wins')]='Variante esterna';
+ fails(()=>saveWeek({...retried.commonUpserts.weeks[0],wins:'Blocca'}),'CommitBlocked');
+ fails(()=>commonDateSlice_(mockSheets.Weeks,WEEK_HEADERS,'week',a,a),'CommitBlocked');
+ fails(()=>rows_(mockSheets.Weeks,WEEK_HEADERS),'CommitBlocked');
+ console.log('Week migration app: Demo saveWeek, full/journal/week/habits readers, old drafts, lost ACK, canonical-only weeks, bypass/divergence barriers and 50k bounded period reads OK.');
+}`,ctx);

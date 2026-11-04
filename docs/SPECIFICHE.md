@@ -1,5 +1,9 @@
 # Specifiche funzionali correnti
 
+Nel percorso locale sperimentale, una prima pagina del diario già conservata può essere modificata attraverso l'outbox durante la lettura remota; la vista segnala la copertura parziale e conserva la versione per il controllo dei conflitti. [Verifica](VERIFICA-PAGINE-LOCALI-DIARIO.md).
+
+Dietro la capability locale disattivata, Settimana e Abitudini possono mostrare un'anteprima datata e non modificabile mentre si verifica la risposta remota. [Verifica e limiti](VERIFICA-PAGINE-LOCALI-DIARIO.md).
+
 ## Intento
 
 Un diario che rende semplice scrivere, ritrovare e portare avanti attività. Tipografia e interazioni coerenti hanno priorità rispetto all'aggiunta di viste duplicate. Ispirazione visiva: sobrietà di Agenda e diario cartaceo, senza imitare la pagina cartacea in modo letterale.
@@ -167,3 +171,46 @@ Seguito: [percorso Days attivo collaudato nel browser locale](VERIFICA-BROWSER-R
 Bozze, conflitti, reload, ACK persi/malformati e readOnly verificati con dati
 inventati. Migliorato il messaggio di sola lettura, mantenendo le bozze.
 Nessuna registrazione reale, nuova modalità offline o attivazione del manifest.
+
+
+Seguito del pacchetto 8: [writer canonico interno Weeks](VERIFICA-WRITER-SETTIMANALE-CANONICO.md)
+con snapshot completi e recupero verificato sulle fixture. SaveWeek e letture
+applicative restano legacy; ponte, controller e collaudo browser ancora aperti.
+
+
+Seguito Weeks: [ponte e lettori coerenti](VERIFICA-MIGRAZIONE-SETTIMANE.md) e
+[controller persistente](VERIFICA-CONTROLLER-ROUTING-SETTIMANE.md) verificati
+sulle fixture. Days e Weeks condividono il registro con binding verificato;
+modalità readOnly per dominio e nessuna registrazione reale. Collaudo browser
+Weeks e restante matrice delle mutazioni ancora aperti.
+
+
+Seguito: [collaudo browser Weeks attivo](VERIFICA-BROWSER-ROUTING-SETTIMANE.md)
+verificato con UI reale su server sintetico. Bozze per settimana nella scheda,
+versione iniziale conservata, ACK validato prima del merge ed eventi tardivi
+conservati; nessuna attivazione Google o capacità manifest.
+
+
+Seguito HabitLogs: [writer canonico](VERIFICA-WRITER-REGISTRAZIONI-CANONICO.md),
+[planner puro](VERIFICA-PLANNER-REGISTRAZIONI.md) e
+[ponte con lettori coerenti](VERIFICA-MIGRAZIONE-REGISTRAZIONI.md) implementati
+sulle fixture. Checklist storica e dipendenze dei cataloghi catturate nei piani;
+setHabitLog instradato solo con iniezione sintetica, controller persistente
+e browser attivo ancora successivi. Nessuna attivazione reale o nuova RPC.
+
+
+Seguito HabitLogs: [controller persistente](VERIFICA-CONTROLLER-REGISTRAZIONI.md)
+e [browser attivo locale](VERIFICA-BROWSER-REGISTRAZIONI.md) verificati. Binding
+esplicito dei tre fogli applicativi allo stesso registro Days/Weeks, modalità
+persistenti per dominio, ACK confrontato con identità/checklist richieste prima
+del merge. Focus e bozze del diario conservati. Nessuna nuova RPC o outbox,
+registrazione reale ancora assente; feed completo e altre mutazioni aperti.
+
+
+Seguito Goals/Habits: [writer canonico](VERIFICA-WRITER-CATALOGHI-CANONICO.md) e
+[planner delle API](VERIFICA-PLANNER-CATALOGHI.md) verificati solo sulle fixture,
+con lotti atomici, dipendenze del goal e identità delle microazioni conservate.
+[Composizione delle letture tra controller](VERIFICA-COMPOSIZIONE-LOCK-ROUTING.md)
+supportata senza consentire mutazioni annidate. API/cataloghi applicativi ancora
+legacy: ponte, lettori coerenti, controller e browser restano da completare.
+Nessuna nuova RPC o attivazione reale.

@@ -1,5 +1,7 @@
 # Modello dati
 
+La copia sperimentale IndexedDB v9 conserva fino a otto descrittori di dati comuni per diario, settimana e abitudini, con appartenenza e versioni verificate; non modifica il modello Google. [Verifica](VERIFICA-PAGINE-LOCALI-DIARIO.md).
+
 Schemi estratti dai sorgenti v2.0.3. Le costanti nel codice restano la definizione operativa; verificare le funzioni di estensione prima di modificare fogli esistenti.
 
 ## PLAN_HEADERS — Code.gs
@@ -103,6 +105,25 @@ Schemi estratti dai sorgenti v2.0.3. Le costanti nel codice restano la definizio
 Entries.id identifica la voce condivisa tra tutte le viste. Entries.text è il titolo; non usare la colonna body storica per dedurre da sola dove si trova il testo corrente. DocContent memorizza JSON suddiviso in parti, TaskDocQueue lo stato della sincronizzazione, DocRefs il collegamento alle sezioni Docs, JournalLayout la posizione nel diario. updatedAt viene usato per controllare modifiche concorrenti; requestId/clientId aiutano a evitare duplicazioni.
 
 TaskPlans.date è la pianificazione giornaliera; workStart/workEnd il periodo di lavorazione; Entries.due la deadline e Entries.date la data di annotazione. completedAt è l'istante di completamento, convertito in Europe/Rome per i riepiloghi. Non confondere questi campi durante filtri o migrazioni.
+
+Per Entries canoniche, i nuovi allegati sono entità `files` nel commit ledger,
+con indice per Entry in `settings`; le righe preesistenti del foglio Files
+restano la preimmagine legacy. Il dettaglio sovrappone i due insiemi per
+`fileId`. L'indice canonico ammette fino a 128 allegati per Entry. La lettura
+globale Files non è ancora completa per la sessione successiva al reload.
+[Verifica](VERIFICA-ALLEGATI-ENTRIES.md).
+
+La cancellazione di una Entry canonica pubblica un tombstone `entries` e, se
+presente, dell'indice allegati `settings` nello stesso commit recuperabile. Il
+piano in `settings` conserva operation ID e richiesta per il retry. L'indice
+non espone più i riferimenti canonici; il feed immutabile e i payload storici
+non vengono eliminati. [Verifica](VERIFICA-CANCELLAZIONE-ENTRIES-CANONICA.md).
+
+La conversione progetto→tag aggiorna le Entries canoniche e tombstona
+`projects` in un unico commit. Le route Entries già esistenti restano valide;
+quelle delle Entries legacy sono create nello stesso commit. La route Project
+si conserva come overlay tombstonato per non far riapparire la preimmagine
+legacy. [Verifica](VERIFICA-CONVERSIONE-PROGETTO-TAG-ENTRIES.md).
 
 ## Contratto Task differiti — sviluppo locale SPEC-004
 
@@ -221,3 +242,31 @@ e modalità; MARK_A_V1/MARK_B_V1 per preparazione/pubblicazione. Checksum SHA-25
 nessuna identità utente in chiaro o contenuto del diario. Nessuna proprietà
 viene creata dall'avvio ordinario: registrazione server esplicita e disabilitata
 per default; nessuna tabella o modifica degli schemi del diario.
+
+
+## Snapshot canonici HabitLogs — prototipo locale SPEC-004
+
+Collezione habitLogs, chiave habitId|data, formato sync-habit-log/v1: snapshot
+di LOG_HEADERS salvo updatedAt; versione commit-N dal nucleo. Checklist JSON
+completa con steps/checked, ID univoci e titoli storici, stato coerente. Nessuna
+nuova colonna legacy. Piani e routing in settings del registro, con digest
+della preimmagine e dei cataloghi; [contratto e limiti](VERIFICA-MIGRAZIONE-REGISTRAZIONI.md).
+Iniezione spenta, nessuna migrazione reale o provisioning automatico.
+
+
+Il controller HabitLogs aggiunge un'ancora interna con cinque ID distinti:
+habitLogsSheetId, indexSheetId, blockSheetId, habitsSheetId, goalsSheetId.
+Stato active/readOnly a due slot in ScriptProperties e chiavi
+SYNC_HABIT_LOG_ROUTING_*; [contratto](VERIFICA-CONTROLLER-REGISTRAZIONI.md).
+Nessuna nuova colonna nei fogli legacy o attivazione reale.
+
+
+## Snapshot canonici Goals/Habits — prototipo locale SPEC-004
+
+Formati sync-goal/v1 e sync-habit/v1 nelle collezioni goals/habits: record
+completi dei rispettivi HEADERS salvo updatedAt; versioni commit-N. Steps è
+JSON canonico con ID/titoli della definizione corrente; le checklist dei log
+restano fotografie indipendenti. L'archivio è un upsert archived:yes, senza
+cancellare o riscrivere la definizione precedente. Lotti fino a 25 record e
+32.768 unità complessive, senza divisione automatica. [Contratto e limiti](VERIFICA-WRITER-CATALOGHI-CANONICO.md).
+Nessun writer o lettore applicativo migrato, nessuna nuova colonna legacy.

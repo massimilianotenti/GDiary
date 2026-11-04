@@ -125,7 +125,7 @@ per riferimenti/allegati al posto di ricerche ripetute per ogni voce.
 
 ### 1B. Scrittura Docs coordinata
 
-Implementata solo l’alternativa intermedia a lotti piccoli sotto lock: [verifica](../VERIFICA-WORKER-LOTTI-PICCOLI.md). Prenotazioni, writer condizionale e lavoro fuori lock descritti sotto restano proposti.
+Implementati lotti piccoli, writer Docs API con `requiredRevisionId`, prenotazione per token/versione con lease di 60 secondi e scrittura fuori lock. I writer applicativi che entrano da `locked_` o dal commit store sono sospesi durante la prenotazione. Il takeover scaduto invia un batch Docs API condizionale che crea e cancella un named range temporaneo; test REST simulati coprono revisione scaduta, doppio worker, edit concorrente, ACK perso e blocco di cancellazione/rebase/export/worker legacy. Gate locale completo superato: [lotti](../VERIFICA-WORKER-LOTTI-PICCOLI.md), [writer e limiti](../VERIFICA-WRITER-DOCS-CONDIZIONALE.md). Resta da convalidare il fence contro Docs reale; la creazione iniziale di sezioni mancanti resta sotto lock.
 
 Estendere la coda con versione richiesta, token worker, scadenza prenotazione,
 tentativi e prossimo tentativo. Coordinare tutti gli scrittori dello stesso
@@ -521,3 +521,159 @@ Pacchetto 8, seguito: [collaudo browser locale Days attivo](../VERIFICA-BROWSER-
 superato con UI reale e backend V8/Sheets simulato, incluse bozze, conflitti,
 reload, errori e readOnly. Nessuna abilitazione reale; prossima estensione
 locale ai checkup Weeks e poi alla restante matrice delle mutazioni.
+
+
+Pacchetto 8, seguito Weeks: [ponte e lettori](../VERIFICA-MIGRAZIONE-SETTIMANE.md)
+e [controller persistente](../VERIFICA-CONTROLLER-ROUTING-SETTIMANE.md) implementati
+e verificati localmente. Stesso registro di Days, modalità per dominio,
+nessuna registrazione reale. Browser Weeks e altre mutazioni restano aperti.
+
+
+Pacchetto 8, seguito: [browser locale Weeks attivo](../VERIFICA-BROWSER-ROUTING-SETTIMANE.md)
+verificato con controller persistente e registro condiviso Days/Weeks. Form
+con bozze nella scheda, conflitti e ACK recuperabili; nessuna abilitazione reale.
+Prossimo dominio HabitLogs, poi restante matrice e feed completo dell’archivio.
+
+
+Pacchetto 8, seguito HabitLogs: [writer](../VERIFICA-WRITER-REGISTRAZIONI-CANONICO.md),
+[planner](../VERIFICA-PLANNER-REGISTRAZIONI.md) e
+[ponte](../VERIFICA-MIGRAZIONE-REGISTRAZIONI.md) verificati con fault injection e
+API Demo. Controller persistente, browser e restante matrice ancora aperti.
+[Stato dei 12 pacchetti](../STATO-PIANO-SPEC-004.md): 7 richiedono sviluppo,
+1 verifica esterna; nessuna riduzione dell'ambito originale.
+
+
+Pacchetto 8, seguito HabitLogs: [controller persistente](../VERIFICA-CONTROLLER-REGISTRAZIONI.md)
+e [browser attivo locale](../VERIFICA-BROWSER-REGISTRAZIONI.md) verificati dopo
+writer/planner/ponte. Binding anche dei cataloghi, checkpoint condiviso con
+Days/Weeks e ricevute validate nel frontend. Nessuna attivazione reale;
+prossimo dominio Goals/Habits e relativa coerenza dei lettori usati dai log.
+
+
+Pacchetto 8, seguito Goals/Habits: [writer canonico](../VERIFICA-WRITER-CATALOGHI-CANONICO.md),
+[planner delle API](../VERIFICA-PLANNER-CATALOGHI.md) e
+[letture con lock componibili](../VERIFICA-COMPOSIZIONE-LOCK-ROUTING.md)
+verificati localmente. Nessuna migrazione dei cataloghi applicativi: ponte,
+coerenza dei lettori usati dai log, controller e browser ancora aperti. Nessuna
+abilitazione del manifest o modifica ai dati reali; ambito del piano invariato.
+
+Seguito del 28 ottobre: ponte/migrazione, controller persistente e letture
+browser Goals/Habits completati su fixture. La matrice Catalog copre create,
+edit, archive, replay e conflitti; il binding Days/Weeks/HabitLogs/Catalog è
+verificato in tutti i 24 ordini. Report:
+[VERIFICA-CONTROLLER-CATALOGHI](../VERIFICA-CONTROLLER-CATALOGHI.md).
+Build, npm test, test:e2e, test:release e diff check passati. Restano la matrice
+delle altre mutazioni applicative, il feed completo e il contratto di
+provisioning/abilitazione; nessuna modifica ai dati reali o abilitazione.
+
+Seguito del 29 ottobre: gateway e controller Projects con letture sovrapposte,
+salvataggio canonico, unicità del nome, replay e blocco delle mutazioni ancora
+legacy. [VERIFICA-CONTROLLER-PROGETTI](../VERIFICA-CONTROLLER-PROGETTI.md).
+Build, npm test, test:e2e, test:release e diff check superati. Associazioni
+Entries e conversione a tag restano nella matrice; nessuna registrazione o
+attivazione reale.
+
+Seguito del 29 ottobre: il diario continuo multi-blocco Entries salva fino a
+12 voci per commit, includendo metadata, contenuto Docs, layout e pianificazione;
+browser, retry ACK perso, reboot, build, suite completa e `test:release` sono
+verificati. Report: [diario continuo Entries](../VERIFICA-DIARIO-CONTINUO-ENTRIES.md).
+Eliminazione, allegati, conversione progetto→tag, feed completo e provisioning
+restano aperti; il routing è ancora readOnly per default.
+
+Segue, 29 ottobre: `addFileLink` delle Entries instradate salva collegamento e
+indice dei file nello stesso commit recuperabile; la vista dettaglio sovrappone
+i riferimenti dopo il reload. Controller/browser e 363 recovery Sheet/Range
+sono verificati. Il feed globale degli allegati, eliminazione e conversione
+progetto→tag restano aperti. Report:
+[allegati Entries](../VERIFICA-ALLEGATI-ENTRIES.md).
+
+Seguito del 29 ottobre: la cancellazione canonica di `deleteNote` usa un piano
+durevole, tombstone atomici dell'Entry/indice allegati e retry stabile; Docs
+mantiene il file e rimuove soltanto la sezione verificata. Controller, UI dopo
+reload, fault injection, build, suite completa e `test:release` sono superati.
+Restano conversione progetto→tag, feed globale completo e provisioning/
+abilitazione. Report:
+[cancellazione canonica Entries](../VERIFICA-CANCELLAZIONE-ENTRIES-CANONICA.md).
+
+Seguito del 29 ottobre: conversione progetto→tag instradata con Projects ed
+Entries attivi; Entry aggiornate e tombstone Project condividono il commit.
+Progetto legacy preparato con migrazione semantica neutra, retry e fault
+recovery verificati. Report:
+[conversione progetto→tag](../VERIFICA-CONVERSIONE-PROGETTO-TAG-ENTRIES.md).
+Restano feed completo, ottimizzazione lookup e provisioning/abilitazione.
+
+Seguito, 29 ottobre: la vista globale «File collegati» legge tutte le Entries
+e sovrappone riferimenti legacy/canonici nel batch, anche dopo una sessione
+nuova. Test browser verifica entrambe le origini fuori dal mese corrente.
+Report: [feed globale Files Entries](../VERIFICA-FEED-GLOBALE-FILES-ENTRIES.md).
+Resta da realizzare il feed incrementale completo del protocollo, ridurre il
+costo del lookup per ID e definire provisioning/abilitazione.
+
+Seguito, 29 ottobre: endpoint server `getChanges` collegato al ledger
+persistente con cursore scoped e pagine limitate; `getSyncCheckpoint` cattura
+`highWater` e cursore sotto lock. Le mutation matrix e il bootstrap non sono
+ancora completi, quindi la capability resta non pubblicata. Report:
+[API incrementale dei commit](../VERIFICA-FEED-COMMIT-API.md).
+
+Seguito ulteriore: `getSnapshotPage` pagina per identità stabile dieci
+raccolte routate, inclusi Files uniti dal facade Entries, settings filtrati ai
+due setting applicativi e layouts uniti dal descriptor Entry e dalle righe
+legacy. Fissa il checkpoint iniziale e restituisce la copertura
+legacy/canonica. Le scritture concorrenti si recuperano dal feed dopo il
+paging; il client e la scansione Docs non sono ancora collegati e le letture
+scalabili restano aperte, quindi non si dichiara una snapshot completa. Report:
+[pagine snapshot](../VERIFICA-PAGINE-SNAPSHOT.md).
+
+Seguito, 29 ottobre: anche `addJournal` e `addCompleteNote` instradano le
+creazioni attraverso il writer recuperabile Entries, con batch fino a 12,
+corpo/rich text, retry stabile e test browser. Report:
+[creazione canonica Entries](../VERIFICA-CREAZIONE-ENTRIES-CANONICA.md).
+Il feed ai client resta disabilitato finché bootstrap e matrice delle
+mutazioni non sono completi.
+
+Seguito, 29 ottobre: il commit store mantiene una mappa volatile delle chiavi
+durante lock con molti lookup, mantenendo `TextFinder` per le richieste
+singole. Il test con 50.000 chiavi e 64 route riduce le ricerche complete da
+64 a 8 più 13 blocchi della colonna indice. Report:
+[lookup Entries batch](../VERIFICA-LOOKUP-ENTRIES-BATCH.md). Bootstrap/feed
+completo, provisioning e attivazione restano aperti.
+
+Seguito, 29 ottobre: `migrateDocsBatch` salta le Entries instradate e
+continua la migrazione dei record legacy, senza alterare le preimmagini
+congelate né aggiungere riferimenti Docs canonici. Report:
+[migrazione Docs e routing](../VERIFICA-MIGRAZIONE-DOCS-ROUTING-ENTRIES.md).
+Seguito ulteriore: il comando esplicito aggiorna Entries canoniche da Docs,
+inclusi corpo e titolo sezione in commit coordinato, preserva le bozze pending e
+rifiuta revisioni instabili/formattazione non supportata. Restano snapshot
+iniziale, scansione Docs in background e consumer. Report:
+[riconciliazione Docs Entries](../VERIFICA-RICONCILIAZIONE-DOCS-ENTRIES.md).
+
+Seguito, 29 ottobre: il comando esplicito di aggiornamento anteprime importa
+corpo e formattazione supportata delle Entries instradate tramite il commit
+canonico, valida la revisione Docs e mantiene la bozza app in caso di conflitto.
+Report: [riconciliazione Docs Entries](../VERIFICA-RICONCILIAZIONE-DOCS-ENTRIES.md).
+Bootstrap, scansione in background, titolo e consumer locale restano da
+realizzare.
+
+Seguito, 29 ottobre: endpoint `getContentsBatch` per corpi canonici con
+versione/digest verificati, 12 ID massimi, lock condiviso e limite reale di
+2 MiB UTF-8. Il consumer non è ancora collegato. Report:
+[lettura batch dei contenuti](../VERIFICA-CONTENUTI-BATCH-ENTRIES.md).
+Bootstrap e pubblicazione di `capabilities.changes` restano bloccati.
+
+Seguito, 29 ottobre: `rebaseDocQueue` applica la conferma delle Entries
+instradate come commit recuperabile, conserva il testo Docs conflittuale e
+riaccoda il corpo app senza toccare la riga legacy Entry. Retry e worker
+verificati. Lo stato finale del worker e le mutazioni Docs restano fuori dal
+feed. Report: [rebase canonico](../VERIFICA-REBASE-DOCS-ENTRIES.md).
+
+Seguito, 29 ottobre: bootstrap del consumer parte dal cursore zero e rigioca il
+feed immutabile conservato. `getSnapshotPage` per Files/Layouts ora enumera
+solo le rispettive tabelle legacy e valida i proprietari per ID, senza
+scansionare tutte le Entries; il feed ricostruisce allegati e layout canonici.
+Test sintetici coprono 50 commit, allegato canonico, layout indipendente da un
+Entry snapshot più recente e assenza di `readRows()` Entries. Report:
+[pagine snapshot](../VERIFICA-PAGINE-SNAPSHOT.md). Questa strategia dipende dal
+feed completo dall'origine; prima della compattazione sarà necessario
+pubblicare un checkpoint recuperabile. Il client resta disabilitato e i test
+mirati sono passati; gate completo in corso.
