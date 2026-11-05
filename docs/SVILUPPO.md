@@ -183,8 +183,14 @@ il profilo a fine prova. Il report `artifacts/local-bootstrap-scale.json`
 è escluso da Git e contiene campioni, p50/p95, ambiente, volume serializzato
 della fixture e heap renderer dopo GC.
 
-Il comando verifica una sola transazione readonly e il numero esatto di
-letture dei corpi; non misura il consumer, la rete, il merge della shell,
+Il comando verifica una sola transazione readonly, gli indici per vista,
+il numero di metadati restituiti e il numero esatto di letture dei corpi; non misura il consumer, la rete, il merge della shell,
 il DOM o il paint. Il flag p95 entro 500 ms è diagnostico, non attesta il
 criterio end-to-end della SPEC-004. È un benchmark esplicito, separato dalle
 suite funzionali per evitare di aggiungere stress test a ogni verifica.
+
+`test:local-bootstrap` e `test:repository` includono anche
+`verify-local-bootstrap-indexes.cjs`: migrazione di un database v9 popolato
+a v10 con preservazione di checkpoint, impostazioni, bozze e outbox, confini
+del mese, Task esterni, cambi di data/tipo e tombstone. Il test del downgrade
+usa una versione futura 11 per verificare il rifiuto senza perdita di dati.

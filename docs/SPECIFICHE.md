@@ -1,5 +1,11 @@
 # Specifiche funzionali correnti
 
+Il bootstrap sperimentale del mese legge i soli metadati pertinenti,
+conservando tutti i Task per la pianificazione globale. La vista Task
+esclude i metadati delle note. Corpi, privacy, bozze e outbox mantengono
+la fotografia atomica; la migrazione IndexedDB v10 preserva i record.
+[Contratto e limiti](VERIFICA-BOOTSTRAP-INDICI.md).
+
 Il percorso sperimentale apre ora il diario dalla copia completa del consumer
 snapshot/feed dopo la verifica identità, senza attendere le RPC di vista.
 Checkpoint concluso, privacy, bozze e outbox vengono verificati nella lettura

@@ -1,5 +1,9 @@
 # Scalabilità del bootstrap locale — 5 novembre 2026
 
+Questa è la baseline precedente agli indici per vista. Il comando è stato
+poi aggiornato per verificare la proiezione indicizzata; risultati correnti
+e migrazione sono descritti in [VERIFICA-BOOTSTRAP-INDICI](VERIFICA-BOOTSTRAP-INDICI.md).
+
 ## Incremento implementato
 
 Aggiunto `npm run test:local-bootstrap-scale`: benchmark Chromium ripetibile

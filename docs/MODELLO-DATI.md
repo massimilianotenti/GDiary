@@ -1,13 +1,23 @@
 # Modello dati
 
+IndexedDB v10 aggiunge a `entries` gli indici composti `byScopeDate`
+(`[archiveId, principalId, epoch, data.date]`) e `byScopeType`
+(`[archiveId, principalId, epoch, data.type]`). Gli indici sono popolati
+automaticamente anche per i record esistenti. La proiezione di bootstrap
+restituisce metadati del mese e Task globali, deduplicati per ID, oppure
+solo Task. I record comuni restano completi. Nessuna modifica al modello
+Google, al protocollo di sync o al formato del checkpoint.
+[Verifica della migrazione e dei filtri](VERIFICA-BOOTSTRAP-INDICI.md).
+
 Sviluppo locale: `archiveMeta.coverage.readCheckpoint` registra formato
 `local-read-checkpoint/v1`, revisione, cursore scoped e data della lettura
 completata dal consumer. Il bootstrap della vista verifica questi dati insieme
 alla copertura completa, nella transazione con Entries, corpi, dati comuni,
-bozze e outbox. Nessuna migrazione o cancellazione IndexedDB; resta v9.
+bozze e outbox. IndexedDB è ora v10, con migrazione additiva degli indici
+descritta sotto e senza cancellazione dei record.
 [Contratto e invalidazione](VERIFICA-BOOTSTRAP-LOCALE.md).
 
-La copia sperimentale IndexedDB v9 conserva fino a otto descrittori di dati comuni per diario, settimana e abitudini, con appartenenza e versioni verificate; non modifica il modello Google. [Verifica](VERIFICA-PAGINE-LOCALI-DIARIO.md).
+Dalla versione IndexedDB v9 la copia sperimentale conserva fino a otto descrittori di dati comuni per diario, settimana e abitudini, con appartenenza e versioni verificate; non modifica il modello Google. [Verifica](VERIFICA-PAGINE-LOCALI-DIARIO.md).
 
 Schemi estratti dai sorgenti v2.0.3. Le costanti nel codice restano la definizione operativa; verificare le funzioni di estensione prima di modificare fogli esistenti.
 

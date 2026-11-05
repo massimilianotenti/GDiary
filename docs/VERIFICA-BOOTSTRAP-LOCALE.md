@@ -63,8 +63,8 @@ Se il recupero di un corpo fallisce dopo l'avanzamento del cursore, la nuova
 revisione non coincide col vecchio checkpoint: il bootstrap della vista viene
 rifiutato fino al recupero. La vista già aperta e le sue bozze restano disponibili.
 
-Non cambia la versione IndexedDB (v9), non viene cancellato lo storage per
-migrare e non si trasformano i vecchi descrittori di pagina in prove complete.
+Il primo incremento manteneva IndexedDB v9. Il seguito aggiunge gli
+indici v10 senza cancellare lo storage per migrare e non si trasformano i vecchi descrittori di pagina in prove complete.
 Letture tardive vengono scartate dopo cambio di vista, periodo, sessione,
 repository, scope o consenso.
 
@@ -110,9 +110,10 @@ il segnaposto ROOT_FOLDER_ID e lo staging di esattamente sei file.
 una PWA, un service worker o un'applicazione HTML caricabile senza Google;
 l'identità deve ancora essere verificata a ogni avvio. Le altre mutazioni
 applicative conservano i rispettivi contratti: non si estende l'outbox a
-riflessioni, cataloghi o impostazioni. Non è dimostrata la scalabilità della
-lettura atomica dell'intero insieme dei metadati: i corpi sono selezionati per
-vista, ma metadati e record comuni vengono ancora enumerati per scope.
+riflessioni, cataloghi o impostazioni. Il seguito [con indici per vista](VERIFICA-BOOTSTRAP-INDICI.md) limita
+i metadati letti al mese e ai Task globali. I record comuni, bozze e outbox
+restano enumerati per scope; non è dimostrata la scalabilità per qualunque
+distribuzione dei Task o volume dello storico comune.
 
 Le capability reali rimangono disattivate. Matrice completa delle mutazioni,
 provisioning, iframe Google, retention e collaudo autenticato restano gate
@@ -135,6 +136,7 @@ Build, test:local-bootstrap e test:release superati. Nessun deploy o accesso
 ai dati reali; restano i confini sperimentali descritti sopra.
 
 La scalabilità della lettura atomica è ora misurata separatamente: vedere
-[benchmark 10.000/50.000 voci](VERIFICA-BOOTSTRAP-SCALA.md). La misura non
+[benchmark 10.000/50.000 voci](VERIFICA-BOOTSTRAP-SCALA.md). La baseline precedente agli indici non
 chiude il criterio di apertura end-to-end; a 50.000 voci il repository da
-solo supera il budget di 500 ms.
+solo superava il budget di 500 ms. Le misure del seguito sono nella
+[verifica degli indici](VERIFICA-BOOTSTRAP-INDICI.md).

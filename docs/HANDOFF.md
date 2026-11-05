@@ -1,5 +1,27 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Bootstrap con indici per vista — 5 novembre
+
+IndexedDB v10 aggiunge a Entries gli indici per scope/data e scope/tipo,
+con backfill additivo senza cancellare record, bozze o outbox. Il bootstrap
+legge il mese insieme a tutti i Task per la pianificazione globale, oppure
+i soli Task nella loro vista, deduplicati e ordinati per ID. Dati comuni
+completi e lettura atomica con checkpoint/privacy/bozze/outbox conservati.
+Nuova prova v9→v10 include confini mese, Task esterni, cambi data/tipo,
+tombstone, corpi mancanti e isolamento. Inclusa in test:local-bootstrap
+e test:repository; aggiornato il test del downgrade alla futura v11.
+
+Benchmark definitivo, 30 letture per scenario: a 50.000 voci p95 repository
+201–289 ms, con 999–1.023 metadati anziché 50.000; corpi invariati. A
+10.000 voci p95 65–84 ms. Non è misura end-to-end né A/B alternato.
+Record comuni ancora enumerati per scope: prossimo incremento da progettare
+sulla loro copertura per vista, senza perdere la pianificazione globale.
+Build, test:repository, test:release, test:local-bootstrap-scale,
+test:local-common, test:local-pages, test:sync-consumer e P70 superati;
+npm test generale concluso senza errori. Index/Demo rigenerati, sei file e
+segnaposto ROOT_FOLDER_ID preservati. Nessun deploy o accesso ai dati reali.
+[Contratto, migrazione e misure](VERIFICA-BOOTSTRAP-INDICI.md).
+
 ## Baseline di scalabilità del bootstrap — 5 novembre
 
 Aggiunto `test:local-bootstrap-scale`: Chromium/IndexedDB reali su Demo,

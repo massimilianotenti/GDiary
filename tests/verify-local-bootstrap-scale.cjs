@@ -55,24 +55,24 @@ const server=http.createServer((req,res)=>{
    const originalGet=IDBObjectStore.prototype.get,originalAll=IDBIndex.prototype.getAll,originalTransaction=IDBDatabase.prototype.transaction;
    let counts;
    IDBObjectStore.prototype.get=function(...args){if(counts&&this.name==='contents')counts.bodyGets++;return originalGet.apply(this,args);};
-   IDBIndex.prototype.getAll=function(...args){if(counts){const name=this.objectStore.name;counts.enumerations.push(name);}return originalAll.apply(this,args);};
+   IDBIndex.prototype.getAll=function(...args){if(counts){const name=this.objectStore.name;counts.enumerations.push(name+':'+this.name);}return originalAll.apply(this,args);};
    IDBDatabase.prototype.transaction=function(names,mode,...args){if(counts)counts.transactions.push({names:[...names].sort(),mode});return originalTransaction.call(this,names,mode,...args);};
    try{
-    for(const [name,request,expectedBodies] of [['month',{month:'2026-11'},24],['empty-month',{month:'2027-02'},0],['tasks',{month:'2026-11',taskOnly:true},size/50-1]]){
+    for(const [name,request,expectedBodies,expectedMetadata] of [['month',{month:'2026-11'},24,24+size/50-1],['empty-month',{month:'2027-02'},0,size/50-1],['tasks',{month:'2026-11',taskOnly:true},size/50-1,size/50-1]]){
      const samples=[];let firstReadMs;
      for(let iteration=0;iteration<repetitions+1;iteration++){
       counts={bodyGets:0,enumerations:[],transactions:[]};const started=performance.now(),read=await repository.readBootstrapView(request),elapsed=performance.now()-started;
       if(!read.ok)throw Error(name+': '+read.error);
       const value=read.value;
-      if(!value||value.entries.length!==size||value.common.length!==commonCount+2)throw Error('incomplete snapshot');
+      if(!value||value.entries.length!==expectedMetadata||value.common.length!==commonCount+2)throw Error('incomplete snapshot');
       const loaded=value.entries.filter(entry=>entry.contentLoaded);
       if(loaded.length!==expectedBodies||counts.bodyGets!==expectedBodies)throw Error('body selection is not limited to the requested view');
       if(loaded.some(entry=>!entry.body.startsWith('Corpo sintetico caffè 🌱')||entry.rich[0].runs[0].text!==entry.body||!entry.rich[0].runs[0].bold))throw Error('body/rich mismatch');
       if(counts.transactions.length!==1||counts.transactions[0].mode!=='readonly'||counts.transactions[0].names.join(',')!=='archiveMeta,commonRecords,contents,drafts,entries,outbox')throw Error('snapshot is not a single atomic read');
-      if(counts.enumerations.sort().join(',')!=='commonRecords,drafts,entries,outbox')throw Error('unexpected enumeration or whole body scan');
+      if(counts.enumerations.sort().join(',')!==['commonRecords:byScope','drafts:byScope','outbox:byScope','entries:byScopeType',...(request.taskOnly?[]:['entries:byScopeDate'])].sort().join(','))throw Error('unexpected enumeration or whole body scan');
       if(iteration===0)firstReadMs=elapsed;else samples.push(elapsed);
      }
-     scenarios.push({name,repetitions,samplesMs:samples,p50Ms:percentile(samples,.5),p95Ms:percentile(samples,.95),firstReadMs,metadataRows:size,commonRows:commonCount+2,bodyGets:expectedBodies,transactions:1,repositoryP95Within500ms:percentile(samples,.95)<=500});
+     scenarios.push({name,repetitions,samplesMs:samples,p50Ms:percentile(samples,.5),p95Ms:percentile(samples,.95),firstReadMs,metadataRows:expectedMetadata,commonRows:commonCount+2,bodyGets:expectedBodies,transactions:1,repositoryP95Within500ms:percentile(samples,.95)<=500});
     }
    }finally{counts=null;IDBObjectStore.prototype.get=originalGet;IDBIndex.prototype.getAll=originalAll;IDBDatabase.prototype.transaction=originalTransaction;repository.close();}
    return {connectionOpenMs,scenarios};
