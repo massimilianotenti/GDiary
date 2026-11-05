@@ -16,6 +16,7 @@ const server=http.createServer((req,res)=>{
   const scope={archiveId:'bootstrap-archive-001',principalId:'bootstrap-principal-001',epoch:'bootstrap-epoch-001',schemaVersion:1,protocolVersion:1},identity={getScope:()=>scope,status:()=>({verified:true,cacheReady:true})},date=captureToday();
   const cursor=sequence=>({format:'sync-cursor/v1',archiveId:scope.archiveId,principalId:scope.principalId,epoch:scope.epoch,sequence});
   const entries=['bootstrap-note','bootstrap-task','bootstrap-private','bootstrap-delete','bootstrap-empty'].map((id,index)=>({id,type:id==='bootstrap-task'?'task':'note',date,text:id,createdAt:date+'T08:00:00.000Z',updatedAt:'commit-1',contentVersion:id==='bootstrap-empty'?null:'page-content-'+('a'.repeat(64)),contentDigest:id==='bootstrap-empty'?null:'a'.repeat(64),tags:id==='bootstrap-private'?'segreto':'',projects:'',scope:'personal',status:id==='bootstrap-task'?'open':'',position:index+1}));
+  entries.push({...entries[1],id:'bootstrap-task-other-month',date:shiftMonth(date.slice(0,7),-1)+'-15',plannedDate:date,workStart:'09:00',workEnd:'10:30',importance:'urgent'});
   const common={settings:[{id:'privacy',version:'privacy-v1',value:{privateTags:['segreto']}},{id:'reflection',version:'reflection-v1',value:{dailyReflectionMode:'essential'}}],goals:[{id:'bootstrap-goal',title:'Obiettivo dalla copia',description:'Descrizione conservata',cycle:cycleFor(date),icon:'none',archived:false,updatedAt:'commit-1'}]};
   const changes=entries.map(entry=>({collection:'entries',id:entry.id,sequence:1,version:'commit-1',deleted:false,data:{format:'sync-entry/v1',record:entry}}));let pages=0;
   const call=async(method,payload)=>{
@@ -32,11 +33,11 @@ const server=http.createServer((req,res)=>{
   };
   const repository=BulletJournalVue.createLocalRepository({identity,enabled:()=>true,databaseName:'gdiary-bootstrap-test'}),consumer=BulletJournalVue.createSyncConsumer({repository,identity,enabled:()=>true,call});
   const boot=await consumer.bootstrap();check(boot.ok&&boot.value.complete,'paginated complete bootstrap '+JSON.stringify(boot));check(pages===12,'three entry pages and nine other collections');
-  const read=await repository.readBootstrapView({month:date.slice(0,7)});check(read.ok&&read.value?.entries.length===5,'finished snapshot is atomically readable');
+  const read=await repository.readBootstrapView({month:date.slice(0,7)});check(read.ok&&read.value?.entries.length===6,'finished snapshot is atomically readable');
   check(read.value.entries.find(row=>row.id==='bootstrap-empty').body==='','explicit null pointer is a complete empty body');
   const transaction=IDBDatabase.prototype.transaction,transactions=[];
   IDBDatabase.prototype.transaction=function(names,mode,...args){transactions.push({names:[...names].sort(),mode});return transaction.call(this,names,mode,...args);};
-  try{check((await repository.readBootstrapView({month:date.slice(0,7)})).value?.entries.length===5,'atomic repeat read');}finally{IDBDatabase.prototype.transaction=transaction;}
+  try{check((await repository.readBootstrapView({month:date.slice(0,7)})).value?.entries.length===6,'atomic repeat read');}finally{IDBDatabase.prototype.transaction=transaction;}
   check(transactions.length===1&&transactions[0].mode==='readonly'&&transactions[0].names.join(',')==='archiveMeta,commonRecords,contents,drafts,entries,outbox','one transaction for the whole bootstrap view');
 
   const snapshot={...entries.find(entry=>entry.id==='bootstrap-delete'),deleted:true},operationId='bootstrap-local-delete';
@@ -80,6 +81,7 @@ const server=http.createServer((req,res)=>{
  await page.evaluate(()=>releaseBootstrapIdentity());
  await page.waitForFunction(()=>continuousSession?.localBootstrap&&continuousSession.loaded);
  assert.deepEqual(await page.evaluate(()=>({complete:continuousSession.complete,busy,privateVisible:!!document.querySelector('[data-client-id="bootstrap-private"]'),deleted:continuousSession.blocks.some(b=>b.id==='bootstrap-delete'),rpcs:bootstrapRPC.filter(name=>['getState','getJournalPage'].includes(name)),settings:state.settings.privateTags})),{complete:true,busy:false,privateVisible:false,deleted:false,rpcs:[],settings:['segreto']});
+ assert.deepEqual(await page.evaluate(()=>state.taskPlans.find(plan=>plan.entryId==='bootstrap-task-other-month')),{entryId:'bootstrap-task-other-month',date:await page.evaluate(()=>captureToday()),workStart:'09:00',workEnd:'10:30',importance:'urgent',updatedAt:'commit-1'},'monthly bootstrap preserves planning for tasks recorded in another month');
  assert.equal(await page.getByText('Obiettivo dalla copia',{exact:true}).count(),1);
  const editor=page.locator('[data-client-id="bootstrap-note"] .rich-area');assert.equal(await editor.textContent(),'Bozza persistente prima del riavvio','migrated session draft survives activation finalization');await editor.fill('Bozza dopo riavvio');await editor.focus();
  await page.evaluate(()=>{
@@ -110,6 +112,7 @@ const server=http.createServer((req,res)=>{
  await page.evaluate(()=>{month=shiftMonth(month,1);window.emptyBootstrapMonth=month;run('getState');});
  await page.waitForFunction(()=>continuousSession?.month===emptyBootstrapMonth&&continuousSession.localBootstrap);
  assert.equal(await page.evaluate(()=>continuousSession.complete&&continuousSession.blocks.length===0),true,'a cached empty month is complete');
+ assert.equal(await page.evaluate(()=>state.taskPlans.some(plan=>plan.entryId==='bootstrap-task-other-month')&&!state.taskPlans.some(plan=>plan.entryId==='bootstrap-task')),true,'empty-month navigation preserves archive planning and removes feed tombstones');
  await page.evaluate(async()=>{releaseDelayedBootstrap();await delayedBootstrapNavigation;restoreBootstrapRepository();});
  assert.equal(await page.evaluate(()=>!bootstrapRPC.includes('getState')),true,'a cancelled local navigation must not start a stale foreground RPC');
  await page.evaluate(()=>go('tasks'));

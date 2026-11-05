@@ -1,5 +1,17 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Pianificazione completa nel bootstrap mensile — 5 novembre
+
+Corretto il ripristino di taskPlans: usa tutti i metadati task della copia
+completa, anche quando il diario apre un solo mese o un mese vuoto. Il filtro
+dei corpi e delle voci visualizzate resta per vista. Test Chromium riproduceva
+la perdita prima della correzione e ora verifica pianificazione, intervalli
+e importanza di un task annotato nel mese precedente, anche dopo il riavvio,
+e la rimozione delle pianificazioni dei task cancellati dal feed.
+Build, test:local-bootstrap e test:release superati. Index e Demo rigenerati;
+staging dei sei file preservato. Nessun deploy o accesso ai dati reali.
+Dettagli in [VERIFICA-BOOTSTRAP-LOCALE](VERIFICA-BOOTSTRAP-LOCALE.md).
+
 ## Bootstrap del diario dalla copia completa — 5 novembre
 
 Collegato l'avvio al checkpoint locale concluso del consumer snapshot/feed.

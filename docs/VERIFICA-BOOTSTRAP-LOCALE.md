@@ -117,3 +117,19 @@ vista, ma metadati e record comuni vengono ancora enumerati per scope.
 Le capability reali rimangono disattivate. Matrice completa delle mutazioni,
 provisioning, iframe Google, retention e collaudo autenticato restano gate
 separati. Nessun deploy, setupDrive o accesso ai dati reali.
+
+## Pianificazione dei task fuori mese — 5 novembre 2026
+
+La ricostruzione di `taskPlans` usa ora tutti i metadati task della fotografia
+atomica, anziché le sole voci selezionate per il mese visualizzato. Prima,
+aprire il diario mensile eliminava dalla vista comune le pianificazioni dei
+task annotati negli altri mesi, pur dichiarando copertura completa. Non
+servono corpi aggiuntivi né nuove RPC.
+
+Il test Chromium riproduceva il difetto prima della correzione. Ora verifica
+dopo il riavvio un task annotato nel mese precedente ma pianificato oggi,
+con orario e importanza conservati; passando a un mese vuoto, la pianificazione
+resta disponibile e il task eliminato dal feed resta assente.
+
+Build, test:local-bootstrap e test:release superati. Nessun deploy o accesso
+ai dati reali; restano i confini sperimentali descritti sopra.
