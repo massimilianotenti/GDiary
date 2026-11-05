@@ -1,9 +1,10 @@
+import {commonReadRanges} from './common-read-cache.js';
 import {journalPageDescriptors} from './journal-page-index.js';
 import {commonViewDescriptors} from './common-view-index.js';
 // Repository foundation. No automatic opening or real-data initializer.
 // Application callers must explicitly opt in and receive an advertised,
 // verified identity before the real archive namespace can be opened.
-const DB_NAME='gdiary-local-v1',VERSION=10,TIMEOUT=5000;
+const DB_NAME='gdiary-local-v1',VERSION=11,TIMEOUT=5000;
 const STORES=['archiveMeta','entries','contents','commonRecords','drafts','outbox','searchDocuments'];
 const REMOTE=['archiveMeta','entries','contents','commonRecords','searchDocuments'];
 const KEYS={projects:'slug',days:'date',weeks:'week',goals:'id',habits:'id',habitLogs:'key',taskPlans:'entryId',files:'id',settings:'id',layouts:'entryId'};
@@ -76,6 +77,7 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
       if(name==='entries'&&!store.indexNames.contains('byScopeType'))store.createIndex('byScopeType',['archiveId','principalId','epoch','data.type']);
       if(name==='drafts'&&!store.indexNames.contains('byOwner'))store.createIndex('byOwner',['archiveId','principalId']);
       if(name==='commonRecords'&&!store.indexNames.contains('byCollection'))store.createIndex('byCollection',['archiveId','principalId','epoch','collection']);
+      if(name==='commonRecords'&&!store.indexNames.contains('byCollectionDate'))store.createIndex('byCollectionDate',['archiveId','principalId','epoch','collection','data.date']);
       if(name==='commonRecords'&&!store.indexNames.contains('byCollectionEntry'))store.createIndex('byCollectionEntry',['archiveId','principalId','epoch','collection','data.entryId']);
       if(name==='outbox'&&!store.indexNames.contains('byScopeStatus'))store.createIndex('byScopeStatus',['archiveId','principalId','epoch','status','createdAt','operationId']);
       if(name==='outbox'&&!store.indexNames.contains('byScopeEntity'))store.createIndex('byScopeEntity',['archiveId','principalId','epoch','kind','id']);
@@ -88,7 +90,7 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
      try{
       if(!STORES.every(name=>db.objectStoreNames.contains(name)))throw fail('SchemaError');
       const check=db.transaction(STORES,'readonly');
-      for(const name of STORES){const store=check.objectStore(name),tail=name==='archiveMeta'?[]:name==='commonRecords'?['collection','id']:name==='drafts'?['kind','id']:name==='outbox'?['operationId']:['id'];if(JSON.stringify(store.keyPath)!==JSON.stringify(['archiveId','principalId','epoch',...tail])||JSON.stringify(store.index('byScope').keyPath)!==JSON.stringify(['archiveId','principalId','epoch']))throw fail('SchemaError');if(name==='entries'&&(JSON.stringify(store.index('byScopeDate').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','data.date'])||JSON.stringify(store.index('byScopeType').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','data.type'])))throw fail('SchemaError');if(name==='drafts'&&JSON.stringify(store.index('byOwner').keyPath)!==JSON.stringify(['archiveId','principalId']))throw fail('SchemaError');if(name==='commonRecords'&&(JSON.stringify(store.index('byCollection').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','collection'])||JSON.stringify(store.index('byCollectionEntry').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','collection','data.entryId'])))throw fail('SchemaError');if(name==='outbox'&&(JSON.stringify(store.index('byScopeStatus').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','status','createdAt','operationId'])||JSON.stringify(store.index('byScopeEntity').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','kind','id'])||JSON.stringify(store.index('byScopeEntityStatus').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','kind','id','status','createdAt','operationId'])))throw fail('SchemaError');}
+      for(const name of STORES){const store=check.objectStore(name),tail=name==='archiveMeta'?[]:name==='commonRecords'?['collection','id']:name==='drafts'?['kind','id']:name==='outbox'?['operationId']:['id'];if(JSON.stringify(store.keyPath)!==JSON.stringify(['archiveId','principalId','epoch',...tail])||JSON.stringify(store.index('byScope').keyPath)!==JSON.stringify(['archiveId','principalId','epoch']))throw fail('SchemaError');if(name==='entries'&&(JSON.stringify(store.index('byScopeDate').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','data.date'])||JSON.stringify(store.index('byScopeType').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','data.type'])))throw fail('SchemaError');if(name==='drafts'&&JSON.stringify(store.index('byOwner').keyPath)!==JSON.stringify(['archiveId','principalId']))throw fail('SchemaError');if(name==='commonRecords'&&JSON.stringify(store.index('byCollectionDate').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','collection','data.date']))throw fail('SchemaError');if(name==='commonRecords'&&(JSON.stringify(store.index('byCollection').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','collection'])||JSON.stringify(store.index('byCollectionEntry').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','collection','data.entryId'])))throw fail('SchemaError');if(name==='outbox'&&(JSON.stringify(store.index('byScopeStatus').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','status','createdAt','operationId'])||JSON.stringify(store.index('byScopeEntity').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','kind','id'])||JSON.stringify(store.index('byScopeEntityStatus').keyPath)!==JSON.stringify(['archiveId','principalId','epoch','kind','id','status','createdAt','operationId'])))throw fail('SchemaError');}
      }catch(ignore){db.close();finish(fail('SchemaError'));return;}
      db.onversionchange=()=>{schemaChanged=true;db.close();connection=null;};connection=db;finish(null,db);
     };
@@ -137,14 +139,24 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
   })),
   // App state, current-month bodies, privacy, drafts and pending deletions
   // must share a transaction. A cursor alone does not prove a finished read.
-  readBootstrapView:({month,taskOnly=false}={})=>result(()=>execute('readonly',['archiveMeta','entries','contents','commonRecords','drafts','outbox'],({scope,tx,request,done})=>{
+  readBootstrapView:({month,taskOnly=false,today=month+'-01'}={})=>result(()=>execute('readonly',['archiveMeta','entries','contents','commonRecords','drafts','outbox'],({scope,tx,request,done})=>{
    if(typeof month!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)||typeof taskOnly!=='boolean')throw fail('DataError');
+   const ranges=commonReadRanges({kind:'journal',month,today});
    request(tx.objectStore('archiveMeta').get(scopeKey(scope)),stored=>{
     const meta=validMeta(stored,scope),checkpoint=meta.coverage?.readCheckpoint,cursor=meta.cursor;
     if(meta.requiresBootstrap||meta.coverage?.consumer?.complete!==true||meta.coverage.consumer.docsScanComplete!==true||checkpoint?.format!=='local-read-checkpoint/v1'||checkpoint.revision!==meta.revision||!Number.isSafeInteger(checkpoint.savedAt)||checkpoint.savedAt<0||!cursor||cursor.format!=='sync-cursor/v1'||!Number.isSafeInteger(cursor.sequence)||cursor.sequence<0||!['archiveId','principalId','epoch'].every(key=>cursor[key]===scope[key])||JSON.stringify(checkpoint.cursor)!==JSON.stringify(cursor)){done(null);return;}
-    const value={meta,entries:[],common:[],drafts:[],operations:[]};let remaining=4;
-    const finish=()=>{if(--remaining===0)done(value);};
-    for(const [store,key]of [['commonRecords','common'],['drafts','drafts'],['outbox','operations']])request(tx.objectStore(store).index('byScope').getAll(scopeKey(scope)),rows=>{value[key]=rows;finish();});
+    const value={meta,entries:[],common:[],drafts:[],operations:[],commonScope:taskOnly?{kind:'full'}:{kind:'journal',month,today}};let remaining=4;
+    const compare=(a,b)=>a<b?-1:a>b?1:0;
+    const finish=()=>{if(--remaining===0){value.common.sort((a,b)=>compare(a.collection,b.collection)||compare(a.id,b.id));done(value);}};
+    for(const [store,key]of [['drafts','drafts'],['outbox','operations']])request(tx.objectStore(store).index('byScope').getAll(scopeKey(scope)),rows=>{value[key]=rows;finish();});
+    const common=tx.objectStore('commonRecords');
+    if(taskOnly)request(common.index('byScope').getAll(scopeKey(scope)),rows=>{for(const row of rows)value.common.push(row);finish();});
+    else{
+     let lists=7;const collect=rows=>{for(const row of rows)value.common.push(row);if(--lists===0)finish();};
+     for(const collection of ['settings','projects','goals','habits'])request(common.index('byCollection').getAll([...scopeKey(scope),collection]),collect);
+     for(const collection of ['days','weeks'])request(common.getAll(environment.IDBKeyRange.bound([...scopeKey(scope),collection,ranges[collection].from],[...scopeKey(scope),collection,ranges[collection].to])),collect);
+     request(common.index('byCollectionDate').getAll(environment.IDBKeyRange.bound([...scopeKey(scope),'habitLogs',ranges.habitLogs.from],[...scopeKey(scope),'habitLogs',ranges.habitLogs.to])),collect);
+    }
     // Keep all task metadata for global planning, but do not enumerate notes
     // outside this month. Both index reads share the checkpoint transaction.
     const entryStore=tx.objectStore('entries'),rowsById=new Map();let lists=taskOnly?1:2;
@@ -152,14 +164,21 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
      for(const row of incoming)rowsById.set(row.id,row);
      if(--lists)return;
      const rows=[...rowsById.values()].sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0),selected=rows.filter(row=>taskOnly?row.data.type==='task':row.data.date?.startsWith(month+'-'));
-     value.entries=rows.map(row=>({...row.data,contentLoaded:false}));let pending=selected.length;
+     value.entries=rows.map(row=>({...row.data,contentLoaded:false}));let pending=selected.length*(taskOnly?1:3);
+     const entryDone=()=>{if(--pending===0)finish();};
      if(!pending){finish();return;}
      const byId=new Map(value.entries.map(row=>[row.id,row]));
-     for(const row of selected)request(tx.objectStore('contents').get([...scopeKey(scope),row.id]),body=>{
-      if(row.data.contentVersion===null){Object.assign(byId.get(row.id),{body:'',rich:[],contentLoaded:true});if(--pending===0)finish();return;}
-      if(!body||body.version!==(row.data.contentVersion||row.version)||body.data?.version!==body.version||body.data.id!==row.id)throw fail('StaleVersionError');
-      const {id:bodyId,version:bodyVersion,...content}=body.data;Object.assign(byId.get(row.id),content,{contentLoaded:true});if(--pending===0)finish();
-     });
+     for(const row of selected){
+      if(!taskOnly){
+       request(common.index('byCollectionEntry').getAll([...scopeKey(scope),'files',row.id]),rows=>{for(const row of rows)value.common.push(row);entryDone();});
+       request(common.get([...scopeKey(scope),'layouts',row.id]),layout=>{if(layout)value.common.push(layout);entryDone();});
+      }
+      request(tx.objectStore('contents').get([...scopeKey(scope),row.id]),body=>{
+       if(row.data.contentVersion===null){Object.assign(byId.get(row.id),{body:'',rich:[],contentLoaded:true});entryDone();return;}
+       if(!body||body.version!==(row.data.contentVersion||row.version)||body.data?.version!==body.version||body.data.id!==row.id)throw fail('StaleVersionError');
+       const {id:bodyId,version:bodyVersion,...content}=body.data;Object.assign(byId.get(row.id),content,{contentLoaded:true});entryDone();
+      });
+     }
     };
     request(entryStore.index('byScopeType').getAll([...scopeKey(scope),'task']),collect);
     if(!taskOnly)request(entryStore.index('byScopeDate').getAll(environment.IDBKeyRange.bound([...scopeKey(scope),month+'-'],[...scopeKey(scope),month+'.'],false,true)),collect);

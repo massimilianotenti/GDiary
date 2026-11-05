@@ -47,6 +47,6 @@ const server=http.createServer((req,res)=>{if(req.url!=='/Demo.html'){res.writeH
   check(checked(await repository.getDraft('note','note-first')).snapshot.body==='Bozza preservata 🌱','index writes and failed read preserve draft');
   repository.close();
  });
- assert.deepEqual(errors,[]);console.log('Indexed bootstrap: v9 to v10 backfill, atomic checkpoint/privacy/draft/outbox preservation, month boundaries, deduplication, task-only bodies, planning outside month, principal isolation, date/type updates, tombstones and missing-body rejection OK.');
+ assert.deepEqual(errors,[]);console.log('Indexed bootstrap: v9 to v11 backfill, atomic checkpoint/privacy/draft/outbox preservation, month boundaries, deduplication, task-only bodies, planning outside month, principal isolation, date/type updates, tombstones and missing-body rejection OK.');
  }finally{if(context)await context.close();await new Promise(resolve=>server.close(resolve));fs.rmSync(profile,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

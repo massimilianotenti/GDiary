@@ -1,5 +1,9 @@
 # Bootstrap con metadati indicizzati — 5 novembre 2026
 
+Questa verifica descrive la fase v10 dei metadati. Il seguito v11 limita
+anche i record comuni del mese e introduce una copertura per periodo:
+[VERIFICA-BOOTSTRAP-COMUNI-PERIODO](VERIFICA-BOOTSTRAP-COMUNI-PERIODO.md).
+
 ## Modifica implementata
 
 Il bootstrap usa IndexedDB v10 con due nuovi indici composti su `entries`:

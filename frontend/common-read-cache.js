@@ -22,6 +22,8 @@ function expectedRanges(request){
  const first=request.month+'-01',date=new Date(first+'T12:00:00Z');date.setUTCMonth(date.getUTCMonth()+1);const last=shift(date.toISOString().slice(0,10),-1),week=monday(request.today);
  return {days:{from:shift(first,-1),to:last},weeks:{from:week,to:week},habitLogs:{from:monday(first),to:shift(monday(last),6)}};
 }
+// Shared by complete-checkpoint bootstrap reads and independent previews.
+export function commonReadRanges(request){return expectedRanges(normalizeRequest(request));}
 function normalizeResponse(request,response){
  const scope=response?.commonScope;
  if(response?.commonIncluded!==true||scope?.kind!==request.kind||(request.kind==='journal'?(response.today!==request.today||response.month!==request.month||scope.month!==request.month||scope.today!==request.today):(scope.week!==request.week||request.kind==='habits'&&scope.date!==request.date))||!response.commonSlices||Object.keys(response.commonSlices).sort().join(',')!=='days,habitLogs,weeks')throw fail('DataError');

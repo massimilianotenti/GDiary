@@ -551,10 +551,10 @@ async function handleLocalOutboxAck(operation,entry){if(operation.action==='dele
 async function dispatchLocalOutbox(){if(!localOutboxDispatcher||localOutboxRun)return;localOutboxRun=localOutboxDispatcher.drain();const sent=await localOutboxRun;localOutboxRun=null;if(!sent.ok){localCacheStatus='Copia locale pronta · invio in attesa ('+sent.error+').';refreshArchiveIdentityStatus();}else if(sent.value.processed){localCacheStatus='Copia locale pronta · '+sent.value.processed+' operazioni inviate.';refreshArchiveIdentityStatus();}}
 let localBootstrapRefresh=null,localBootstrapGeneration=0,localBootstrapWrites=0;
 async function openLocalBootstrap({verified=false}={}){
- const repository=localRepository,scope=activeCacheScope?{...activeCacheScope}:null,requestedMonth=month||captureToday().slice(0,7),key=continuousKey(),generation=++localBootstrapGeneration;
+ const repository=localRepository,scope=activeCacheScope?{...activeCacheScope}:null,requestedMonth=month||captureToday().slice(0,7),requestedToday=captureToday(),key=continuousKey(),generation=++localBootstrapGeneration;
  if(localBootstrapWrites||view!=='journal'||!continuousMode||!localCacheEnabled||!repository?.readBootstrapView||!scope||archiveIdentityStatus?.verified!==true||archiveIdentityStatus.cacheReady!==true)return false;
- const current=()=>generation===localBootstrapGeneration&&repository===localRepository&&localCacheEnabled&&view==='journal'&&continuousMode&&continuousKey()===key&&archiveIdentityStatus?.verified===true&&archiveIdentityStatus.cacheReady===true&&activeCacheScope&&['archiveId','principalId','epoch','protocolVersion','schemaVersion'].every(k=>activeCacheScope[k]===scope[k])&&journalPageCache?.isCurrent(scope);
- const read=await repository.readBootstrapView({month:requestedMonth,taskOnly:taskDiary});
+ const current=()=>generation===localBootstrapGeneration&&captureToday()===requestedToday&&repository===localRepository&&localCacheEnabled&&view==='journal'&&continuousMode&&continuousKey()===key&&archiveIdentityStatus?.verified===true&&archiveIdentityStatus.cacheReady===true&&activeCacheScope&&['archiveId','principalId','epoch','protocolVersion','schemaVersion'].every(k=>activeCacheScope[k]===scope[k])&&journalPageCache?.isCurrent(scope);
+ const read=await repository.readBootstrapView({month:requestedMonth,today:requestedToday,taskOnly:taskDiary});
  if(!read.ok||!read.value||!current())return false;
  const snapshot=read.value,common={projects:[],days:[],weeks:[],goals:[],habits:[],habitLogs:[],files:[],taskPlans:[]},settings={dailyReflectionMode:'essential',version:'',privateTags:['privato'],privacyVersion:''},layouts=new Map();
  for(const row of snapshot.common){if(row.collection==='settings'){
@@ -576,9 +576,9 @@ async function openLocalBootstrap({verified=false}={}){
  applyLocalOutboxRowsToSession(session,operations);restoreContinuousDrafts(session);
  if(!current())return false;
  common.taskPlans=snapshot.entries.filter(entry=>entry.type==='task').map(entry=>({entryId:entry.id,date:entry.plannedDate||'',workStart:entry.workStart||'',workEnd:entry.workEnd||'',importance:entry.importance||'normal',updatedAt:entry.updatedAt}));
- state={...state,...common,entries,settings,today:captureToday(),month:requestedMonth,commonIncluded:true,commonScope:{kind:'full'},loadedAt:Date.now(),allTags:[...new Set(entries.flatMap(entryTags))].sort()};
+ state={...state,...common,entries,settings,today:requestedToday,month:requestedMonth,commonIncluded:true,commonScope:snapshot.commonScope,loadedAt:Date.now(),allTags:[...new Set(entries.flatMap(entryTags))].sort()};
  for(const operation of operations){if(operation.action==='delete'&&['pending','sending'].includes(operation.status))state.entries=state.entries.filter(entry=>entry.id!==operation.id);else if(operation.action==='upsert'){const local=localOutboxEntry(operation),at=state.entries.findIndex(entry=>entry.id===local.id);if(at>=0)state.entries[at]=local;else if(taskDiary?local.type==='task':local.date?.startsWith(requestedMonth+'-'))state.entries.push(local);}}
- continuousSession=session;commonGeneration++;commonScope={kind:'full'};commonReadAt=catalogReadAt=Date.now();initialiseView();session.key=continuousKey();
+ continuousSession=session;commonGeneration++;commonScope=snapshot.commonScope;commonReadAt=catalogReadAt=Date.now();initialiseView();session.key=continuousKey();
  dirtyMain=session.blocks.some(block=>block.dirty)||[...dailyDrafts.values()].some(block=>block.dirty&&block.date.startsWith(month+'-'));
  if(old)renderContinuous($('content'));else{render();if(dirtyMain)renderContinuous($('content'));}
  message(verified?'Copia locale aggiornata.':'Diario aperto dalla copia locale · verifica aggiornamenti in corso.');return true;

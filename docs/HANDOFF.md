@@ -1,5 +1,26 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Bootstrap dei dati comuni per periodo — 5 novembre
+
+Completato prima il commit 483b311 della fase indici Entries. Il seguito
+IndexedDB v11 aggiunge byCollectionDate per HabitLogs e limita il bootstrap
+mensile a Days del mese con riporto, Week corrente, HabitLogs delle settimane
+sovrapposte, cataloghi/privacy completi e Files/Layouts delle voci visibili.
+Task globali per la pianificazione e transazione atomica preservati; Task
+mantiene il precedente contratto comune completo. commonScope mensile viene
+applicato dalla shell, evitando il riuso improprio per Settimana/Abitudini.
+
+Nuova prova v10→v11 e bootstrap con riavvio coprono dati dentro/fuori periodo,
+confini/bisestile/anno, cataloghi/privacy, allegati/posizioni, rich, bozze/outbox,
+delta e scope. Incluse in test:local-bootstrap e test:repository.
+Benchmark finale 30 letture: a 50.000 voci p95 mese 38 ms, mese vuoto 31 ms,
+Task 183 ms; 12/2 record comuni mensili anziché 5.002. Nessun confronto A/B
+né misura end-to-end. Build, repository, release, bootstrap, benchmark,
+local-common, local-pages, common-window, common-periods, P70 e P60.1 passati;
+npm test generale concluso senza errori. Index/Demo rigenerati, sei file e
+segnaposto preservati. Nessun deploy o accesso ai dati reali.
+[Contratto, migrazione e misure](VERIFICA-BOOTSTRAP-COMUNI-PERIODO.md).
+
 ## Bootstrap con indici per vista — 5 novembre
 
 IndexedDB v10 aggiunge a Entries gli indici per scope/data e scope/tipo,

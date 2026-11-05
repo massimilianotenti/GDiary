@@ -1,11 +1,20 @@
 # Modello dati
 
-IndexedDB v10 aggiunge a `entries` gli indici composti `byScopeDate`
+IndexedDB v11 aggiunge `commonRecords.byCollectionDate` con chiave
+`[archiveId, principalId, epoch, collection, data.date]` per le registrazioni
+delle abitudini. Giorni e settimane usano intervalli sulla chiave primaria
+della rispettiva raccolta. Il bootstrap restituisce `commonScope` esplicito:
+`{kind:'journal', month, today}` per il mese, `{kind:'full'}` per i Task.
+Le anteprime indipendenti conservano i loro descrittori; il nuovo bootstrap
+si basa sempre sul checkpoint completo del consumer.
+[Contratto, campi globali e migrazione](VERIFICA-BOOTSTRAP-COMUNI-PERIODO.md).
+
+Dalla versione v10, `entries` dispone degli indici composti `byScopeDate`
 (`[archiveId, principalId, epoch, data.date]`) e `byScopeType`
 (`[archiveId, principalId, epoch, data.type]`). Gli indici sono popolati
 automaticamente anche per i record esistenti. La proiezione di bootstrap
 restituisce metadati del mese e Task globali, deduplicati per ID, oppure
-solo Task. I record comuni restano completi. Nessuna modifica al modello
+solo Task. Da v11 i record comuni del mese sono una proiezione per periodo. Nessuna modifica al modello
 Google, al protocollo di sync o al formato del checkpoint.
 [Verifica della migrazione e dei filtri](VERIFICA-BOOTSTRAP-INDICI.md).
 
@@ -13,7 +22,7 @@ Sviluppo locale: `archiveMeta.coverage.readCheckpoint` registra formato
 `local-read-checkpoint/v1`, revisione, cursore scoped e data della lettura
 completata dal consumer. Il bootstrap della vista verifica questi dati insieme
 alla copertura completa, nella transazione con Entries, corpi, dati comuni,
-bozze e outbox. IndexedDB è ora v10, con migrazione additiva degli indici
+bozze e outbox. IndexedDB è ora v11, con migrazione additiva degli indici
 descritta sotto e senza cancellazione dei record.
 [Contratto e invalidazione](VERIFICA-BOOTSTRAP-LOCALE.md).
 

@@ -36,7 +36,7 @@ const server=http.createServer((req,res)=>{
    }
    const commonCount=size/10;
    for(let offset=0;offset<commonCount;offset+=200){
-    const habitLogs=Array.from({length:Math.min(200,commonCount-offset)},(_,index)=>({key:'synthetic-log-'+(offset+index),habitId:'synthetic-habit',date:'2025-01-15',updatedAt:'commit-1',status:'done'}));
+    const habitLogs=Array.from({length:Math.min(200,commonCount-offset)},(_,index)=>{const n=offset+index,habitId='synthetic-habit-'+n,date=n<10?'2026-11-05':'2025-01-15';return {key:habitId+'|'+date,habitId,date,updatedAt:'commit-1',status:'done'};});
     const batch={expectedRevision:revision,commonUpserts:{habitLogs}};fixtureBytes+=new TextEncoder().encode(JSON.stringify(batch)).length;
     revision=checked(await repository.applyRemoteBatch(batch)).revision;
    }
@@ -52,29 +52,33 @@ const server=http.createServer((req,res)=>{
    const connectionStarted=performance.now(),opened=await repository.getMeta();if(!opened.ok)throw Error(opened.error);
    const connectionOpenMs=performance.now()-connectionStarted;
    const scenarios=[],percentile=(values,p)=>[...values].sort((a,b)=>a-b)[Math.ceil(values.length*p)-1];
-   const originalGet=IDBObjectStore.prototype.get,originalAll=IDBIndex.prototype.getAll,originalTransaction=IDBDatabase.prototype.transaction;
+   const originalGet=IDBObjectStore.prototype.get,originalStoreAll=IDBObjectStore.prototype.getAll,originalAll=IDBIndex.prototype.getAll,originalTransaction=IDBDatabase.prototype.transaction;
    let counts;
    IDBObjectStore.prototype.get=function(...args){if(counts&&this.name==='contents')counts.bodyGets++;return originalGet.apply(this,args);};
+   IDBObjectStore.prototype.getAll=function(...args){if(counts&&this.name==='commonRecords')counts.commonRanges.push(args[0]?.lower?.[3]);return originalStoreAll.apply(this,args);};
    IDBIndex.prototype.getAll=function(...args){if(counts){const name=this.objectStore.name;counts.enumerations.push(name+':'+this.name);}return originalAll.apply(this,args);};
    IDBDatabase.prototype.transaction=function(names,mode,...args){if(counts)counts.transactions.push({names:[...names].sort(),mode});return originalTransaction.call(this,names,mode,...args);};
    try{
-    for(const [name,request,expectedBodies,expectedMetadata] of [['month',{month:'2026-11'},24,24+size/50-1],['empty-month',{month:'2027-02'},0,size/50-1],['tasks',{month:'2026-11',taskOnly:true},size/50-1,size/50-1]]){
+    for(const [name,request,expectedBodies,expectedMetadata,expectedCommon] of [['month',{month:'2026-11',today:'2026-11-05'},24,24+size/50-1,12],['empty-month',{month:'2027-02',today:'2026-11-05'},0,size/50-1,2],['tasks',{month:'2026-11',today:'2026-11-05',taskOnly:true},size/50-1,size/50-1,commonCount+2]]){
      const samples=[];let firstReadMs;
      for(let iteration=0;iteration<repetitions+1;iteration++){
-      counts={bodyGets:0,enumerations:[],transactions:[]};const started=performance.now(),read=await repository.readBootstrapView(request),elapsed=performance.now()-started;
+      counts={bodyGets:0,enumerations:[],commonRanges:[],transactions:[]};const started=performance.now(),read=await repository.readBootstrapView(request),elapsed=performance.now()-started;
       if(!read.ok)throw Error(name+': '+read.error);
       const value=read.value;
-      if(!value||value.entries.length!==expectedMetadata||value.common.length!==commonCount+2)throw Error('incomplete snapshot');
+      if(!value||value.entries.length!==expectedMetadata||value.common.length!==expectedCommon)throw Error('incomplete snapshot');
       const loaded=value.entries.filter(entry=>entry.contentLoaded);
       if(loaded.length!==expectedBodies||counts.bodyGets!==expectedBodies)throw Error('body selection is not limited to the requested view');
       if(loaded.some(entry=>!entry.body.startsWith('Corpo sintetico caffè 🌱')||entry.rich[0].runs[0].text!==entry.body||!entry.rich[0].runs[0].bold))throw Error('body/rich mismatch');
       if(counts.transactions.length!==1||counts.transactions[0].mode!=='readonly'||counts.transactions[0].names.join(',')!=='archiveMeta,commonRecords,contents,drafts,entries,outbox')throw Error('snapshot is not a single atomic read');
-      if(counts.enumerations.sort().join(',')!==['commonRecords:byScope','drafts:byScope','outbox:byScope','entries:byScopeType',...(request.taskOnly?[]:['entries:byScopeDate'])].sort().join(','))throw Error('unexpected enumeration or whole body scan');
+      const commonQueries=request.taskOnly?['commonRecords:byScope']:['entries:byScopeDate',...Array(4).fill('commonRecords:byCollection'),'commonRecords:byCollectionDate',...Array(expectedBodies).fill('commonRecords:byCollectionEntry')];
+      if(counts.enumerations.sort().join(',')!==['drafts:byScope','outbox:byScope','entries:byScopeType',...commonQueries].sort().join(','))throw Error('unexpected enumeration or whole body scan');
+      if(counts.commonRanges.sort().join(',')!==(request.taskOnly?'':'days,weeks'))throw Error('temporal common reads must be bounded by collection');
+      if(value.commonScope.kind!==(request.taskOnly?'full':'journal'))throw Error('common coverage must describe the projection');
       if(iteration===0)firstReadMs=elapsed;else samples.push(elapsed);
      }
-     scenarios.push({name,repetitions,samplesMs:samples,p50Ms:percentile(samples,.5),p95Ms:percentile(samples,.95),firstReadMs,metadataRows:expectedMetadata,commonRows:commonCount+2,bodyGets:expectedBodies,transactions:1,repositoryP95Within500ms:percentile(samples,.95)<=500});
+     scenarios.push({name,repetitions,samplesMs:samples,p50Ms:percentile(samples,.5),p95Ms:percentile(samples,.95),firstReadMs,metadataRows:expectedMetadata,commonRows:expectedCommon,bodyGets:expectedBodies,transactions:1,repositoryP95Within500ms:percentile(samples,.95)<=500});
     }
-   }finally{counts=null;IDBObjectStore.prototype.get=originalGet;IDBIndex.prototype.getAll=originalAll;IDBDatabase.prototype.transaction=originalTransaction;repository.close();}
+   }finally{counts=null;IDBObjectStore.prototype.get=originalGet;IDBObjectStore.prototype.getAll=originalStoreAll;IDBIndex.prototype.getAll=originalAll;IDBDatabase.prototype.transaction=originalTransaction;repository.close();}
    return {connectionOpenMs,scenarios};
   },repetitions);
   await session.send('HeapProfiler.collectGarbage');const heapAfter=await session.send('Runtime.getHeapUsage');

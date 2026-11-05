@@ -1,10 +1,12 @@
 # Specifiche funzionali correnti
 
-Il bootstrap sperimentale del mese legge i soli metadati pertinenti,
-conservando tutti i Task per la pianificazione globale. La vista Task
-esclude i metadati delle note. Corpi, privacy, bozze e outbox mantengono
-la fotografia atomica; la migrazione IndexedDB v10 preserva i record.
-[Contratto e limiti](VERIFICA-BOOTSTRAP-INDICI.md).
+Il bootstrap sperimentale del mese limita metadati e storico comune alla
+vista, conservando tutti i Task per la pianificazione e tutti i cataloghi
+e le impostazioni di privacy. La copertura comune è dichiarata per mese e
+giorno corrente, così Settimana e Abitudini richiedono i rispettivi dati.
+La vista Task conserva il contratto comune completo. IndexedDB v11 migra
+con indici additivi; corpi, checkpoint, bozze e outbox restano atomici.
+[Contratto e limiti](VERIFICA-BOOTSTRAP-COMUNI-PERIODO.md).
 
 Il percorso sperimentale apre ora il diario dalla copia completa del consumer
 snapshot/feed dopo la verifica identità, senza attendere le RPC di vista.

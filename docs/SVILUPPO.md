@@ -191,6 +191,14 @@ suite funzionali per evitare di aggiungere stress test a ogni verifica.
 
 `test:local-bootstrap` e `test:repository` includono anche
 `verify-local-bootstrap-indexes.cjs`: migrazione di un database v9 popolato
-a v10 con preservazione di checkpoint, impostazioni, bozze e outbox, confini
+alla versione corrente v11 con preservazione di checkpoint, impostazioni, bozze e outbox, confini
 del mese, Task esterni, cambi di data/tipo e tombstone. Il test del downgrade
-usa una versione futura 11 per verificare il rifiuto senza perdita di dati.
+usa una versione futura 12 per verificare il rifiuto senza perdita di dati.
+
+Le stesse suite includono `verify-local-bootstrap-common.cjs`: migrazione
+v10→v11, mese bisestile e giorno precedente, settimana corrente indipendente,
+settimane sovrapposte/anno, cataloghi e privacy completi, allegati/posizioni
+visibili, contratto Task completo e rifiuto di riusare la copertura mensile
+per Settimana e Abitudini. Per i limiti temporali eseguire anche
+`test:common-window` e `test:common-periods`. Il benchmark controlla i record
+comuni restituiti e gli indici/intervalli impiegati, oltre a corpi e transazioni.

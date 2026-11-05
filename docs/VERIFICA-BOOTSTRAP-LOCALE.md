@@ -64,7 +64,7 @@ revisione non coincide col vecchio checkpoint: il bootstrap della vista viene
 rifiutato fino al recupero. La vista già aperta e le sue bozze restano disponibili.
 
 Il primo incremento manteneva IndexedDB v9. Il seguito aggiunge gli
-indici v10 senza cancellare lo storage per migrare e non si trasformano i vecchi descrittori di pagina in prove complete.
+indici v10/v11 senza cancellare lo storage per migrare e non si trasformano i vecchi descrittori di pagina in prove complete.
 Letture tardive vengono scartate dopo cambio di vista, periodo, sessione,
 repository, scope o consenso.
 
@@ -111,9 +111,11 @@ una PWA, un service worker o un'applicazione HTML caricabile senza Google;
 l'identità deve ancora essere verificata a ogni avvio. Le altre mutazioni
 applicative conservano i rispettivi contratti: non si estende l'outbox a
 riflessioni, cataloghi o impostazioni. Il seguito [con indici per vista](VERIFICA-BOOTSTRAP-INDICI.md) limita
-i metadati letti al mese e ai Task globali. I record comuni, bozze e outbox
-restano enumerati per scope; non è dimostrata la scalabilità per qualunque
-distribuzione dei Task o volume dello storico comune.
+i metadati letti al mese e ai Task globali. Il seguito
+[dei record comuni per periodo](VERIFICA-BOOTSTRAP-COMUNI-PERIODO.md) limita
+anche lo storico mensile e dichiara la copertura. La vista Task mantiene
+i dati comuni completi; bozze e outbox sono ancora enumerate per scope.
+Non è dimostrata la scalabilità per qualunque distribuzione dei Task.
 
 Le capability reali rimangono disattivate. Matrice completa delle mutazioni,
 provisioning, iframe Google, retention e collaudo autenticato restano gate

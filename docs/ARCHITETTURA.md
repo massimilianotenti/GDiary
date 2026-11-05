@@ -1,10 +1,12 @@
 # Architettura corrente
 
-Il bootstrap locale usa gli indici IndexedDB v10 per data e tipo: legge
-i metadati del mese insieme a tutti i Task necessari alla pianificazione,
-o soltanto i Task nella loro vista. Corpi selezionati e dati comuni completi
-restano nella stessa transazione di checkpoint, bozze e outbox. La migrazione
-aggiunge indici e conserva i record. [Contratto e misure](VERIFICA-BOOTSTRAP-INDICI.md).
+Il bootstrap locale usa gli indici per data e tipo delle Entries e, da
+IndexedDB v11, una proiezione dei record comuni del diario. Restano globali
+metadati Task, cataloghi e privacy; riflessioni e abitudini seguono gli
+intervalli del mese, allegati e posizioni seguono le voci visibili. La stessa
+transazione verifica checkpoint, corpi, bozze e outbox. La migrazione è
+additiva. La vista Task conserva i dati comuni completi.
+[Contratto e misure](VERIFICA-BOOTSTRAP-COMUNI-PERIODO.md).
 
 Il percorso sperimentale apre ora il diario dalla copia completa del consumer
 snapshot/feed dopo la verifica identità, senza attendere le RPC di vista.
