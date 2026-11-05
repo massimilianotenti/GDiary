@@ -1,5 +1,10 @@
 # Architettura corrente
 
+Il bootstrap legge la sola outbox attiva tramite quattro intervalli sullo
+stato, nella stessa fotografia atomica. Le ricevute storiche restano nel
+repository per dipendenze e recupero, senza essere caricate nella vista.
+Nessuna modifica di schema o retention. [Verifica](VERIFICA-BOOTSTRAP-OUTBOX-ATTIVA.md).
+
 Il bootstrap locale usa gli indici per data e tipo delle Entries e, da
 IndexedDB v11, una proiezione dei record comuni del diario. Restano globali
 metadati Task, cataloghi e privacy; riflessioni e abitudini seguono gli

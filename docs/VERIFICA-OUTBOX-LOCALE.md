@@ -1,5 +1,13 @@
 # Outbox locale — fondazione parziale SPEC-004, fase 6
 
+## Bootstrap senza enumerare lo storico — 5 novembre
+
+La fotografia del diario legge soltanto gli stati attivi con byScopeStatus,
+conservando tutte le ricevute storiche per dipendenze e riconciliazione.
+Verificati snapshot atomico durante ACK/retry, revoca, lease e payload,
+con 50.000 ricevute nel benchmark. Non introduce pulizia o retention.
+[Contratto, prove e misure](VERIFICA-BOOTSTRAP-OUTBOX-ATTIVA.md).
+
 ## Lettura coerente di bozza e coda — 30 ottobre
 
 Il repository legge la bozza e le operazioni attive della voce nella stessa transazione IndexedDB read-only, usando l'indice per voce e stato. Gli aggiornamenti della vista dopo ACK upsert e delete usano questa fotografia al posto di due letture separate. Chromium verifica la singola transazione, revisioni e operazioni condivise fra repository e i casi UI di conferma; build, test:repository, test:sync-consumer, test:local-search-persistence e test:release superati. La transazione termina prima dell'aggiornamento del DOM: una scrittura successiva resta da gestire con aggiornamento della vista. Capability operations disattivata e collaudo Google aperto.

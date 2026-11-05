@@ -1,5 +1,24 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Bootstrap con la sola outbox attiva — 5 novembre
+
+Completato il commit richiesto della fase precedente: 553c3ef. Il nuovo
+incremento legge pending/sending/conflict/failed tramite byScopeStatus,
+senza enumerare lo storico acked/superseded. Stessa transazione di checkpoint,
+metadati, corpi, dati comuni e bozze; ordine per operationId conservato.
+Nessuna migrazione (resta IndexedDB v11), pulizia o modifica del dispatcher.
+Le ricevute restano accessibili per dipendenze, replay e riconciliazione.
+
+Nuova prova nel bootstrap/repository: payload/lease, zero e max timestamp,
+Unicode, scope, ACK/retry concorrenti, dipendenza su ACK storico, baseline
+della bozza e revoca. Benchmark esteso con 10.000/50.000 ricevute terminali:
+trasferisce quattro operazioni attive in ogni scenario; a 50.000 voci p95
+mese 65 ms, mese vuoto 37 ms, Task 226 ms. Non è A/B né misura end-to-end.
+Build, repository, release, bootstrap, benchmark, P59/P60.1/P70 superati;
+npm test generale concluso senza errori. Index/Demo rigenerati, sei file e segnaposto
+preservati. Nessun deploy o accesso ai dati reali.
+[Dettagli e limiti](VERIFICA-BOOTSTRAP-OUTBOX-ATTIVA.md).
+
 ## Bootstrap dei dati comuni per periodo — 5 novembre
 
 Completato prima il commit 483b311 della fase indici Entries. Il seguito

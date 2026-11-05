@@ -148,7 +148,14 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
     const value={meta,entries:[],common:[],drafts:[],operations:[],commonScope:taskOnly?{kind:'full'}:{kind:'journal',month,today}};let remaining=4;
     const compare=(a,b)=>a<b?-1:a>b?1:0;
     const finish=()=>{if(--remaining===0){value.common.sort((a,b)=>compare(a.collection,b.collection)||compare(a.id,b.id));done(value);}};
-    for(const [store,key]of [['drafts','drafts'],['outbox','operations']])request(tx.objectStore(store).index('byScope').getAll(scopeKey(scope)),rows=>{value[key]=rows;finish();});
+    request(tx.objectStore('drafts').index('byScope').getAll(scopeKey(scope)),rows=>{value.drafts=rows;finish();});
+    // Terminal receipts remain stored for replay/recovery, but cannot affect
+    // this view. Read each active status in the same snapshot transaction.
+    const outbox=tx.objectStore('outbox').index('byScopeStatus');let statuses=4;
+    for(const status of ['pending','sending','conflict','failed'])request(outbox.getAll(environment.IDBKeyRange.bound([...scopeKey(scope),status],[...scopeKey(scope),status+'\u0000'],false,true)),rows=>{
+     for(const row of rows)value.operations.push(row);
+     if(--statuses===0){value.operations.sort((a,b)=>compare(a.operationId,b.operationId));finish();}
+    });
     const common=tx.objectStore('commonRecords');
     if(taskOnly)request(common.index('byScope').getAll(scopeKey(scope)),rows=>{for(const row of rows)value.common.push(row);finish();});
     else{

@@ -202,3 +202,10 @@ visibili, contratto Task completo e rifiuto di riusare la copertura mensile
 per Settimana e Abitudini. Per i limiti temporali eseguire anche
 `test:common-window` e `test:common-periods`. Il benchmark controlla i record
 comuni restituiti e gli indici/intervalli impiegati, oltre a corpi e transazioni.
+
+`verify-local-bootstrap-outbox.cjs`, incluso in test:local-bootstrap e
+test:repository, copre snapshot dei quattro stati attivi, ACK/retry
+concorrenti, ricevute storiche per le dipendenze, revoca e baseline della bozza.
+Il benchmark bootstrap ora include anche 10.000/50.000 ricevute terminali
+oltre a quattro operazioni attive, e verifica il numero di righe effettivamente
+trasferite dai quattro intervalli dell'indice outbox.

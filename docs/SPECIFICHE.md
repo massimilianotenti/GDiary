@@ -1,5 +1,10 @@
 # Specifiche funzionali correnti
 
+All'apertura dalla copia locale vengono lette soltanto le operazioni ancora
+attive, inclusi invii, conflitti ed errori. Lo storico confermato o superato
+resta conservato per dipendenze e recupero; la lettura non lo cancella.
+[Verifica e limiti](VERIFICA-BOOTSTRAP-OUTBOX-ATTIVA.md).
+
 Il bootstrap sperimentale del mese limita metadati e storico comune alla
 vista, conservando tutti i Task per la pianificazione e tutti i cataloghi
 e le impostazioni di privacy. La copertura comune è dichiarata per mese e

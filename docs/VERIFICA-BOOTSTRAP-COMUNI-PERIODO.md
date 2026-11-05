@@ -1,5 +1,9 @@
 # Bootstrap del diario con dati comuni per periodo — 5 novembre 2026
 
+Il seguito [outbox attiva](VERIFICA-BOOTSTRAP-OUTBOX-ATTIVA.md) limita anche
+la coda letta all'avvio e aggiunge ricevute storiche alla fixture del benchmark.
+Le misure qui sotto si riferiscono alla fase precedente, senza quello storico.
+
 ## Contratto implementato
 
 Il bootstrap mensile da checkpoint completo evita ora la lettura dello storico

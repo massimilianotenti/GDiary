@@ -1,5 +1,10 @@
 # Modello dati
 
+La fotografia `readBootstrapView.operations` contiene soltanto pending,
+sending, conflict e failed tramite l'indice byScopeStatus. Acked e superseded
+restano nello store originale e leggibili per operationId. Schema IndexedDB
+v11 e checkpoint invariati. [Contratto e prove](VERIFICA-BOOTSTRAP-OUTBOX-ATTIVA.md).
+
 IndexedDB v11 aggiunge `commonRecords.byCollectionDate` con chiave
 `[archiveId, principalId, epoch, collection, data.date]` per le registrazioni
 delle abitudini. Giorni e settimane usano intervalli sulla chiave primaria

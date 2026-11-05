@@ -114,7 +114,9 @@ riflessioni, cataloghi o impostazioni. Il seguito [con indici per vista](VERIFIC
 i metadati letti al mese e ai Task globali. Il seguito
 [dei record comuni per periodo](VERIFICA-BOOTSTRAP-COMUNI-PERIODO.md) limita
 anche lo storico mensile e dichiara la copertura. La vista Task mantiene
-i dati comuni completi; bozze e outbox sono ancora enumerate per scope.
+i dati comuni completi. Le bozze restano enumerate per scope; il seguito
+[outbox attiva](VERIFICA-BOOTSTRAP-OUTBOX-ATTIVA.md) evita di caricare
+lo storico delle operazioni confermate o superate.
 Non è dimostrata la scalabilità per qualunque distribuzione dei Task.
 
 Le capability reali rimangono disattivate. Matrice completa delle mutazioni,
