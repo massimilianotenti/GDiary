@@ -111,7 +111,7 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
  const result=async fn=>{try{const scope=authorize(),value=await fn();guard(scope);return {ok:true,value,scope:{...scope}};}catch(error){return {ok:false,error:safe(error)};}};
  const metaDefault=scope=>({...scope,revision:0,cursor:null,coverage:{}});
  const validMeta=(stored,scope)=>{const value=stored||metaDefault(scope);if(value.schemaVersion!==1||value.protocolVersion!==1||!Number.isSafeInteger(value.revision)||value.revision<0||value.revision>=Number.MAX_SAFE_INTEGER)throw fail('SchemaError');return value;};
- function invalidateDraftSearch(scope,tx,request,done){const store=tx.objectStore('archiveMeta');request(store.get(scopeKey(scope)),stored=>{const current=validMeta(stored,scope),revision=current.revision+1,coverage={...current.coverage};for(const key of ['journalPage','commonJournal'])if(coverage[key]?.revision===current.revision)coverage[key]={...coverage[key],revision};if(coverage.journalPages)coverage.journalPages={...coverage.journalPages,pages:journalPageDescriptors(coverage).map(page=>page.revision===current.revision?{...page,revision}:page)};if(coverage.commonJournals)coverage.commonJournals={...coverage.commonJournals,views:commonViewDescriptors(coverage).map(view=>view.revision===current.revision?{...view,revision}:view)};coverage.localSearch={...(coverage.localSearch||{complete:false,documents:0}),fresh:false,revision,cursor:current.cursor};store.put({...current,revision,coverage});done();});}
+ function invalidateDraftSearch(scope,tx,request,done){const store=tx.objectStore('archiveMeta');request(store.get(scopeKey(scope)),stored=>{const current=validMeta(stored,scope),revision=current.revision+1,coverage={...current.coverage};for(const key of ['journalPage','commonJournal'])if(coverage[key]?.revision===current.revision)coverage[key]={...coverage[key],revision};if(coverage.journalPages)coverage.journalPages={...coverage.journalPages,pages:journalPageDescriptors(coverage).map(page=>page.revision===current.revision?{...page,revision}:page)};if(coverage.commonJournals)coverage.commonJournals={...coverage.commonJournals,views:commonViewDescriptors(coverage).map(view=>view.revision===current.revision?{...view,revision}:view)};if(coverage.readCheckpoint?.revision===current.revision)coverage.readCheckpoint={...coverage.readCheckpoint,revision};coverage.localSearch={...(coverage.localSearch||{complete:false,documents:0}),fresh:false,revision,cursor:current.cursor};store.put({...current,revision,coverage});done();});}
  const row=(scope,record,v)=>({...scope,id:record.id,version:v,data:record});
  function readOne(store,key){return result(()=>execute('readonly',[store],({scope,tx,request,done})=>request(tx.objectStore(store).get([...scopeKey(scope),...key]),value=>done(value?.data??value??null))));}
  function list(store,index,key){return result(()=>execute('readonly',[store],({scope,tx,request,done})=>request(tx.objectStore(store).index(index).getAll(key?key(scope):scopeKey(scope)),rows=>done(rows))));}
@@ -124,6 +124,38 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
   listCommon:collection=>Object.hasOwn(KEYS,collection)?list('commonRecords','byCollection',scope=>[...scopeKey(scope),collection]):Promise.resolve({ok:false,error:'DataError'}),
   listEntryFiles:entryId=>id(entryId)?list('commonRecords','byCollectionEntry',scope=>[...scopeKey(scope),'files',entryId]):Promise.resolve({ok:false,error:'DataError'}),
   listDrafts:()=>list('drafts','byScope'),
+  invalidateReadCheckpoint:()=>result(()=>execute('readwrite',['archiveMeta'],({scope,tx,request,done})=>{
+   const store=tx.objectStore('archiveMeta');request(store.get(scopeKey(scope)),stored=>{const current=validMeta(stored,scope),revision=current.revision+1;store.put({...current,revision,coverage:{...current.coverage,readCheckpoint:null,localSearch:{...current.coverage.localSearch,fresh:false}}});done(true);});
+  })),
+  markReadCheckpoint:expectedRevision=>result(()=>execute('readwrite',['archiveMeta'],({scope,tx,request,done})=>{
+   const store=tx.objectStore('archiveMeta');request(store.get(scopeKey(scope)),stored=>{
+    const meta=validMeta(stored,scope);if(meta.revision!==expectedRevision||meta.requiresBootstrap||!meta.cursor)throw fail('ConflictError');
+    store.put({...meta,coverage:{...meta.coverage,readCheckpoint:{format:'local-read-checkpoint/v1',revision:meta.revision,cursor:meta.cursor,savedAt:Date.now()}}});done(true);
+   });
+  })),
+  // App state, current-month bodies, privacy, drafts and pending deletions
+  // must share a transaction. A cursor alone does not prove a finished read.
+  readBootstrapView:({month,taskOnly=false}={})=>result(()=>execute('readonly',['archiveMeta','entries','contents','commonRecords','drafts','outbox'],({scope,tx,request,done})=>{
+   if(typeof month!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)||typeof taskOnly!=='boolean')throw fail('DataError');
+   request(tx.objectStore('archiveMeta').get(scopeKey(scope)),stored=>{
+    const meta=validMeta(stored,scope),checkpoint=meta.coverage?.readCheckpoint,cursor=meta.cursor;
+    if(meta.requiresBootstrap||meta.coverage?.consumer?.complete!==true||meta.coverage.consumer.docsScanComplete!==true||checkpoint?.format!=='local-read-checkpoint/v1'||checkpoint.revision!==meta.revision||!Number.isSafeInteger(checkpoint.savedAt)||checkpoint.savedAt<0||!cursor||cursor.format!=='sync-cursor/v1'||!Number.isSafeInteger(cursor.sequence)||cursor.sequence<0||!['archiveId','principalId','epoch'].every(key=>cursor[key]===scope[key])||JSON.stringify(checkpoint.cursor)!==JSON.stringify(cursor)){done(null);return;}
+    const value={meta,entries:[],common:[],drafts:[],operations:[]};let remaining=4;
+    const finish=()=>{if(--remaining===0)done(value);};
+    for(const [store,key]of [['commonRecords','common'],['drafts','drafts'],['outbox','operations']])request(tx.objectStore(store).index('byScope').getAll(scopeKey(scope)),rows=>{value[key]=rows;finish();});
+    request(tx.objectStore('entries').index('byScope').getAll(scopeKey(scope)),rows=>{
+     const selected=rows.filter(row=>taskOnly?row.data.type==='task':row.data.date?.startsWith(month+'-'));
+     value.entries=rows.map(row=>({...row.data,contentLoaded:false}));let pending=selected.length;
+     if(!pending){finish();return;}
+     const byId=new Map(value.entries.map(row=>[row.id,row]));
+     for(const row of selected)request(tx.objectStore('contents').get([...scopeKey(scope),row.id]),body=>{
+      if(row.data.contentVersion===null){Object.assign(byId.get(row.id),{body:'',rich:[],contentLoaded:true});if(--pending===0)finish();return;}
+      if(!body||body.version!==(row.data.contentVersion||row.version)||body.data?.version!==body.version||body.data.id!==row.id)throw fail('StaleVersionError');
+      const {id:bodyId,version:bodyVersion,...content}=body.data;Object.assign(byId.get(row.id),content,{contentLoaded:true});if(--pending===0)finish();
+     });
+    });
+   });
+  })),
   // Page membership, metadata and matching bodies must come from one read
   // transaction. Separate getMeta/getEntry/getContent calls can mix revisions.
   readRemoteView:key=>result(()=>execute('readonly',['archiveMeta','entries','contents'],({scope,tx,request,done})=>{

@@ -1,5 +1,10 @@
 # Sviluppo e verifiche
 
+`npm run test:local-bootstrap` verifica il bootstrap con consumer reale,
+snapshot su più pagine, riavvio Chromium, identità, privacy, checkpoint atomico,
+errore di recupero corpi, tombstone e bozze. Incluso in test:repository.
+[Dettagli](VERIFICA-BOOTSTRAP-LOCALE.md).
+
 `npm run test:repository` include la prima pagina locale modificabile, la versione di base, i blocchi di bypass e la conservazione dell'editor dopo risposte tardive.
 
 `npm run test:local-common` verifica anche anteprime di settimana e abitudini, intervalli disgiunti e migrazione IndexedDB v8→v9 con bozze e outbox conservate.

@@ -1,5 +1,47 @@
 # Più pagine locali del diario — pacchetto 7, seguito parziale
 
+## Riapertura delle pagine disponibili — 5 novembre
+
+Con identità e capability operations verificate, l'apertura della prima
+pagina locale prosegue automaticamente lungo le continuazioni presenti nella
+cache, senza ulteriori RPC. Ogni pagina viene letta separatamente e applicata
+con la coda locale aggiornata; il percorso si ferma a una pagina mancante,
+un cursore già visitato, un totale diverso o al limite di 16 pagine.
+Il messaggio mostra la data più vecchia delle pagine riaperte. Anche quando
+l'ultima continuazione è presente, la vista resta datata e incompleta:
+le pagine indipendenti non costituiscono una fotografia coerente del mese.
+
+Le pagine riaperte restano da verificare singolarmente. Riprova richiede la
+prima ancora non verificata; soltanto le risposte remote rimuovono tale stato.
+La risposta remota, il cambio di sessione/cache/scope e la disattivazione
+interrompono l'applicazione delle letture locali tardive. I blocchi puliti
+seguono il merge remoto esistente; bozze e operazioni pendenti conservano
+editor e versione originaria. In caso di lacuna rimane il comando manuale
+per tentare la continuazione con il percorso cache/remoto già esistente.
+
+Il test `verify-local-diary-reopen-pages.cjs`, incluso in test:repository,
+usando Chromium e IndexedDB sintetico copre tre pagine, una sola RPC iniziale,
+privacy, lacune e cicli, revoca, risposta remota prima di una lettura locale
+sospesa, retry in ordine e salvataggio di una bozza della terza pagina con
+baseline originale. Il test precedente conserva il caso della continuazione
+inizialmente mancante e del suo recupero manuale; sincronizza il retry con
+l'effettiva partenza della RPC, dopo la preparazione asincrona della cache.
+
+Verifiche superate: build, test:repository (incluso il nuovo test),
+test:local-pages, test:release, test:progressive, P70 privacy, P59 build e
+`git diff --check`. Index e Demo rigenerati; bootstrap UTF-8 e staging dei
+sei file preservati. Verificata anche la conservazione di nodo editor,
+focus e selezione durante l'arrivo delle continuazioni locali. Il recupero
+automatico avviene solo all'apertura iniziale: un retry non riapre pagine
+già verificate, evitando di reintrodurle tra quelle ancora da controllare.
+
+Non è un bootstrap offline completo: servono identità verificata e prima
+pagina disponibile; dati comuni, feed coerente, pagine mai acquisite ed
+eliminazioni remote non dimostrate da una singola pagina restano fuori da
+questo incremento. Capability reali disattivate; nessun deploy, setupDrive o
+accesso ai dati reali.
+
+
 ## Aggiornamento remoto delle copie pulite — 4 novembre
 
 Riprodotto un errore del merge: una voce aperta dalla cache senza modifiche

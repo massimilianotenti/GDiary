@@ -1,5 +1,12 @@
 # Modello dati
 
+Sviluppo locale: `archiveMeta.coverage.readCheckpoint` registra formato
+`local-read-checkpoint/v1`, revisione, cursore scoped e data della lettura
+completata dal consumer. Il bootstrap della vista verifica questi dati insieme
+alla copertura completa, nella transazione con Entries, corpi, dati comuni,
+bozze e outbox. Nessuna migrazione o cancellazione IndexedDB; resta v9.
+[Contratto e invalidazione](VERIFICA-BOOTSTRAP-LOCALE.md).
+
 La copia sperimentale IndexedDB v9 conserva fino a otto descrittori di dati comuni per diario, settimana e abitudini, con appartenenza e versioni verificate; non modifica il modello Google. [Verifica](VERIFICA-PAGINE-LOCALI-DIARIO.md).
 
 Schemi estratti dai sorgenti v2.0.3. Le costanti nel codice restano la definizione operativa; verificare le funzioni di estensione prima di modificare fogli esistenti.

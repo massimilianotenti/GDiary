@@ -677,3 +677,9 @@ Entry snapshot più recente e assenza di `readRows()` Entries. Report:
 feed completo dall'origine; prima della compattazione sarà necessario
 pubblicare un checkpoint recuperabile. Il client resta disabilitato e i test
 mirati sono passati; gate completo in corso.
+
+Seguito, 5 novembre: [bootstrap del diario dalla copia completa](../VERIFICA-BOOTSTRAP-LOCALE.md)
+collegato all'avvio dopo consenso e verifica identità. Lettura atomica con
+checkpoint concluso, dati comuni, privacy e outbox; aggiornamenti dal consumer
+preservano le bozze. Corretto il paging snapshot finale su più pagine.
+Capability reali disattivate; non introduce caricamento HTML offline o PWA.

@@ -189,7 +189,7 @@ export function createSyncConsumer({repository,identity,call,enabled=()=>false}=
      if(!entries.includes(entry))entries.push(entry);
     }
     const next={...current,sequence:commit.sequence},meta=await checked(repository.getMeta());
-    await checked(repository.applyRemoteBatch({expectedRevision:meta.revision,cursor:next,entries,commonUpserts,commonRemovals,deletedEntryIds,coverage:{consumer:{format:'sync-consumer/v1',appliedThrough:commit.sequence}}}));
+    await checked(repository.applyRemoteBatch({expectedRevision:meta.revision,cursor:next,entries,commonUpserts,commonRemovals,deletedEntryIds,coverage:{consumer:{...meta.coverage?.consumer,format:'sync-consumer/v1',appliedThrough:commit.sequence}}}));
     current=next;applied++;
    }
    if(response.cursor.sequence<current.sequence)throw fail('DataError');
@@ -236,7 +236,7 @@ export function createSyncConsumer({repository,identity,call,enabled=()=>false}=
      if(collection==='entries'){batch.entries=records;batch.contents=await contentsFor(records);}
      else if(records.length)batch.commonUpserts={[collection]:records};
      const saved=await checked(repository.applyRemoteBatch(batch));revision=saved.revision;count+=records.length;
-     if(page.hasMore){if(!records.length||typeof page.nextAfter!=='string'||page.nextAfter!==records.at(-1)[collection==='projects'?'slug':collection==='days'?'date':collection==='weeks'?'week':collection==='habitLogs'?'key':collection==='layouts'?'entryId':'id']||page.nextAfter===afterId)throw fail('DataError');afterId=page.nextAfter;}else if(page.nextAfter!==null)throw fail('DataError');
+     if(page.hasMore){if(!records.length||typeof page.nextAfter!=='string'||page.nextAfter!==records.at(-1)[collection==='projects'?'slug':collection==='days'?'date':collection==='weeks'?'week':collection==='habitLogs'?'key':collection==='layouts'?'entryId':'id']||page.nextAfter===afterId)throw fail('DataError');afterId=page.nextAfter;}else{if(page.nextAfter!==null)throw fail('DataError');afterId=undefined;}
     }while(afterId!==undefined);
     if(!coverage||count!==coverage.total)throw fail('DataError');totals[collection]={total:count,canonical:coverage.canonical,complete:coverage.complete===true};
    }
@@ -244,7 +244,7 @@ export function createSyncConsumer({repository,identity,call,enabled=()=>false}=
    const caught=await readChanges(scope,pinned,head.cursor);await hydrate(caught.changedContent,caught.cursor,scope);revision=(await checked(repository.getMeta())).revision;
    const complete=Object.values(totals).every(item=>item.complete)&&totals.entries.canonical===totals.entries.total;
    const saved=await checked(repository.applyRemoteBatch({expectedRevision:revision,cursor:caught.cursor,coverage:{consumer:{format:'sync-consumer/v1',complete,docsScanComplete:complete,collections:totals,appliedThrough:caught.cursor.sequence}}}));ensureScope(scope);
-   await checked(repository.finishBootstrap(saved.revision));const search=await persistSearchSnapshot(scope,complete);return {cursor:caught.cursor,appliedCommits:caught.applied,collections:totals,complete,revision:saved.revision,search};
+   await checked(repository.finishBootstrap(saved.revision));const search=await persistSearchSnapshot(scope,complete);await checked(repository.markReadCheckpoint(saved.revision));return {cursor:caught.cursor,appliedCommits:caught.applied,collections:totals,complete,revision:saved.revision,search};
   }),
   sync:()=>result(async()=>{
    const scope=authorize(),initial=await checked(repository.getMeta());if(initial.requiresBootstrap)return checked(consumer.bootstrap());await ensureSearchIndex(scope);const meta=await checked(repository.getMeta());if(!cursor(meta.cursor,scope))throw fail('ProtocolUnavailable');if(meta.coverage?.localSearch?.fresh!==true||meta.coverage.localSearch.revision!==meta.revision)throw fail('ConflictError');const searchComplete=(await searchIndex.status()).complete;
@@ -258,6 +258,7 @@ export function createSyncConsumer({repository,identity,call,enabled=()=>false}=
    const hydratedRevision=(await checked(repository.getMeta())).revision;if(hydratedRevision!==afterFeed.revision+tracking.writes)throw fail('ConflictError');
    const touched=new Set([...caught.searchTouched,...hydrated]),removed=new Set(caught.searchRemoved);for(const id of removed)touched.delete(id);
    const changed=await refreshSearchEntries(scope,touched),coverage=await persistSearchDelta(scope,{upserts:changed.upserts,removals:[...new Set([...removed,...changed.removals])],complete:searchComplete,expectedRevision:hydratedRevision}),updated=await checked(repository.getMeta());if(updated.revision!==hydratedRevision)throw fail('ConflictError');
+   await checked(repository.markReadCheckpoint(hydratedRevision));
    hydrationCheckedRevision=hydratedRevision===afterFeed.revision+tracking.writes&&updated.revision===hydratedRevision?updated.revision:null;return {cursor:caught.cursor,appliedCommits:caught.applied,complete:updated.coverage?.consumer?.complete===true,search:coverage};
   }),
   refreshDraft:id=>result(async()=>{const scope=authorize();if(!validId(id))throw fail('DataError');await ensureSearchIndex(scope);ensureScope(scope);const meta=await checked(repository.getMeta());if(meta.coverage?.localSearch?.fresh!==true||meta.coverage.localSearch.revision!==meta.revision)throw fail('ConflictError');const changed=await refreshSearchEntries(scope,[id]),coverage=await persistSearchDelta(scope,{upserts:changed.upserts,removals:changed.removals,complete:(await searchIndex.status()).complete,expectedRevision:meta.revision});return coverage;}),

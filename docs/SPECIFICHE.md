@@ -1,5 +1,17 @@
 # Specifiche funzionali correnti
 
+Il percorso sperimentale apre ora il diario dalla copia completa del consumer
+snapshot/feed dopo la verifica identità, senza attendere le RPC di vista.
+Checkpoint concluso, privacy, bozze e outbox vengono verificati nella lettura
+atomica; aggiornamenti e retry conservano le bozze. Le copie parziali restano
+sul precedente fallback. [Contratto e limiti](VERIFICA-BOOTSTRAP-LOCALE.md).
+
+Nel percorso locale sperimentale, l'apertura della prima pagina recupera anche
+le continuazioni disponibili (massimo 16 pagine), senza RPC aggiuntive.
+La copia resta datata e incompleta fino alla verifica remota di ogni pagina;
+bozze e versioni originali restano protette. Non è un bootstrap offline né
+una fotografia coerente del mese. [Verifica e limiti](VERIFICA-PAGINE-LOCALI-DIARIO.md).
+
 Nel percorso locale sperimentale, una prima pagina del diario già conservata può essere modificata attraverso l'outbox durante la lettura remota; la vista segnala la copertura parziale e conserva la versione per il controllo dei conflitti. [Verifica](VERIFICA-PAGINE-LOCALI-DIARIO.md).
 
 Dietro la capability locale disattivata, Settimana e Abitudini possono mostrare un'anteprima datata e non modificabile mentre si verifica la risposta remota. [Verifica e limiti](VERIFICA-PAGINE-LOCALI-DIARIO.md).

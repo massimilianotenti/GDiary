@@ -1,5 +1,17 @@
 # Architettura corrente
 
+Il percorso sperimentale apre ora il diario dalla copia completa del consumer
+snapshot/feed dopo la verifica identità, senza attendere le RPC di vista.
+Checkpoint concluso, privacy, bozze e outbox vengono verificati nella lettura
+atomica; aggiornamenti e retry conservano le bozze. Le copie parziali restano
+sul precedente fallback. [Contratto e limiti](VERIFICA-BOOTSTRAP-LOCALE.md).
+
+Nel percorso locale sperimentale, l'apertura della prima pagina recupera anche
+le continuazioni disponibili (massimo 16 pagine), senza RPC aggiuntive.
+La copia resta datata e incompleta fino alla verifica remota di ogni pagina;
+bozze e versioni originali restano protette. Non è un bootstrap offline né
+una fotografia coerente del mese. [Verifica e limiti](VERIFICA-PAGINE-LOCALI-DIARIO.md).
+
 Nel percorso sperimentale con copia e outbox abilitate, la prima pagina del diario già verificata può essere modificata localmente mentre si attende il remoto; viene marcata come datata e incompleta. [Verifica e limiti](VERIFICA-PAGINE-LOCALI-DIARIO.md).
 
 Nel percorso locale sperimentale, le anteprime read-only dei dati comuni coprono diario, settimana e abitudini tramite descrittori scoped; IndexedDB v9 separa i nuovi descrittori dai client precedenti. [Verifica e limiti](VERIFICA-PAGINE-LOCALI-DIARIO.md).
