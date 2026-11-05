@@ -133,3 +133,8 @@ resta disponibile e il task eliminato dal feed resta assente.
 
 Build, test:local-bootstrap e test:release superati. Nessun deploy o accesso
 ai dati reali; restano i confini sperimentali descritti sopra.
+
+La scalabilità della lettura atomica è ora misurata separatamente: vedere
+[benchmark 10.000/50.000 voci](VERIFICA-BOOTSTRAP-SCALA.md). La misura non
+chiude il criterio di apertura end-to-end; a 50.000 voci il repository da
+solo supera il budget di 500 ms.

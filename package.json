@@ -70,6 +70,7 @@
     "test:entry-create-browser": "node tests/verify-entry-create-routing-browser.cjs",
     "test:sync-consumer": "node tests/verify-sync-consumer.cjs",
     "test:local-bootstrap": "node tests/verify-local-bootstrap.cjs",
+    "test:local-bootstrap-scale": "node tests/verify-local-bootstrap-scale.cjs",
     "test:local-search": "node tests/verify-local-search-index.cjs",
     "test:local-search-scale": "node --expose-gc tests/verify-local-search-scale.cjs",
     "test:local-search-persistence": "node tests/verify-local-search-persistence.cjs",

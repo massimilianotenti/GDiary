@@ -1,5 +1,21 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Baseline di scalabilità del bootstrap — 5 novembre
+
+Aggiunto `test:local-bootstrap-scale`: Chromium/IndexedDB reali su Demo,
+10.000/50.000 voci sintetiche e 30 letture misurate per mese, mese vuoto e
+Task. Controllati transazione atomica, corpi selezionati e rich. Report JSON
+in artifacts escluso da Git. p95 repository 187–227 ms a 10.000 voci,
+1.105–1.330 ms a 50.000: oltre l'obiettivo già prima di merge/rendering.
+Il percorso enumera ancora metadati e dati comuni per scope; prossimo
+incremento da progettare sulle letture per vista, conservando checkpoint,
+privacy, bozze/outbox e pianificazione globale. Non è una misura end-to-end.
+
+Superati build, npm test, test:local-bootstrap, test:release e il nuovo
+benchmark; nessun cambiamento applicativo, deploy o accesso ai dati reali.
+La suite npm test completa è passata anche sulla correzione taskPlans
+del commit e557113. [Risultati e limiti](VERIFICA-BOOTSTRAP-SCALA.md).
+
 ## Pianificazione completa nel bootstrap mensile — 5 novembre
 
 Corretto il ripristino di taskPlans: usa tutti i metadati task della copia

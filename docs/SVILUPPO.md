@@ -172,3 +172,19 @@ e `test:routing-locks` sono inclusi in npm test. Rieseguire anche controller
 Days/Weeks/HabitLogs e relativi browser quando si modifica la composizione
 dei lock; per compatibilità applicativa usare release, ciclo, incremental,
 common-periods e tracing. Nessun Google richiesto.
+
+## Benchmark del bootstrap locale
+
+`npm run test:local-bootstrap-scale` misura `readBootstrapView` su Chromium
+con 10.000 e 50.000 voci e storico comune sintetico. Esegue 30 letture
+misurate per scenario (mese, mese vuoto e Task), dopo una prima lettura
+esclusa dai percentili. Usa un profilo temporaneo, blocca HTTPS e rimuove
+il profilo a fine prova. Il report `artifacts/local-bootstrap-scale.json`
+è escluso da Git e contiene campioni, p50/p95, ambiente, volume serializzato
+della fixture e heap renderer dopo GC.
+
+Il comando verifica una sola transazione readonly e il numero esatto di
+letture dei corpi; non misura il consumer, la rete, il merge della shell,
+il DOM o il paint. Il flag p95 entro 500 ms è diagnostico, non attesta il
+criterio end-to-end della SPEC-004. È un benchmark esplicito, separato dalle
+suite funzionali per evitare di aggiungere stress test a ogni verifica.
