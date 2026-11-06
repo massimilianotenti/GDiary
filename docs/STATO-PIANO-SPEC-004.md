@@ -90,9 +90,23 @@ visibile di retry, revisione della copia locale e conferma esplicita. La
 conferma durevole è scoped al fingerprint/cursore completo; feed identici la
 mantengono e delta reali la invalidano finché non arriva conferma esplicita,
 anche con versione `updatedAt` invariata. La scrittura HabitLogs controlla la
-conferma nella stessa transazione IndexedDB. Prove browser/repository,
-`test:repository`, `test:release` e `npm test` superati. Il backend è sintetico:
-resta da coprire la gara con entrambe le schede UI in modifica e feed/ACK
-concorrenti; nessun collaudo Google. Pacchetto 11
-aperto, offline completo non disponibile.
+conferma nella stessa transazione IndexedDB. La tranche successiva ha aggiunto
+le prove UI cross-tab e le interleaving documentate sotto; restano i limiti ivi
+elencati e nessun collaudo Google. Pacchetto 11 aperto, offline completo non
+disponibile.
 [Rapporto e limiti](VERIFICA-RIALLINEAMENTO-CATALOGHI-HABITLOGS-LOCALE.md).
+
+
+### Seguito: concorrenza del riallineamento HabitLogs fra schede — parziale, 6 novembre
+
+Sul commit adaa4a7 il segnale di invalidazione cross-tab, privo di dati privati,
+fa rileggere la prova dallo scope locale. Token di lettura e verifica post-ACK
+impediscono a risposte obsolete o delta successivi di lasciare lo stato `ready`.
+Delta Goals/Habits e ACK HabitLogs non invalidano inutilmente l'indice Entries.
+Due pagine Chromium con IndexedDB condivisa provano delta/tombstone, conferma
+peer, delta durante ACK trattenuto, modifica successiva, focus, cambio scope,
+revoca e retry feed incompleto. Restano non provati gli ordini arbitrari di più
+eventi e tutti i tipi di selezione/editor. Rapporto aggiornato:
+[concorrenza del riallineamento](VERIFICA-RIALLINEAMENTO-CATALOGHI-HABITLOGS-LOCALE.md).
+Il backend è sintetico; il pacchetto 11 rimane aperto e offline completo non è
+disponibile.
