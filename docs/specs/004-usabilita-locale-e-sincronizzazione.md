@@ -683,3 +683,12 @@ collegato all'avvio dopo consenso e verifica identità. Lettura atomica con
 checkpoint concluso, dati comuni, privacy e outbox; aggiornamenti dal consumer
 preservano le bozze. Corretto il paging snapshot finale su più pagine.
 Capability reali disattivate; non introduce caricamento HTML offline o PWA.
+
+### Seguito locale del 6 novembre — apertura applicativa e periodi
+
+Misurati repository+shell+Vue/frame su 10k/50k, limitato il montaggio iniziale
+a 50 risultati Task con espansione e preservazione delle bozze. Settimana e
+Abitudini collegate al checkpoint completo con periodi esatti e guardie sulle
+letture tardive. Rapporti: ../VERIFICA-BOOTSTRAP-APPLICATIVO.md e
+../VERIFICA-BOOTSTRAP-VISTE-PERIODO.md. Non chiude interi pacchetti, non abilita
+capability reali, non estende l'outbox alle pratiche e non certifica Google.

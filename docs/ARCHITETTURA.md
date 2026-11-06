@@ -331,3 +331,13 @@ con lotti atomici, dipendenze del goal e identità delle microazioni conservate.
 supportata senza consentire mutazioni annidate. API/cataloghi applicativi ancora
 legacy: ponte, lettori coerenti, controller e browser restano da completare.
 Nessuna nuova RPC o attivazione reale.
+
+## Bootstrap per periodo e montaggio Task — 6 novembre 2026
+
+La fotografia completa di readBootstrapView copre anche week/habits con
+intervalli temporali espliciti e la stessa transazione/checkpoint del diario.
+La shell apre le viste prima delle RPC di stato e rinvia l'applicazione dei
+delta quando un form è modificato. DiaryPage monta inizialmente 50 risultati
+Task, espandibili di 50, mantenendo tutte le voci nel modello e bozze/pending
+sempre montati. Vedere VERIFICA-BOOTSTRAP-VISTE-PERIODO.md e
+VERIFICA-BOOTSTRAP-APPLICATIVO.md per contratti, prove e limiti.

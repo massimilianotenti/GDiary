@@ -301,3 +301,12 @@ restano fotografie indipendenti. L'archivio è un upsert archived:yes, senza
 cancellare o riscrivere la definizione precedente. Lotti fino a 25 record e
 32.768 unità complessive, senza divisione automatica. [Contratto e limiti](VERIFICA-WRITER-CATALOGHI-CANONICO.md).
 Nessun writer o lettore applicativo migrato, nessuna nuova colonna legacy.
+
+## Proiezioni bootstrap week/habits — 6 novembre 2026
+
+Nessuna migrazione: IndexedDB resta v11. readBootstrapView aggiunge kind, week
+e date alle richieste; commonScope distingue journal/week/habits (full nella
+vista Task). Gli intervalli condividono commonReadRanges con le anteprime,
+ma richiedono il checkpoint completo per attestare la copertura. La settimana
+include metadati Task globali e corpi delle sole voci nei sette giorni;
+Abitudini non idrata corpi. Dettagli in VERIFICA-BOOTSTRAP-VISTE-PERIODO.md.

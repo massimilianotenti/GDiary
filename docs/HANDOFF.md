@@ -1,5 +1,29 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+
+## Apertura applicativa e viste per periodo — 6 novembre
+
+Aggiunta misura applicativa al benchmark IndexedDB 10k/50k: lettura, merge,
+DOM/Vue e due frame, 30 campioni dopo la prima apertura; HTML e identità
+esclusi e distinti. Individuato costo del montaggio simultaneo degli editor
+Task: ora primi 50 e «Mostra altri task», con tutti i risultati disponibili
+per ricerca/salvataggio e bozze/pending sempre visibili. Campione p95 50k:
+mese 52 ms, vuoto 34 ms, Task 184 ms. Nessun A/B isolato o prova paint/Google.
+[Misure e limiti](VERIFICA-BOOTSTRAP-APPLICATIVO.md).
+
+Settimana e Abitudini aprono dal checkpoint completo con query per i periodi
+esatti, tutti i Task per pianificazione e stessa transazione atomica. Dati
+incompleti mantengono il fallback. Delta rinviati durante editing conservano
+form/focus/selezione e baseline; letture tardive dopo navigazione/revoca
+scartate. Prove su confini, periodi indipendenti, reload/bozza, remoto sospeso,
+errore e checkpoint invalidato. Nessuna estensione dell'outbox alle pratiche.
+[Contratto e verifiche](VERIFICA-BOOTSTRAP-VISTE-PERIODO.md).
+
+Capability reali disattivate; nessun deploy, Google, dati reali o commit.
+I pacchetti SPEC-004 restano parziali. Superati build, npm test, repository,
+bootstrap/scala, release, progressive, common-periods, cycle, local-common,
+P70/P64/P60.1 e diff --check. Esiti e limiti nei rapporti.
+
 ## Bootstrap con la sola outbox attiva — 5 novembre
 
 Completato il commit richiesto della fase precedente: 553c3ef. Il nuovo

@@ -13,6 +13,7 @@ const server=http.createServer((req,res)=>{
  await page.route('https://**/*',route=>route.abort());
  await page.goto('http://127.0.0.1:'+server.address().port+'/Demo.html');
  await page.waitForFunction(()=>continuousSession?.loaded&&!busy);
+ const frontendStartup=await page.evaluate(()=>{const timing=performance.getEntriesByType('navigation')[0];return {htmlResponseEndMs:timing.responseEnd,domContentLoadedMs:timing.domContentLoadedEventEnd,applicationReadyObservedMs:performance.now(),identity:'Synthetic preverified scope; no Google identity RPC measured'};});
  const session=await context.newCDPSession(page),results=[];
  for(const size of [10000,50000]){
   const seeded=await page.evaluate(async size=>{
@@ -93,12 +94,42 @@ const server=http.createServer((req,res)=>{
    }finally{counts=null;IDBObjectStore.prototype.get=originalGet;IDBObjectStore.prototype.getAll=originalStoreAll;IDBIndex.prototype.getAll=originalAll;IDBDatabase.prototype.transaction=originalTransaction;repository.close();}
    return {connectionOpenMs,scenarios};
   },repetitions);
+  const application=await page.evaluate(async repetitions=>{
+   const {identity,databaseName}=bootstrapScale,scope=identity.getScope();
+   localSyncTimer?.stop();await localSyncTimer?.idle?.();
+   localCacheEnabled=true;localRepository=BulletJournalVue.createLocalRepository({identity,enabled:()=>localCacheEnabled,databaseName});
+   activeCacheScope=scope;archiveIdentityStatus={verified:true,cacheReady:true};journalPageCache={isCurrent:()=>localCacheEnabled};
+   captureToday=()=> '2026-11-05';
+   const repository=localRepository,read=repository.readBootstrapView;let repositoryMs=0;
+   localRepository={...repository,readBootstrapView:async request=>{const start=performance.now(),value=await read(request);repositoryMs=performance.now()-start;return value;}};
+   const frame=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   const percentile=(values,p)=>[...values].sort((a,b)=>a-b)[Math.ceil(values.length*p)-1],scenarios=[];
+   for(const [name,requestedMonth,tasks] of [['month','2026-11',false],['empty-month','2027-02',false],['tasks','2026-11',true]]){
+    const samples=[];
+    for(let iteration=0;iteration<=repetitions;iteration++){
+     view='journal';continuousMode=true;continuousSession=null;continuousProject='';taskDiary=tasks;month=requestedMonth;query='';dirtyMain=false;dirtyDetail=false;busy=false;
+     taskFilters={status:'open',period:'archive',project:'',tag:'',text:'',sort:'priority'};
+     const started=performance.now();if(!await openLocalBootstrap())throw Error('application bootstrap refused');
+     const applied=performance.now();await frame();const finished=performance.now();
+     if(!(repositoryMs>0))throw Error('repository timing wrapper was not exercised');
+     if(tasks&&document.querySelectorAll('.diary-task-results .continuous-block').length>50)throw Error('initial task editors are not bounded');
+     if(!continuousSession.complete||!continuousSession.localBootstrap||busy)throw Error('incomplete application bootstrap');
+     if(document.querySelector('[data-client-id="synthetic-000011"]'))throw Error('private entry exposed');
+     const sample={totalMs:finished-started,repositoryMs,applyMs:applied-started-repositoryMs,renderOpportunityMs:finished-applied};
+     if(iteration)samples.push(sample);
+    }
+    scenarios.push({name,repetitions,samples,p50Ms:percentile(samples.map(s=>s.totalMs),.5),p95Ms:percentile(samples.map(s=>s.totalMs),.95),repositoryP95Ms:percentile(samples.map(s=>s.repositoryMs),.95),applyP95Ms:percentile(samples.map(s=>s.applyMs),.95),renderOpportunityP95Ms:percentile(samples.map(s=>s.renderOpportunityMs),.95)});
+   }
+   repository.close();localCacheEnabled=false;localRepository=null;journalPageCache=null;
+   return {scenarios,scope:'Loaded Demo and verified synthetic identity; real shell bootstrap, merge, Vue DOM flush and two animation frames. Frames offer a rendering opportunity, not proof of screen paint. Each iteration clears the continuous session; excludes HTML, identity, network and consumer.'};
+  },repetitions);
+  console.log('Application bootstrap '+size+': '+application.scenarios.map(s=>s.name+' p50/p95 '+s.p50Ms.toFixed(1)+'/'+s.p95Ms.toFixed(1)+' ms').join('; '));
   await session.send('HeapProfiler.collectGarbage');const heapAfter=await session.send('Runtime.getHeapUsage');
-  results.push({records:size,...seeded,postGcHeapBeforeBytes:heapBefore.usedSize,postGcHeapAfterBytes:heapAfter.usedSize,...measured});
+  results.push({records:size,...seeded,application,postGcHeapBeforeBytes:heapBefore.usedSize,postGcHeapAfterBytes:heapAfter.usedSize,...measured});
   console.log('Local bootstrap scale: '+size+' records; '+measured.scenarios.map(row=>row.name+' p50/p95 '+row.p50Ms.toFixed(1)+'/'+row.p95Ms.toFixed(1)+' ms, '+row.bodyGets+' body reads').join('; '));
  }
  assert.deepEqual(errors,[]);
- const report={format:'gdiary-local-bootstrap-scale/v1',generatedAt:new Date().toISOString(),syntheticOnly:true,environment:{node:process.version,platform:process.platform,architecture:process.arch,cpus:os.cpus().length,cpuModel:os.cpus()[0]?.model,totalMemoryBytes:os.totalmem(),browser:context.browser()?.version()||await page.evaluate(()=>navigator.userAgent),headless:true},scope:'Repository read after loading Demo; excludes identity RPC, network, sync consumer, shell merge, DOM rendering and paint. First read per scenario is excluded from percentiles; connection opening plus initial getMeta is measured separately from reads. Post-GC heap is an indicative renderer reading, not peak memory or database size. Fixture bytes are serialized seed payload volume, not physical IndexedDB usage. The 500 ms flag is diagnostic, not a test failure or end-to-end acceptance.',results};
+ const report={format:'gdiary-local-bootstrap-scale/v1',generatedAt:new Date().toISOString(),syntheticOnly:true,frontendStartup,environment:{node:process.version,platform:process.platform,architecture:process.arch,cpus:os.cpus().length,cpuModel:os.cpus()[0]?.model,totalMemoryBytes:os.totalmem(),browser:context.browser()?.version()||await page.evaluate(()=>navigator.userAgent),headless:true},scope:'Repository scenarios and separately application scenarios (see each application.scope). Repository read after loading Demo; excludes identity RPC, network, sync consumer, shell merge, DOM rendering and paint. First read per scenario is excluded from percentiles; connection opening plus initial getMeta is measured separately from reads. Post-GC heap is an indicative renderer reading, not peak memory or database size. Fixture bytes are serialized seed payload volume, not physical IndexedDB usage. The 500 ms flag is diagnostic, not a test failure or end-to-end acceptance.',results};
  fs.mkdirSync(path.join(root,'artifacts'),{recursive:true});fs.writeFileSync(path.join(root,'artifacts/local-bootstrap-scale.json'),JSON.stringify(report,null,2)+'\n');
  console.log('30 measured reads per scenario; atomic snapshot, selected bodies and rich content OK. Report: artifacts/local-bootstrap-scale.json');
  }finally{if(context)await context.close();await new Promise(resolve=>server.close(resolve));fs.rmSync(profile,{recursive:true,force:true});}

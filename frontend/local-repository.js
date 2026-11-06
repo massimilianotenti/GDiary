@@ -139,13 +139,16 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
   })),
   // App state, current-month bodies, privacy, drafts and pending deletions
   // must share a transaction. A cursor alone does not prove a finished read.
-  readBootstrapView:({month,taskOnly=false,today=month+'-01'}={})=>result(()=>execute('readonly',['archiveMeta','entries','contents','commonRecords','drafts','outbox'],({scope,tx,request,done})=>{
+  readBootstrapView:({month,taskOnly=false,today=month+'-01',kind='journal',week,date}={})=>result(()=>execute('readonly',['archiveMeta','entries','contents','commonRecords','drafts','outbox'],({scope,tx,request,done})=>{
    if(typeof month!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)||typeof taskOnly!=='boolean')throw fail('DataError');
-   const ranges=commonReadRanges({kind:'journal',month,today});
+   if(!['journal','week','habits'].includes(kind)||kind!=='journal'&&taskOnly)throw fail('DataError');
+   const commonScope=kind==='journal'?{kind,month,today}:kind==='week'?{kind,week}:{kind,week,date},ranges=commonReadRanges(commonScope);
+   const entryRange=kind==='journal'?{from:month+'-',to:month+'.'}:kind==='week'?{from:week,to:ranges.days.to}:null;
+   const inView=row=>!!entryRange&&row.date>=entryRange.from&&row.date<=entryRange.to;
    request(tx.objectStore('archiveMeta').get(scopeKey(scope)),stored=>{
     const meta=validMeta(stored,scope),checkpoint=meta.coverage?.readCheckpoint,cursor=meta.cursor;
     if(meta.requiresBootstrap||meta.coverage?.consumer?.complete!==true||meta.coverage.consumer.docsScanComplete!==true||checkpoint?.format!=='local-read-checkpoint/v1'||checkpoint.revision!==meta.revision||!Number.isSafeInteger(checkpoint.savedAt)||checkpoint.savedAt<0||!cursor||cursor.format!=='sync-cursor/v1'||!Number.isSafeInteger(cursor.sequence)||cursor.sequence<0||!['archiveId','principalId','epoch'].every(key=>cursor[key]===scope[key])||JSON.stringify(checkpoint.cursor)!==JSON.stringify(cursor)){done(null);return;}
-    const value={meta,entries:[],common:[],drafts:[],operations:[],commonScope:taskOnly?{kind:'full'}:{kind:'journal',month,today}};let remaining=4;
+    const value={meta,entries:[],common:[],drafts:[],operations:[],commonScope:taskOnly?{kind:'full'}:commonScope};let remaining=4;
     const compare=(a,b)=>a<b?-1:a>b?1:0;
     const finish=()=>{if(--remaining===0){value.common.sort((a,b)=>compare(a.collection,b.collection)||compare(a.id,b.id));done(value);}};
     request(tx.objectStore('drafts').index('byScope').getAll(scopeKey(scope)),rows=>{value.drafts=rows;finish();});
@@ -159,18 +162,18 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
     const common=tx.objectStore('commonRecords');
     if(taskOnly)request(common.index('byScope').getAll(scopeKey(scope)),rows=>{for(const row of rows)value.common.push(row);finish();});
     else{
-     let lists=7;const collect=rows=>{for(const row of rows)value.common.push(row);if(--lists===0)finish();};
+     const logRanges=ranges.habitLogs.ranges||[ranges.habitLogs];let lists=6+logRanges.length;const seen=new Set();const collect=rows=>{for(const row of rows){const key=JSON.stringify([row.collection,row.id]);if(!seen.has(key)){seen.add(key);value.common.push(row);}}if(--lists===0)finish();};
      for(const collection of ['settings','projects','goals','habits'])request(common.index('byCollection').getAll([...scopeKey(scope),collection]),collect);
      for(const collection of ['days','weeks'])request(common.getAll(environment.IDBKeyRange.bound([...scopeKey(scope),collection,ranges[collection].from],[...scopeKey(scope),collection,ranges[collection].to])),collect);
-     request(common.index('byCollectionDate').getAll(environment.IDBKeyRange.bound([...scopeKey(scope),'habitLogs',ranges.habitLogs.from],[...scopeKey(scope),'habitLogs',ranges.habitLogs.to])),collect);
+     for(const range of logRanges)request(common.index('byCollectionDate').getAll(environment.IDBKeyRange.bound([...scopeKey(scope),'habitLogs',range.from],[...scopeKey(scope),'habitLogs',range.to])),collect);
     }
     // Keep all task metadata for global planning, but do not enumerate notes
     // outside this month. Both index reads share the checkpoint transaction.
-    const entryStore=tx.objectStore('entries'),rowsById=new Map();let lists=taskOnly?1:2;
+    const entryStore=tx.objectStore('entries'),rowsById=new Map();let lists=taskOnly||!entryRange?1:2;
     const collect=incoming=>{
      for(const row of incoming)rowsById.set(row.id,row);
      if(--lists)return;
-     const rows=[...rowsById.values()].sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0),selected=rows.filter(row=>taskOnly?row.data.type==='task':row.data.date?.startsWith(month+'-'));
+     const rows=[...rowsById.values()].sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0),selected=rows.filter(row=>taskOnly?row.data.type==='task':inView(row.data));
      value.entries=rows.map(row=>({...row.data,contentLoaded:false}));let pending=selected.length*(taskOnly?1:3);
      const entryDone=()=>{if(--pending===0)finish();};
      if(!pending){finish();return;}
@@ -188,7 +191,7 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
      }
     };
     request(entryStore.index('byScopeType').getAll([...scopeKey(scope),'task']),collect);
-    if(!taskOnly)request(entryStore.index('byScopeDate').getAll(environment.IDBKeyRange.bound([...scopeKey(scope),month+'-'],[...scopeKey(scope),month+'.'],false,true)),collect);
+    if(!taskOnly&&entryRange)request(entryStore.index('byScopeDate').getAll(environment.IDBKeyRange.bound([...scopeKey(scope),entryRange.from],[...scopeKey(scope),entryRange.to],false,kind==='journal')),collect);
    });
   })),
   // Page membership, metadata and matching bodies must come from one read

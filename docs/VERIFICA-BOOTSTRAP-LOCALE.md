@@ -31,7 +31,8 @@ le perde prima del rendering e usa la chiave del mese corrente.
 
 Le pagine datate parziali del percorso precedente non diventano complete:
 se non esiste una copia completa utilizzabile resta il fallback ordinario.
-Le altre viste mantengono il proprio percorso remoto e le proprie anteprime.
+Il seguito del 6 novembre estende il bootstrap completo a Settimana e Abitudini;
+vedere VERIFICA-BOOTSTRAP-VISTE-PERIODO.md. Le altre viste restano sui percorsi precedenti.
 
 ## Checkpoint e transazioni
 

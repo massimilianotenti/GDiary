@@ -209,3 +209,14 @@ concorrenti, ricevute storiche per le dipendenze, revoca e baseline della bozza.
 Il benchmark bootstrap ora include anche 10.000/50.000 ricevute terminali
 oltre a quattro operazioni attive, e verifica il numero di righe effettivamente
 trasferite dai quattro intervalli dell'indice outbox.
+
+## Benchmark applicativo e periodi — 6 novembre 2026
+
+`npm run test:local-bootstrap-scale` include 30 aperture applicative misurate
+per scenario su 10k/50k, oltre alle letture repository. Usa Chromium/IndexedDB
+reali, shell e Vue di Demo; dati inventati. JSON in artifacts escluso da Git,
+con campioni, ambiente e tempi iniziali HTML separati. Identità pre-verificata
+sintetica, nessuna RPC Google; due frame non certificano paint.
+`test:local-bootstrap`/`test:repository` coprono ora periodi week/habits,
+riavvio, bozze/versioni, revoca, letture tardive e finestra editor Task.
+Vedere VERIFICA-BOOTSTRAP-APPLICATIVO.md e VERIFICA-BOOTSTRAP-VISTE-PERIODO.md.

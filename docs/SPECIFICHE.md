@@ -239,3 +239,14 @@ con lotti atomici, dipendenze del goal e identità delle microazioni conservate.
 supportata senza consentire mutazioni annidate. API/cataloghi applicativi ancora
 legacy: ponte, lettori coerenti, controller e browser restano da completare.
 Nessuna nuova RPC o attivazione reale.
+
+## Riapertura locale delle viste per periodo — 6 novembre 2026
+
+Nel percorso sperimentale, dopo consenso e verifica identità, Settimana e
+Obiettivi/Abitudini possono aprirsi dalla copia completa senza attendere lo
+stato remoto. La data della copia è esplicita; i form modificati conservano
+la versione originaria e rinviano gli aggiornamenti della vista. Il salvataggio
+delle pratiche resta remoto. I Task mostrano inizialmente 50 risultati con
+«Mostra altri task»; ricerca, conteggi e salvataggio includono tutti i risultati
+caricati, le bozze e le operazioni locali restano visibili. Capability reali
+disattivate; dettagli e limiti nei rapporti del bootstrap applicativo/periodi.

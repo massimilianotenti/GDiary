@@ -17,7 +17,7 @@ const server=http.createServer((req,res)=>{
   const cursor=sequence=>({format:'sync-cursor/v1',archiveId:scope.archiveId,principalId:scope.principalId,epoch:scope.epoch,sequence});
   const entries=['bootstrap-note','bootstrap-task','bootstrap-private','bootstrap-delete','bootstrap-empty'].map((id,index)=>({id,type:id==='bootstrap-task'?'task':'note',date,text:id,createdAt:date+'T08:00:00.000Z',updatedAt:'commit-1',contentVersion:id==='bootstrap-empty'?null:'page-content-'+('a'.repeat(64)),contentDigest:id==='bootstrap-empty'?null:'a'.repeat(64),tags:id==='bootstrap-private'?'segreto':'',projects:'',scope:'personal',status:id==='bootstrap-task'?'open':'',position:index+1}));
   entries.push({...entries[1],id:'bootstrap-task-other-month',date:shiftMonth(date.slice(0,7),-1)+'-15',plannedDate:date,workStart:'09:00',workEnd:'10:30',importance:'urgent'});
-  const common={settings:[{id:'privacy',version:'privacy-v1',value:{privateTags:['segreto']}},{id:'reflection',version:'reflection-v1',value:{dailyReflectionMode:'essential'}}],goals:[{id:'bootstrap-goal',title:'Obiettivo dalla copia',description:'Descrizione conservata',cycle:cycleFor(date),icon:'none',archived:false,updatedAt:'commit-1'}]};
+  const common={settings:[{id:'privacy',version:'privacy-v1',value:{privateTags:['segreto']}},{id:'reflection',version:'reflection-v1',value:{dailyReflectionMode:'essential'}}],goals:[{id:'bootstrap-goal',title:'Obiettivo dalla copia',target:'10',progress:'2',description:'Descrizione conservata',cycle:cycleFor(date),icon:'none',archived:false,updatedAt:'commit-1'}]};
   common.days=[{date,intention:'Intenzione dalla copia locale',intentionRich:[{kind:'p',runs:[{text:'Intenzione dalla copia locale',bold:true}]}],updatedAt:'commit-1'},{date:'2000-01-01',intention:'Storico fuori vista',updatedAt:'commit-1'}];
   common.habitLogs=[date,'2000-01-01'].map(day=>({key:'synthetic-habit|'+day,habitId:'synthetic-habit',date:day,status:'done',updatedAt:'commit-1'}));
   const changes=entries.map(entry=>({collection:'entries',id:entry.id,sequence:1,version:'commit-1',deleted:false,data:{format:'sync-entry/v1',record:entry}}));let pages=0;
@@ -86,6 +86,8 @@ const server=http.createServer((req,res)=>{
  assert.deepEqual(await page.evaluate(()=>state.taskPlans.find(plan=>plan.entryId==='bootstrap-task-other-month')),{entryId:'bootstrap-task-other-month',date:await page.evaluate(()=>captureToday()),workStart:'09:00',workEnd:'10:30',importance:'urgent',updatedAt:'commit-1'},'monthly bootstrap preserves planning for tasks recorded in another month');
  assert.equal(await page.evaluate(()=>commonScope.kind==='journal'&&state.commonScope.month===month&&commonScope.today===captureToday()&&state.days.length===1&&state.days[0].date===captureToday()&&state.days[0].intentionRich[0].runs[0].bold&&state.habitLogs.length===1&&state.habitLogs[0].date===captureToday()),true,'monthly shell applies bounded common data and explicit coverage');
  assert.equal(await page.getByText('Obiettivo dalla copia',{exact:true}).count(),1);
+ await page.evaluate(async()=>{view='week';window.slowRemoteWeekOpened=await run('getState');view='journal';await run('getState');});
+ assert.equal(await page.evaluate(()=>slowRemoteWeekOpened&&continuousSession.localBootstrap&&bootstrapRPC.includes('getSyncCheckpoint')&&!busy&&!bootstrapRPC.includes('getState')),true,'navigation works while background transport is held indefinitely');
  const editor=page.locator('[data-client-id="bootstrap-note"] .rich-area');assert.equal(await editor.textContent(),'Bozza persistente prima del riavvio','migrated session draft survives activation finalization');await editor.fill('Bozza dopo riavvio');await editor.focus();
  await page.evaluate(()=>{
   window.bootstrapEditor=document.activeElement;
@@ -121,6 +123,71 @@ const server=http.createServer((req,res)=>{
  await page.evaluate(()=>go('tasks'));
  await page.waitForFunction(()=>taskDiary&&continuousSession?.key==='tasks:archive');
  assert.equal(await page.evaluate(()=>continuousSession.localBootstrap&&continuousSession.complete&&!bootstrapRPC.some(name=>['getState','getJournalPage'].includes(name))),true,'task navigation reuses the complete checkpoint');
+ // Complete period views reuse the same checkpoint, never independent previews.
+ await page.evaluate(async()=>{
+  localSyncTimer.stop();await localSyncTimer.idle();dirtyMain=false;dirtyDetail=false;
+  const meta=(await localRepository.getMeta()).value,date=captureToday(),start=monday(date);
+  const written=await localRepository.applyRemoteBatch({expectedRevision:meta.revision,commonUpserts:{
+   weeks:[{week:start,focus:'Focus locale completo',priorities:'',wins:'',obstacles:'',lessons:'',next:'',energy:'3',closed:'no',updatedAt:'commit-2'}],
+   habits:[{id:'synthetic-habit',goalId:'bootstrap-goal',title:'Pratica locale',start:dateAdd(date,-30),days:'0,1,2,3,4,5,6',archived:'no',updatedAt:'commit-2'}]
+  }});if(!written.ok)throw Error(written.error);await localRepository.markReadCheckpoint(written.value.revision);
+  week=start;day=date;view='week';window.periodOpened=await openLocalPeriodBootstrap();
+ });
+ assert.equal(await page.evaluate(()=>periodOpened&&localPeriodBootstrap.view==='week'&&commonScope.kind==='week'&&state.weeks[0].focus==='Focus locale completo'),true);
+ assert.equal(await page.evaluate(()=>state.settings.privateTags.join(',')==='segreto'&&!document.querySelector('.entry[data-id="bootstrap-private"]')),true,'weekly copy retains custom privacy and hides private notes');
+ const weekFocus=page.locator('form[data-week] textarea').first();assert.equal(await weekFocus.inputValue(),'Focus locale completo');
+ await weekFocus.fill('Bozza settimana conservata');
+ await page.evaluate(()=>{window.periodEditor=document.activeElement;periodEditor.setSelectionRange(4,8);});
+ await page.evaluate(async()=>{const meta=(await localRepository.getMeta()).value;const changed=await localRepository.applyRemoteBatch({expectedRevision:meta.revision,commonUpserts:{weeks:[{...state.weeks[0],focus:'Nuovo focus remoto',updatedAt:'commit-3'}]}});await localRepository.markReadCheckpoint(changed.value.revision);await openLocalPeriodBootstrap({verified:true});});
+ assert.equal(await page.evaluate(()=>document.activeElement===periodEditor&&periodEditor.selectionStart===4&&periodEditor.value==='Bozza settimana conservata'&&periodEditor.closest('form').dataset.version==='commit-2'),true,'late delta preserves mounted weekly draft and original baseline');
+ await page.evaluate(async()=>{const consumer=localSearchConsumer;localSearchConsumer={sync:async()=>({ok:false,error:'SyntheticNetworkError'})};window.periodRefreshFailed=await refreshLocalBootstrap();localSearchConsumer=consumer;});
+ assert.equal(await page.evaluate(()=>!periodRefreshFailed&&document.activeElement===periodEditor&&periodEditor.value==='Bozza settimana conservata'),true,'period refresh error preserves editor and retry remains available');
+ await page.evaluate(async()=>{const consumer=localSearchConsumer;localSearchConsumer={sync:async()=>({ok:true,value:{}})};window.periodRetry=await refreshLocalBootstrap();localSearchConsumer=consumer;});
+ assert.equal(await page.evaluate(()=>periodRetry&&document.activeElement===periodEditor&&periodEditor.closest('form').dataset.version==='commit-2'),true,'successful retry preserves the modified period form');
+
+ await page.evaluate(async()=>{dirtyMain=false;view='habits';window.habitsOpened=await openLocalPeriodBootstrap();});
+ assert.equal(await page.evaluate(()=>habitsOpened&&commonScope.kind==='habits'&&commonScope.date===day&&state.habits[0].title==='Pratica locale'),true);
+ await page.evaluate(async()=>{dirtyMain=false;window.changedLocalHabitPeriod=await changeHabitPeriod({date:dateAdd(day,14)});});
+ assert.equal(await page.evaluate(()=>changedLocalHabitPeriod&&commonScope.date===day&&state.habitLogs.length===1),true,'habit day and selected tracker week have independent exact ranges');
+ await page.evaluate(async()=>{dirtyMain=false;view='week';week=dateAdd(week,7);window.nextLocalWeek=await openLocalPeriodBootstrap();});
+ assert.equal(await page.evaluate(()=>nextLocalWeek&&commonScope.week===week&&state.weeks.length===0),true,'an empty covered week is complete');
+ await page.evaluate(async()=>{
+  const repository=localRepository;let release;
+  localRepository={...repository,readBootstrapView:async request=>{const read=await repository.readBootstrapView(request);await new Promise(resolve=>release=resolve);return read;}};
+  window.periodRace=openLocalPeriodBootstrap();while(!release)await new Promise(resolve=>setTimeout(resolve,1));
+  week=dateAdd(week,7);release();window.periodRaceResult=await periodRace;localRepository=repository;
+ });
+ assert.equal(await page.evaluate(()=>periodRaceResult),false,'late period read rejected after navigation');
+ await page.evaluate(async()=>{
+  const repository=localRepository;let release;
+  localRepository={...repository,readBootstrapView:async request=>{const read=await repository.readBootstrapView(request);await new Promise(resolve=>release=resolve);return read;}};
+  window.periodRace=openLocalPeriodBootstrap();while(!release)await new Promise(resolve=>setTimeout(resolve,1));localCacheEnabled=false;release();window.periodRevoked=await periodRace;localCacheEnabled=true;localRepository=repository;
+ });
+ assert.equal(await page.evaluate(()=>periodRevoked),false,'revoked consent prevents period application');
+ await page.reload();await page.waitForFunction(()=>typeof releaseBootstrapIdentity==='function');await page.evaluate(()=>releaseBootstrapIdentity());await page.waitForFunction(()=>continuousSession?.localBootstrap&&continuousSession.loaded);
+ await page.evaluate(async()=>{dirtyMain=false;view='week';week=monday(captureToday());window.weekAfterReload=await openLocalPeriodBootstrap();});
+ assert.equal(await page.evaluate(()=>weekAfterReload&&state.weeks[0].updatedAt==='commit-3'&&document.querySelector('form[data-week] textarea').value==='Bozza settimana conservata'&&document.querySelector('form[data-week]').dataset.version==='commit-2'),true,'restart restores current canonical week and persisted draft with its original baseline');
+ await page.evaluate(()=>{dirtyMain=false;});
+ assert.equal(await page.evaluate(()=>!bootstrapRPC.some(name=>['getState','getJournalPage','getCommonState'].includes(name))),true,'complete periods do not require foreground RPC');
+ await page.evaluate(async()=>{await localRepository.invalidateReadCheckpoint();window.incompletePeriod=await openLocalPeriodBootstrap();});
+ assert.equal(await page.evaluate(()=>incompletePeriod),false,'incomplete checkpoint never becomes a complete period');
+ await page.evaluate(async()=>{window.periodFallback=await run('getState');});
+ assert.equal(await page.evaluate(()=>!periodFallback&&bootstrapRPC.includes('getState')),true,'incomplete period uses the ordinary remote fallback and reports its failure');
+
+ await page.evaluate(async()=>{
+  const meta=(await localRepository.getMeta()).value,entries=Array.from({length:125},(_,i)=>({id:'window-task-'+String(i).padStart(3,'0'),type:'task',text:'Task finestra '+i,date:captureToday(),status:'open',projects:'',tags:'',updatedAt:'commit-4',contentVersion:null}));
+  const result=await localRepository.applyRemoteBatch({expectedRevision:meta.revision,entries});if(!result.ok)throw Error(result.error);await localRepository.markReadCheckpoint(result.value.revision);
+  dirtyMain=false;dirtyDetail=false;view='journal';taskDiary=true;continuousSession=null;taskFilters={status:'open',period:'archive',project:'',tag:'',text:'',sort:'priority'};await openLocalBootstrap();
+ });
+ await page.waitForFunction(()=>document.querySelectorAll('.diary-task-results .continuous-block').length===50);
+ assert.equal(await page.evaluate(()=>continuousSession.blocks.filter(row=>row.type==='task').length>=125),true,'all results remain in the session');
+ await page.getByRole('button',{name:'Mostra altri task',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelectorAll('.diary-task-results .continuous-block').length===100);
+ const windowTitle=page.locator('.diary-task-results .continuous-title').nth(90);await windowTitle.fill('Bozza task oltre la prima finestra');
+ await page.evaluate(()=>{window.windowEditor=document.activeElement;windowEditor.setSelectionRange(3,7);changeTaskFilter('status','done');});
+ assert.equal(await page.evaluate(()=>document.activeElement===windowEditor&&windowEditor.selectionStart===3&&windowEditor.value==='Bozza task oltre la prima finestra'&&continuousSession.blocks.find(row=>row.title==='Bozza task oltre la prima finestra').updatedAt==='commit-4'),true,'filter reset keeps an edited task outside the first window mounted');
+ await page.evaluate(async()=>{archiveIdentityStatus.operationsReady=true;await saveContinuous();});
+ assert.equal(await page.evaluate(async()=>{const block=continuousSession.blocks.find(row=>row.title==='Bozza task oltre la prima finestra'),outbox=await localRepository.listActiveEntityOutbox({kind:'task',id:block.id});return outbox.value.some(row=>row.baseVersion==='commit-4'&&row.payload.title===block.title);}),true,'save includes the edited task outside the initial window');
  await page.evaluate(async()=>{
   // Exercise the real API wrapper against Demo's simulated backend. Even an
   // uncertain/rejected mutation must prevent reopening the old ready marker.
@@ -128,6 +195,6 @@ const server=http.createServer((req,res)=>{
  });
  assert.equal(await page.evaluate(async()=>{const read=await localRepository.readBootstrapView({month});return read.ok&&read.value===null&&localBootstrapWrites===0;}),true,'a foreground write invalidates cached readiness');
  assert.deepEqual(pageErrors,[]);
- console.log('Complete local bootstrap: paginated snapshot terminates, browser restart, verified identity, complete common state, private tags, empty body, atomic outbox deletion, no foreground diary RPC, failed hydration checkpoint, feed tombstone, focus/selection/draft and original baseline OK.');
+ console.log('Complete local bootstrap and period views (restart/drafts/races/coverage) plus bounded Task editors (expand/filter/save): paginated snapshot terminates, browser restart, verified identity, complete common state, private tags, empty body, atomic outbox deletion, no foreground diary RPC, failed hydration checkpoint, feed tombstone, focus/selection/draft and original baseline OK.');
  }finally{if(context)await context.close();await new Promise(resolve=>server.close(resolve));fs.rmSync(profile,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

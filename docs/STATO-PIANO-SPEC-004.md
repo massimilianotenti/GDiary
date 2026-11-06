@@ -1,6 +1,6 @@
 # Stato dei pacchetti SPEC-004
 
-Rilevazione locale del 29 ottobre 2026 sui sorgenti e sulle verifiche attuali.
+Rilevazione di base del 29 ottobre 2026; aggiornamento bootstrap del 6 novembre sotto.
 Il riferimento di ambito resta la [SPEC-004, sezione 15](specs/004-usabilita-locale-e-sincronizzazione.md#15-pacchetti-di-implementazione).
 Questa tabella non riduce il piano ai soli incrementi già implementati e non
 certifica il deployment Google: online resta Apps Script 75.
@@ -36,3 +36,13 @@ esiti nel rapporto specifico e in HANDOFF.
 Il piano non autorizza deploy, setup o migrazioni sui dati reali. Le verifiche
 Google richiedono un'azione pertinente autorizzata separatamente; non sono un
 motivo per saltare lo sviluppo locale ancora disponibile.
+
+## Aggiornamento bootstrap — 6 novembre 2026
+
+I seguiti del 5 novembre hanno introdotto checkpoint completo del diario,
+indici per vista, dati comuni per periodo e outbox attiva. Il 6 novembre
+aggiunti benchmark applicativo, limite iniziale agli editor Task e riapertura
+completa Settimana/Abitudini. Le righe 7 e 9 sopra descrivono lo stato di base:
+queste viste ora usano il checkpoint coerente; altre viste e collaudi reali
+restano aperti. Nessuna chiusura aggiuntiva di pacchetti interi. Rapporti:
+VERIFICA-BOOTSTRAP-APPLICATIVO.md e VERIFICA-BOOTSTRAP-VISTE-PERIODO.md.
