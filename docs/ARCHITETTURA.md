@@ -373,6 +373,6 @@ UI Abitudini/giorno/diario continuo, ACK senza rimontaggio e conflitti con
 catalogo confrontato. Nessuna scrittura locale dei cataloghi Goals/Habits.
 IndexedDB v11 invariato; indice Entries preservato sui salvataggi/ACK.
 Nuovo test:habit-log-outbox; repository/browser anche in test:repository.
-Capacità directory 128 identità e migrazioni legacy restano gate espliciti;
+Directory HabitLogs compatibile v1 e routing v2 a 16 shard (massimo teorico 2.176, con bucket saturabili); retention/compattazione del budget da 512 riferimenti per chiave resta gate esplicito;
 nessuna capability reale o offline completo, pacchetto 11 ancora parziale.
 [Contratto, verifiche e attività residue](VERIFICA-OUTBOX-REGISTRAZIONI.md).

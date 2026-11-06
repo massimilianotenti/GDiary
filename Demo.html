@@ -2381,7 +2381,7 @@ function syncHabitLogSheetSource_(logs,habits,goals){
 }
 function syncHabitLogMigrationGateway_(store,trustedScope,source){
  const fail=name=>{throw Object.assign(Error(name==='ConflictError'?'Registrazione modificata altrove. Conserva la bozza e aggiorna.':name),{name});},copy=value=>JSON.parse(syncCommitCanonical_(value));
- const scope=copy(trustedScope),directoryId='habit-log-routing-v1',routeId=key=>'habit-log-route:'+hash(key);
+ const scope=copy(trustedScope),directoryId='habit-log-routing-v1',routingV2Id='habit-log-routing-v2',shardCount=16,shardLimit=128,routeId=key=>'habit-log-route:'+hash(key),shardId=n=>'habit-log-routing-v2-shard:'+n;
  let owned=false;
  const nested={...store,withLock(fn){if(!owned)fail('ProtocolUnavailable');return fn();}};
  const protocol=syncCommitProtocol_(nested,scope),writer=syncHabitLogWriter_(nested,scope);
@@ -2402,7 +2402,12 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
  function directoryData(data){
   if(!fields(data,['format','keys'])||data.format!=='sync-habit-log-routing/v1'||!Array.isArray(data.keys)||data.keys.length>128||data.keys.some(key=>typeof key!=='string'||!syncHabitLogIdentity_(key))||new Set(data.keys).size!==data.keys.length||syncCommitCanonical_([...data.keys].sort())!==syncCommitCanonical_(data.keys))fail('ProtocolCorrupt');return data;
  }
- function directory(){const entity=unwrap(protocol.read('settings',directoryId)).entity;if(!entity)return {keys:[],version:null};if(entity.deleted)fail('ProtocolCorrupt');return {...directoryData(entity.data),version:entity.version};}
+ function directory(){const entity=unwrap(protocol.read('settings',directoryId)).entity;if(!entity)return {keys:[],version:null,digest:hash(null)};if(entity.deleted)fail('ProtocolCorrupt');directoryData(entity.data);return {...entity.data,version:entity.version,digest:hash(entity.data)};}
+ function shardFor(key){return parseInt(hash(key).slice(0,2),16)%shardCount;}
+ function rootData(data){if(!fields(data,['format','legacyVersion','legacyDigest','legacyCount','shardMask'])||data.format!=='sync-habit-log-routing/v2'||!(data.legacyVersion===null||typeof data.legacyVersion==='string')||!/^[a-f0-9]{64}$/.test(data.legacyDigest)||!Number.isInteger(data.legacyCount)||data.legacyCount!==128||typeof data.shardMask!=='string'||!new RegExp('^[01]{'+shardCount+'}$').test(data.shardMask)||!data.shardMask.includes('1'))fail('ProtocolCorrupt');return data;}
+ function shardData(data,n){if(!fields(data,['format','shard','keys'])||data.format!=='sync-habit-log-shard/v1'||data.shard!==n||!Array.isArray(data.keys)||data.keys.length>shardLimit||data.keys.some(key=>typeof key!=='string'||!syncHabitLogIdentity_(key)||shardFor(key)!==n)||new Set(data.keys).size!==data.keys.length||syncCommitCanonical_([...data.keys].sort())!==syncCommitCanonical_(data.keys))fail('ProtocolCorrupt');return data;}
+ function routing(){const legacy=directory(),entity=unwrap(protocol.read('settings',routingV2Id)).entity;if(!entity){for(let n=0;n<shardCount;n++)if(unwrap(protocol.read('settings',shardId(n))).entity)fail('ProtocolCorrupt');return {...legacy,root:null,shards:new Map(),legacy};}if(entity.deleted)fail('ProtocolCorrupt');const root=rootData(entity.data);if(root.legacyVersion!==legacy.version||root.legacyDigest!==legacy.digest||root.legacyCount!==legacy.keys.length)fail('ProtocolCorrupt');const shards=new Map(),keys=[...legacy.keys];for(let n=0;n<shardCount;n++){const stored=unwrap(protocol.read('settings',shardId(n))).entity;if(root.shardMask[n]==='1'){if(!stored||stored.deleted)fail('ProtocolCorrupt');const data=shardData(stored.data,n);shards.set(n,{...data,version:stored.version});keys.push(...data.keys);}else if(stored)fail('ProtocolCorrupt');}if(new Set(keys).size!==keys.length)fail('ProtocolCorrupt');return {keys,version:legacy.version,digest:legacy.digest,root:{...root,version:entity.version},shards,legacy};}
+ function routeChanges(key,index){const descriptor={format:'sync-habit-log-route/v1',key,sourceDigest:hash(null),legacyVersion:''},changes=[upsert('settings',routeId(key),null,descriptor)];if(!index.root){if(index.keys.length<128){changes.push(upsert('settings',directoryId,index.version,{format:'sync-habit-log-routing/v1',keys:[...index.keys,key].sort()}));return changes;}const n=shardFor(key),data={format:'sync-habit-log-shard/v1',shard:n,keys:[key]},root={format:'sync-habit-log-routing/v2',legacyVersion:index.legacy.version,legacyDigest:index.legacy.digest,legacyCount:index.legacy.keys.length,shardMask:Array.from({length:shardCount},(_,i)=>i===n?'1':'0').join('')};changes.push(upsert('settings',shardId(n),null,data),upsert('settings',routingV2Id,null,root));return changes;}const n=shardFor(key),existing=index.shards.get(n);if(existing&&existing.keys.length>=shardLimit)fail('ProtocolUnavailable');changes.push(upsert('settings',shardId(n),existing?.version||null,{format:'sync-habit-log-shard/v1',shard:n,keys:[...(existing?.keys||[]),key].sort()}));if(!existing){const mask=index.root.shardMask.split('');mask[n]='1';const {version,...rootDataValue}=index.root;changes.push(upsert('settings',routingV2Id,index.root.version,{...rootDataValue,shardMask:mask.join('')}));}return changes;}
  function routeData(data,key){if(!fields(data,['format','key','sourceDigest','legacyVersion'])||data.format!=='sync-habit-log-route/v1'||data.key!==key||!/^[a-f0-9]{64}$/.test(data.sourceDigest)||typeof data.legacyVersion!=='string')fail('ProtocolCorrupt');return data;}
  function route(key){const entity=unwrap(protocol.read('settings',routeId(key))).entity;if(!entity||entity.deleted)fail('ProtocolCorrupt');return {...routeData(entity.data,key),version:entity.version};}
  function checkSource(key,descriptor,rows){if(hash(rawOne(key,rows))!==descriptor.sourceDigest)fail('CommitBlocked');}
@@ -2411,12 +2416,12 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
    if(!fields(data,['format','kind','fingerprint','catalogDigest','request'])||data.format!=='sync-habit-log-plan/v1')fail('ProtocolCorrupt');
    if(!/^[a-f0-9]{64}$/.test(data.catalogDigest))fail('ProtocolCorrupt');
    if(data.kind!==kind||data.fingerprint!==fingerprint)fail('OperationMismatch');
-  const request=data.request;if(!fields(request,['operationId','changes'])||request.operationId!==operationId||!Array.isArray(request.changes)||!((kind==='migrate'||kind==='operation')&&request.changes.length===3||kind!=='migrate'&&request.changes.length===1))fail('ProtocolCorrupt');
+  const request=data.request;if(!fields(request,['operationId','changes'])||request.operationId!==operationId||!Array.isArray(request.changes)||!((kind==='migrate'||kind==='operation')&&[3,4].includes(request.changes.length)||kind!=='migrate'&&request.changes.length===1))fail('ProtocolCorrupt');
   const change=request.changes[0];if(!fields(change,['collection','id','baseVersion','action','data'])||change.collection!=='habitLogs'||change.id!==key||change.action!=='upsert'||!fields(change.data,['format','record'])||change.data.format!=='sync-habit-log/v1'||canonicalRecord(change.data.record)!==syncCommitCanonical_(change.data.record)||change.data.record.key!==key)fail('ProtocolCorrupt');
-  if(request.changes.length===3){
-   const r=request.changes[1],d=request.changes[2];
-   if(change.baseVersion!==null||!fields(r,['collection','id','baseVersion','action','data'])||r.collection!=='settings'||r.id!==routeId(key)||r.action!=='upsert'||r.baseVersion!==null||!fields(d,['collection','id','baseVersion','action','data'])||d.collection!=='settings'||d.id!==directoryId||d.action!=='upsert')fail('ProtocolCorrupt');
-   routeData(r.data,key);if(!directoryData(d.data).keys.includes(key))fail('ProtocolCorrupt');
+  if(request.changes.length===3||request.changes.length===4){
+   const r=request.changes[1];if(change.baseVersion!==null||!fields(r,['collection','id','baseVersion','action','data'])||r.collection!=='settings'||r.id!==routeId(key)||r.action!=='upsert'||r.baseVersion!==null)fail('ProtocolCorrupt');routeData(r.data,key);
+   if(request.changes.length===3){const d=request.changes[2];if(!fields(d,['collection','id','baseVersion','action','data'])||d.collection!=='settings'||d.action!=='upsert')fail('ProtocolCorrupt');if(d.id===directoryId){if(!directoryData(d.data).keys.includes(key))fail('ProtocolCorrupt');}else if(d.id===shardId(d.data?.shard)){shardData(d.data,d.data.shard);if(!d.data.keys.includes(key))fail('ProtocolCorrupt');}else fail('ProtocolCorrupt');}
+   else{const s=request.changes[2],root=request.changes[3];if(!fields(s,['collection','id','baseVersion','action','data'])||s.collection!=='settings'||s.id!==shardId(s.data?.shard)||s.action!=='upsert'||!Number.isInteger(s.data?.shard)||!shardData(s.data,s.data.shard).keys.includes(key)||!fields(root,['collection','id','baseVersion','action','data'])||root.collection!=='settings'||root.id!==routingV2Id||root.action!=='upsert')fail('ProtocolCorrupt');rootData(root.data);if(root.data.shardMask[s.data.shard]!=='1')fail('ProtocolCorrupt');}
   }
   return request;
  }
@@ -2424,7 +2429,7 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
   const fingerprint=hash({kind,input}),planKey=hash([scope.principalId,operationId]),id='habit-log-plan:'+planKey;
   let entity=unwrap(protocol.read('settings',id)).entity;
   if(!entity){
-   const prepared=prepare(),data={format:'sync-habit-log-plan/v1',kind,fingerprint,...prepared};planValue(data,kind,fingerprint,operationId,key);
+   const prepared=prepare(),data={format:'sync-habit-log-plan/v1',kind,fingerprint,...prepared};planValue(data,kind,fingerprint,operationId,key);if(syncCommitCanonical_(data.request).length>32768)fail('ProtocolUnavailable');
    const reservation={operationId:'hl-reserve-'+planKey,changes:[{collection:'settings',id,baseVersion:null,action:'upsert',data}]};
    if(typeof store.preflightWrites==='function'){
     const sequence=unwrap(protocol.recover()).committedThrough;
@@ -2449,7 +2454,7 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
  function save(payload){
   const input=syncHabitLogEditInput_(payload),key=input.habitId+'|'+input.date,version=input.version;
   const operationId=payload.operationId===undefined?'habit-log-edit-'+hash(input):payload.operationId;
-  if(!validId(operationId))fail('DataError');const index=directory();
+  if(!validId(operationId))fail('DataError');const index=routing();
   if(!index.keys.includes(key)){
    if(unwrap(protocol.read('settings',routeId(key))).entity!==null||unwrap(writer.read(key)).version!==null)fail('CommitBlocked');
    return source.saveLegacy(payload);
@@ -2468,21 +2473,21 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
   saveOperation(input,expectedScope){return run(()=>{
    checkExpectedScope(expectedScope);input=habitLogOperationInput_(input);const key=input.log.key;
    const plan=savedPlan('operation',input,input.operationId,key,()=>{
-    const index=directory(),routed=index.keys.includes(key);let current,base;
+    const index=routing(),routed=index.keys.includes(key);let current,base;
     if(routed){const descriptor=route(key);checkSource(key,descriptor);current=unwrap(writer.read(key));base=input.baseVersion===descriptor.legacyVersion&&current.version===descriptor.version?descriptor.version:/^commit-[1-9][0-9]{0,15}$/.test(input.baseVersion||'')?input.baseVersion:null;}
-    else{if(rawOne(key)!==null||unwrap(writer.read(key)).version!==null)fail('ProtocolUnavailable');if(input.baseVersion!==null)fail('ConflictError');if(index.keys.length>=128)fail('ProtocolUnavailable');base=null;}
+    else{if(rawOne(key)!==null||unwrap(writer.read(key)).version!==null)fail('ProtocolUnavailable');if(input.baseVersion!==null)fail('ConflictError');base=null;}
     const catalog=source.readCatalog(key),effective=typeof source.mapHabitVersion==='function'?source.mapHabitVersion(input.log.habitId,input.habitUpdatedAt):input.habitUpdatedAt;
     if(!catalog?.habit||!catalog?.goal||catalog.habit.archived==='yes')fail('ConflictError');let prepared;try{prepared=syncPrepareHabitLogEdit_({habitId:input.log.habitId,date:input.log.date,status:input.log.status,checked:JSON.parse(input.log.checklist).checked,habitUpdatedAt:effective},current?.log?{...current.log,updatedAt:current.version}:null,catalog);}catch(error){if(error?.name==='CommitBlocked')fail('ConflictError');throw error;}
     if(syncCommitCanonical_(prepared.record)!==syncCommitCanonical_(input.log))fail('ConflictError');
     const changes=syncPlanHabitLogOperation_({operationId:input.operationId,baseVersion:base,log:prepared.record}).changes;
-    if(!routed)changes.push(upsert('settings',routeId(key),null,{format:'sync-habit-log-route/v1',key,sourceDigest:hash(null),legacyVersion:''}),upsert('settings',directoryId,index.version,{format:'sync-habit-log-routing/v1',keys:[...index.keys,key].sort()}));
+    if(!routed)changes.push(...routeChanges(key,index));
     return {catalogDigest:hash(catalog),request:{operationId:input.operationId,changes}};
    });
    const descriptor=plan.request.changes.length===3?plan.request.changes[1].data:route(key);checkSource(key,descriptor);if(!alreadyApplied(plan.request)&&hash(source.readCatalog(key))!==plan.catalogDigest)fail('ConflictError');const ack=executePlan(plan,key);checkSource(key,descriptor);return {...plan.request.changes[0].data.record,updatedAt:ack.versions[0].version};
   });},
   readOperationState(input){return run(()=>{
    checkExpectedScope(input?.expectedScope);const key=input.key;if(!syncHabitLogIdentity_(key))fail('DataError');let record;
-   if(directory().keys.includes(key)){const descriptor=route(key);checkSource(key,descriptor);const current=unwrap(writer.read(key));record=current.log?{...current.log,updatedAt:current.version}:null;}
+   if(routing().keys.includes(key)){const descriptor=route(key);checkSource(key,descriptor);const current=unwrap(writer.read(key));record=current.log?{...current.log,updatedAt:current.version}:null;}
    else{if(unwrap(writer.read(key)).version!==null)fail('CommitBlocked');record=rawOne(key);}
    return {key,missing:record===null,log:record,catalog:source.readCatalog(key),scope:copy(input.expectedScope)};
   });},
@@ -2497,7 +2502,7 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
   preview(key){return run(()=>{
    if(!syncHabitLogIdentity_(key))fail('DataError');const legacy=rawOne(key),catalog=source.readCatalog(key);
    const record=legacy&&legacy.checklist?snapshot(legacy):null;
-   return {key,legacy,catalog,record,sourceDigest:hash(legacy),migrated:directory().keys.includes(key)};
+   return {key,legacy,catalog,record,sourceDigest:hash(legacy),migrated:routing().keys.includes(key)};
   });},
   migrate(input){return run(()=>{
    if(!fields(input,['operationId','key','expectedLegacy','expectedCatalog','record'])||!validId(input.operationId)||!syncHabitLogIdentity_(input.key))fail('DataError');
@@ -2515,15 +2520,16 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
    if(expected&&(record.status!==expected.status||expected.checklist&&syncCommitCanonical_(record)!==syncCommitCanonical_(snapshot(expected))))fail('CommitBlocked');
    const plan=savedPlan('migrate',{key,expected,catalog:input.expectedCatalog,record},input.operationId,key,()=>{
     if(hash(rawOne(key))!==sourceDigest||hash(source.readCatalog(key))!==hash(input.expectedCatalog))fail('CommitBlocked');
-    const index=directory();if(index.keys.includes(key)||index.keys.length>=128||unwrap(writer.read(key)).version!==null)fail('CommitBlocked');
-    return {catalogDigest:hash(input.expectedCatalog),request:{operationId:input.operationId,changes:[syncPlanHabitLogOperation_({operationId:input.operationId,baseVersion:null,log:record}).changes[0],upsert('settings',routeId(key),null,{format:'sync-habit-log-route/v1',key,sourceDigest,legacyVersion:expected?.updatedAt||''}),upsert('settings',directoryId,index.version,{format:'sync-habit-log-routing/v1',keys:[...index.keys,key].sort()})]}};
+    const index=routing();if(index.keys.includes(key)||unwrap(writer.read(key)).version!==null)fail('CommitBlocked');
+    const routeOps=routeChanges(key,index);routeOps[0].data.sourceDigest=sourceDigest;routeOps[0].data.legacyVersion=expected?.updatedAt||'';
+    return {catalogDigest:hash(input.expectedCatalog),request:{operationId:input.operationId,changes:[syncPlanHabitLogOperation_({operationId:input.operationId,baseVersion:null,log:record}).changes[0],...routeOps]}};
    });
    if(hash(rawOne(key))!==sourceDigest)fail('CommitBlocked');const ack=executePlan(plan,key);if(hash(rawOne(key))!==sourceDigest)fail('CommitBlocked');return ack;
   });},
   saveLegacy(payload){return run(()=>delta(save(payload)));},
   readRows(ranges=null){return run(()=>{
    if(ranges!==null&&(!Array.isArray(ranges)||!ranges.length||ranges.length>10||ranges.some(range=>!range||typeof range.from!=='string'||typeof range.to!=='string'||!validDate_(range.from)||!validDate_(range.to)||range.from>range.to||(Date.parse(range.to)-Date.parse(range.from))/86400000>400)))fail('DataError');
-   const index=directory(),rows=source.readRows(ranges);if(!Array.isArray(rows))fail('ProtocolCorrupt');
+   const index=routing(),rows=source.readRows(ranges);if(!Array.isArray(rows))fail('ProtocolCorrupt');
    const selected=index.keys.filter(key=>ranges===null||ranges.some(range=>key.slice(-10)>=range.from&&key.slice(-10)<=range.to)),replacements=new Map();
    for(const key of selected){const descriptor=route(key);checkSource(key,descriptor,rows.filter(row=>row.key===key));const current=unwrap(writer.read(key));if(current.version===null)fail('ProtocolCorrupt');replacements.set(key,current.log?{...current.log,updatedAt:current.version}:null);}
    const out=[];for(const row of rows){if(replacements.has(row.key)){const replacement=replacements.get(row.key);if(replacement)out.push(replacement);replacements.delete(row.key);}else out.push(row);}

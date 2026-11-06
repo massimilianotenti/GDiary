@@ -1,5 +1,28 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Directory HabitLogs v2 e limiti di capacità — 7 novembre
+
+Dalla base `12bfbe8` il routing HabitLogs legge ancora directory v1 e aggiunge
+un indice v2 scoped a 16 shard da massimo 128 chiavi ciascuno. La transizione
+alla 129a identità e le aggiunte successive pubblicano record/route/shard/root
+con il commit recuperabile; directory parziali, orfane o corrotte bloccano
+senza fallback. Il feed della transizione 128→129 è verificato con pagine di un
+commit. Prove synthetic server: fixture 127/128/129/256/1.000,
+fault/restart/replay e 429 fault sullo Sheet store; Chromium/IndexedDB reale
+riapre 1.000 registrazioni isolate per archivio.
+
+La directory ha un massimo teorico di 2.176 identità, con possibile saturazione
+di un bucket prima. Il commit store continua a limitare i riferimenti attivi a
+512 per chiave: la prova raggiunge il limite prima della 129a nuova registrazione
+nel profilo senza compattazione. Quindi il routing v2 elimina il tetto del
+formato, ma non sblocca archivi saturi e non chiude retention/capacità del
+pacchetto 12. Snapshot HTTP a 1.000 identità, replay feed a questa scala,
+compatibilità dei client distribuiti e collaudo Google restano da provare.
+Nessuna migrazione reale, capability, deploy o commit. La race di creazione su
+shard v2 fra due client simultanei e una pagina HTTP snapshot/feed completa a
+1.000 restano da provare.
+Dettagli: [verifica routing e capacità HabitLogs](VERIFICA-CAPACITA-ROUTING-HABITLOGS.md).
+
 ## Feed cataloghi HabitLogs end-to-end fra schede — 6 novembre
 
 Aggiornamento dalla base `beed3f9`: il test E2E Chromium ora include retry su

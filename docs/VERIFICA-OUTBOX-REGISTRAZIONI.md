@@ -76,8 +76,7 @@ incerta e non cambia ID durante il retry. Lo spazio hl-reserve- è riservato.
 Creazione canonica con route e directory atomiche soltanto senza preimmagine
 legacy. Una registrazione legacy esistente richiede la migrazione esplicita già
 prevista; nessuna migrazione implicita o doppia scrittura. La tabella HabitLogs
-legacy resta congelata. Il limite attuale della directory è **128 identità**,
-oltre ai budget del registro: non è capacità sufficiente dimostrata per l'uso
+legacy resta congelata. La directory v1 è compatibile ma il routing v2 aggiunto nella tranche successiva usa 16 shard da 128: massimo teorico 2.176 con bucket saturabili. Il budget del registro resta il limite effettivo: lo scenario senza compattazione si ferma a 512 riferimenti prima della 129a nuova identità; non è capacità sufficiente dimostrata per l'uso
 continuativo reale del tracker.
 
 Il dispatcher riusa il trasporto dei record comuni; valida snapshot e versione
@@ -219,3 +218,8 @@ della facade Catalog; gli hash di sorgenti, generati e test sono rimasti
 identici fino al termine. Un precedente avvio era stato interrotto per
 includere la correzione di navigazione; un altro giro completo è passato
 prima della verifica finale congelata. Nessun commit o servizio Google.
+
+
+### Seguito: directory HabitLogs v2 — 7 novembre 2026
+
+La directory v1 resta leggibile; dalla 129a identità si usa una root v2 e shard atomici, senza riscrittura massiva. Fixture sintetiche leggono 127/128/129/256/1.000 identità; fault/restart/replay coprono il passaggio e i dati parziali. Chromium con IndexedDB reale verifica 1.000 record persistenti e scope archivio. La directory teorica arriva a 2.176 ma ogni shard è limitato a 128 e può saturarsi. Il budget corrente di 512 riferimenti/chiave resta un gate: nel profilo senza compattazione impedisce nuove scritture prima del passaggio v2. Snapshot keyset e replay feed HTTP a 1.000, compatibilità client distribuiti, retention e collaudo Google restano residui. [Rapporto routing/capacità](VERIFICA-CAPACITA-ROUTING-HABITLOGS.md). Pacchetto 11 aperto; offline completo non disponibile.
