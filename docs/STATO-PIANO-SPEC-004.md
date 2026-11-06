@@ -71,3 +71,14 @@ Goals/Habits restano fuori outbox. Nessuna attivazione reale; pacchetto 11
 parziale. Directory limitata a 128 log, migrazioni, retention/compatibilità e
 iframe Google restano gate separati.
 [Rapporto corrente](VERIFICA-OUTBOX-REGISTRAZIONI.md).
+
+### Seguito: coerenza locale cataloghi HabitLogs — parziale, 6 novembre
+
+Introdotta la prova IndexedDB per inventario/versioni Goals/Habits e il guard
+atomico sulla scrittura HabitLogs. Delta catalogo invalida la prova; l'intento
+resta non confermato quando baseline/catalogo non sono dimostrabili. Le prove
+browser/repository HabitLogs, `test:repository`, `test:release` e `npm test`
+sono superate sul risultato integrato; il riallineamento catalogo in browser è
+simulato tramite feed sintetico. Pacchetto 11 resta aperto per i limiti elencati
+nel rapporto, non per completamento implicito dell'intero pacchetto.
+[Rapporto e limiti](VERIFICA-CATALOGHI-HABITLOGS-LOCALE.md).

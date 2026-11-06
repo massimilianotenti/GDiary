@@ -722,3 +722,13 @@ Nuovo test:habit-log-outbox; repository/browser anche in test:repository.
 Capacità directory 128 identità e migrazioni legacy restano gate espliciti;
 nessuna capability reale o offline completo, pacchetto 11 ancora parziale.
 [Contratto, verifiche e attività residue](../VERIFICA-OUTBOX-REGISTRAZIONI.md).
+
+### Seguito locale: prova cataloghi HabitLogs — 6 novembre 2026
+
+Tranche parziale dalla base `2ee5db3`: inventario versionato dei cataloghi
+verificati nel feed, invalidazione su delta Goals/Habits e controllo atomico
+prima della scrittura HabitLogs. Browser con IndexedDB/backend sintetico,
+`test:repository`, `test:release` e `npm test` superati sul risultato integrato.
+Riallineamento in browser simulato con feed sintetico; gate Google e copertura
+aggiuntiva restano aperti. Non si estende outbox ai cataloghi e non si dichiara
+offline completo. Stato e limiti: [rapporto di verifica](../VERIFICA-CATALOGHI-HABITLOGS-LOCALE.md).

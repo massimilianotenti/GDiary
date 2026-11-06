@@ -1,5 +1,22 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Stato locale HabitLogs con cataloghi verificati — 6 novembre
+
+Seguito locale in corso dalla base 2ee5db3. IndexedDB mantiene ora una prova
+separata del checkpoint di vista: cursore del feed completo e inventari
+`[id, updatedAt]` di Goals/Habits. I delta catalogo invalidano la prova; ACK
+HabitLogs non la invalidano. Il repository ricontrolla la prova e le versioni
+nella stessa transazione del salvataggio HabitLogs; la UI confronta anche
+pianificazione, ciclo, data e baseline e conserva l'intenzione se non può
+dimostrarli. Nessuna mutazione catalogo entra nell'outbox.
+
+Build, prove browser/repository HabitLogs, `test:repository`, `test:release` e
+`npm test` sono superati sul risultato integrato. Il riallineamento dopo scelta
+Google è simulato con feed sintetico; non costituisce prova Google né abilita
+scritture catalogo. La tranche resta parziale e il pacchetto 11 aperto.
+Rapporto: [prova locale dei cataloghi HabitLogs](VERIFICA-CATALOGHI-HABITLOGS-LOCALE.md).
+
+
 
 
 ## Outbox locale HabitLogs — 6 novembre

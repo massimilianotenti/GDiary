@@ -129,6 +129,31 @@ spunte ai nuovi ID. Il server verifica nuovamente le condizioni dopo il confront
 Le righe legacy senza checklist completa non vengono ricostruite silenziosamente
 da quella odierna. Cataloghi e stato incompleti restano gate espliciti.
 
+## Seguito: prova locale dei cataloghi — 6 novembre 2026
+
+Il repository separa ora l'attestazione dei cataloghi dal checkpoint di vista.
+`markReadCheckpoint` registra in `archiveMeta.coverage.habitCatalogProof` il
+cursore del feed completo e gli inventari ordinati `[id, updatedAt]` di Goals e
+Habits, nella stessa transazione che verifica la scansione completa. Le voci
+canoniche restano in `commonRecords`; la prova descrive completezza e versioni,
+non duplica i cataloghi né contiene dati del diario.
+
+Un delta o tombstone Goals/Habits invalida la prova. Un avanzamento del cursore
+senza mutazioni di catalogo la porta al nuovo cursore; ACK di HabitLogs e
+invalidazioni del checkpoint generale non la cancellano. La lettura del basis
+richiede ID e versioni presenti nell'inventario e record corrispondenti. La
+scrittura atomica dell'outbox confronta di nuovo prova, cursore e versioni
+Goals/Habits nella transazione di commit. La UI verifica inoltre piano, ciclo,
+data, archiviazione e baseline; se la prova manca o la vista è obsoleta mantiene
+l'intenzione non confermata, senza inferire checklist.
+
+La prova repository con IndexedDB reale copre inventario verificato, delta
+catalogo che invalida la prova, rifiuto della versione precedente e regressioni
+di ACK/outbox. Il consolidamento browser aggiorna la revisione UI dopo ACK e
+simula il riallineamento esplicito tramite feed completo sintetico. La suite
+Chromium completa della tranche e le suite integrate sono superate; questa
+simulazione non sostituisce un test Google o con catalogo reale.
+
 ## Verifiche ripetibili
 
 Nuovo npm run test:habit-log-outbox, incluso in npm test. Repository e browser
