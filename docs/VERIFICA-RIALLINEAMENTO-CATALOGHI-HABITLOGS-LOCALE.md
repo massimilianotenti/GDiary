@@ -1,6 +1,6 @@
 # Riallineamento locale del catalogo HabitLogs — 6 novembre 2026
 
-## Seguito: concorrenza fra schede
+## Seguito: ordini concorrenti fra schede — base f978f4a
 
 Le schede attive ora si scambiano tramite `BroadcastChannel` una sola
 invalidazione senza scope, ID o contenuti. La ricevente rilegge la propria
@@ -14,17 +14,18 @@ L'aggiornamento feed non invalida più l'indice Entries per sole mutazioni
 Goals/Habits/HabitLogs o di altre collezioni senza impatto sulla ricerca; le
 modifiche a Entries, corpi, progetti e file lo invalidano ancora. La prova
 Chromium usa due pagine reali dello stesso contesto persistente e IndexedDB
-condivisa, con backend sintetico: controllo focalizzato mentre l'altra scheda
-applica un delta senza bump di versione; conferma in una scheda seguita da
-tombstone Goal; delta durante ACK HabitLogs trattenuto, con seconda modifica
-locale ancora pendente; selezione/focus conservati; lettura tardiva dopo cambio
-scope e revoca; indicatore di errore/retry su feed incompleto. Questo non è un
-collaudo Google.
+condivisa, con backend sintetico: controllo tracker focalizzato in una scheda e
+rich editor con testo sporco, focus e selezione nell'altra durante delta senza
+bump di versione; conferma durevole invalidata da un delta Goal con nuova
+versione prima del readback UI; conferma peer seguita da tombstone; ACK HabitLogs
+prima, durante e dopo delta; modifica successiva ancora pendente durante ACK;
+lettura tardiva dopo cambio scope/revoca e feed incompleto con retry. Nessun
+payload privato viaggia nel BroadcastChannel. Questo non è un collaudo Google.
 
 Non è dimostrato ogni ordine possibile di tre o più feed/ACK, la selezione di
-testo in ogni editor o una gara reale fra due form sporchi in viste diverse.
-Restano prove mirate utili per ulteriori incrementi; la copertura riportata è
-limitata agli scenari nominati.
+testo in ogni editor o due form testuali sporchi simultaneamente in viste diverse.
+La copertura resta limitata agli ordini esplicitamente riprodotti e non implica
+la correttezza di tutte le interleaving possibili.
 
 ## Risultato della tranche
 
@@ -52,18 +53,19 @@ l'indice Entries.
 - `npm run build`: superato; rigenerati `Index.html` e `Demo.html`, preparati i
   sei file Apps Script.
 - `tests/verify-habit-log-outbox-repository.cjs`: superato con Chromium e
-  IndexedDB reale. Verifica anche feed completo identico con conferma durevole,
-  invalidazione dopo delta e tombstone Goal/Habit, upsert senza cambio versione,
-  guard di scrittura e preservazione dell'indice Entries. Due handle IndexedDB
-  verificano ACK stale, feed più vecchio dopo delta più nuovo e cambio archivio.
+  IndexedDB reale. Verifica feed identico e confermato, delta/tombstone, upsert
+  senza cambio versione, guard scrittura e indice Entries. Due handle verificano
+  ACK stale, feed vecchio e cambio archivio. Una matrice esplicita prova ACK log
+  prima del delta, ACK dopo un secondo delta con baseline draft conservata, e
+  invalidazione persistente della conferma anche dopo entrambi gli ACK.
 - `tests/verify-habit-log-outbox-browser.cjs`: superato con Demo/backend
   sintetico, due pagine Chromium nello stesso contesto persistente e IndexedDB
-  reale condivisa. Prova il segnale cross-tab senza payload privati, delta senza
-  bump `updatedAt`, controllo/focus e selezione checkbox conservati, conferma
-  peer seguita da tombstone Goal, e un delta mentre l'ACK HabitLogs è trattenuto:
-  la modifica locale successiva resta pendente e il controllo rimane montato.
-  Include letture tardive scartate dopo cambio scope e revoca, feed incompleto,
-  errore/retry, riavvio e checklist storica non rimappata.
+  reale condivisa. Prova il segnale cross-tab senza payload privati; delta senza
+  bump e con nuova versione; rich editor sporco con testo/focus/selezione
+  conservati mentre il tracker è attivo nell'altra scheda; ACK durevole poi
+  delta prima del readback UI, che resta bloccato; peer confirm/tombstone; delta
+  mentre l'ACK log è trattenuto e nuova modifica ancora pendente. Include risposta
+  tardiva dopo cambio scope e revoca, feed incompleto/errore/retry e riavvio.
 - `npm run test:repository`: superato, incluse regressioni Days, Weeks e
   HabitLogs.
 - `npm run test:release`: superato.
@@ -77,17 +79,21 @@ scrive cataloghi su Google.
 
 Le prove repository coprono delta/tombstone Goal/Habit, contenuto con versione
 invariata, due handle, ACK stale, feed più vecchio e cambio scope. La prova UI
-mirata copre una interleaving: ACK HabitLogs trattenuto, modifica successiva
-locale, delta catalogo da altra pagina e successiva conferma. Non copre tutti
-gli ordini possibili di più ACK/feed, né due form sporchi in viste diverse
-mentre arrivano insieme. Il canale propaga invalidazioni solo fra pagine attive;
+mirata copre la gara dell'ACK UI dopo commit e prima del readback, il dirty
+editor in una scheda mentre il tracker è attivo nell'altra, e il delta durante
+ACK HabitLogs trattenuto con modifica successiva locale. Il repository prova ACK
+prima e dopo delta, preservazione del draft dipendente e freshness dell'indice.
+Non copre tutti gli ordini possibili di più ACK/feed, né due form testuali
+sporchi in viste diverse mentre arrivano insieme. Il canale propaga invalidazioni solo fra pagine attive;
 una pagina riaperta recupera lo stato dalla IndexedDB durante bootstrap.
 
 Editor sporchi e dettagli in modifica non vengono smontati per la revisione:
 la UI chiede di conservarli prima di procedere. È provata la conservazione di
-focus e selezione del checkbox nei casi descritti, non per ogni editor o cambio
-vista/catalogo. Le microazioni riordinate non vengono rimappate; se il
-checklist storico non è compatibile, la scelta locale nel dialogo conflitto
+focus e selezione del checkbox e del rich editor nei casi descritti, non per
+ogni editor o cambio vista/catalogo. Le prove HabitLogs precedenti verificano
+che le microazioni storiche non vengono rimappate; non è provata la gara di un
+riordino catalogo durante una risoluzione conflitto. Se il checklist storico
+non è compatibile, la scelta locale nel dialogo conflitto
 resta disabilitata quando il record remoto è assente e la checklist non è
 compatibile.
 

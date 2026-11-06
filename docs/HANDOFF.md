@@ -1,8 +1,8 @@
 # Passaggio di consegne — 17 ottobre 2026
 
-## Concorrenza fra schede nel riallineamento HabitLogs — 6 novembre
+## Ordini concorrenti del riallineamento HabitLogs — 6 novembre
 
-Seguito locale dalla base adaa4a7. Il sync/bootstrap esistente aggiorna
+Seguito locale dalla base f978f4a. Il sync/bootstrap esistente aggiorna
 Goals/Habits; la UI espone riprova, revisione locale e conferma utente. La
 conferma durevole è scoped e legata al fingerprint e al cursore del feed
 completo. Un delta effettivo invalida prova e conferma e persiste un flag di
@@ -11,9 +11,9 @@ identico le conserva. Le scritture HabitLogs ricontrollano il guard nella transa
 IndexedDB. Nessuna mutazione di catalogo è in outbox e nessuna registrazione
 bloccata viene inviata automaticamente.
 
-Il canale fra schede trasporta solo un segnale d'invalidazione privo di scope e contenuti; la ricevente rilegge IndexedDB nello scope corrente. Letture e conferme asincrone obsolete sono scartate. Il repository mantiene fresco l'indice Entries per delta catalogo/outbox che non lo riguardano. Prove Chromium con due pagine/IndexedDB condivisa coprono delta senza bump, conferma poi tombstone, delta mentre un ACK HabitLogs è trattenuto e una modifica successiva resta pendente, focus/stato controllo, scope/revoca durante lettura tardiva e feed incompleto/retry.
+Il canale fra schede trasporta solo un segnale d'invalidazione privo di scope e contenuti; la ricevente rilegge IndexedDB nello scope corrente. Letture e conferme asincrone obsolete sono scartate. Il repository mantiene fresco l'indice Entries per delta catalogo/outbox che non lo riguardano. Prove Chromium con due pagine/IndexedDB condivisa coprono delta senza bump e con nuova versione, conferma invalidata da un delta arrivato dopo l'ACK IndexedDB ma prima del readback UI, ACK log prima/durante/dopo delta, tombstone, modifica successiva pendente, rich editor sporco con focus/selezione e tracker attivo nell'altra scheda, scope/revoca durante lettura tardiva e feed incompleto/retry.
 
-Build, test browser/repository HabitLogs, `test:repository`, `test:release` e `npm test` sono superati. Il backend browser è sintetico, non un collaudo Google. Non sono dimostrati tutti gli ordini di tre o più eventi concorrenti, selezione in ogni editor o due form sporchi in viste diverse. Il pacchetto 11 resta aperto e offline completo non disponibile.
+Build, test browser/repository HabitLogs, `test:repository`, `test:release` e `npm test` sono superati. Il backend browser è sintetico, non un collaudo Google. Non sono dimostrati tutti gli ordini di tre o più eventi concorrenti, la selezione in ogni editor o due form testuali sporchi in viste diverse. Il pacchetto 11 resta aperto e offline completo non disponibile.
 Risultati e copertura: [rapporto di riallineamento](VERIFICA-RIALLINEAMENTO-CATALOGHI-HABITLOGS-LOCALE.md).
 
 

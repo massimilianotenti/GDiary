@@ -97,16 +97,17 @@ disponibile.
 [Rapporto e limiti](VERIFICA-RIALLINEAMENTO-CATALOGHI-HABITLOGS-LOCALE.md).
 
 
-### Seguito: concorrenza del riallineamento HabitLogs fra schede — parziale, 6 novembre
+### Seguito: ordini concorrenti del riallineamento HabitLogs — parziale, 6 novembre
 
-Sul commit adaa4a7 il segnale di invalidazione cross-tab, privo di dati privati,
-fa rileggere la prova dallo scope locale. Token di lettura e verifica post-ACK
-impediscono a risposte obsolete o delta successivi di lasciare lo stato `ready`.
-Delta Goals/Habits e ACK HabitLogs non invalidano inutilmente l'indice Entries.
-Due pagine Chromium con IndexedDB condivisa provano delta/tombstone, conferma
-peer, delta durante ACK trattenuto, modifica successiva, focus, cambio scope,
-revoca e retry feed incompleto. Restano non provati gli ordini arbitrari di più
-eventi e tutti i tipi di selezione/editor. Rapporto aggiornato:
-[concorrenza del riallineamento](VERIFICA-RIALLINEAMENTO-CATALOGHI-HABITLOGS-LOCALE.md).
-Il backend è sintetico; il pacchetto 11 rimane aperto e offline completo non è
-disponibile.
+Sul commit f978f4a la prova browser estende la copertura degli ordini di ACK,
+feed e conferma fra schede. La conferma UI viene verificata dopo il commit
+IndexedDB: un delta che si inserisce prima del readback la lascia bloccata.
+Prove Chromium a due pagine con archivio condiviso coprono ACK prima/durante/dopo
+il delta, versione invariata e aggiornata, tombstone, ACK dipendente ancora in
+coda, editor rich-text sporco con focus/selezione e tracker attivo nell'altra
+scheda, cambio scope, revoca e retry dopo feed incompleto. Il repository mantiene
+fresco l'indice Entries sui delta di catalogo non pertinenti. Restano non provati
+tutti gli ordini arbitrari di tre o più feed/ACK, ogni tipo di editor e due form
+testuali sporchi simultanei in viste diverse. Rapporto:
+[ordini concorrenti del riallineamento](VERIFICA-RIALLINEAMENTO-CATALOGHI-HABITLOGS-LOCALE.md).
+Il backend è sintetico; pacchetto 11 aperto, offline completo non disponibile.
