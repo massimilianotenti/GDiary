@@ -2,6 +2,24 @@
 
 ## Feed cataloghi HabitLogs end-to-end fra schede — 6 novembre
 
+Aggiornamento dalla base `beed3f9`: il test E2E Chromium ora include retry su
+feed incompleto/errore, tombstone prodotto dal commit store sintetico, sequenza
+conferma → invio HabitLogs con ACK trattenuto → delta consumato dalla seconda
+scheda → ACK, modifica successiva conservata, registrazione bloccata non
+spedita e risposta feed rilasciata dopo revoca del consenso. Il test percorre
+`getChanges`, `createSyncConsumer`, repository, handler applicativo e
+BroadcastChannel con due pagine e IndexedDB condivisa. Corretto anche lo stato
+UI che restava `ready` dopo feed fallito: ora passa a `stale` con retry.
+
+I limiti restano espliciti: upsert con `updatedAt` invariato è coperto solo da
+test repository diretto. Il test E2E verifica editor rich text sporco, formato,
+testo, nodo, focus e selezione durante feed/render, oltre al tracker nella
+scheda peer. L'editor resta attivo anche mentre l'altra scheda ha l'ACK
+trattenuto, modifica la stessa cella e la prima consuma un delta.
+Nessun caso a percorso diretto è dichiarato E2E. Backend sintetico, non collaudo Google; pacchetto 11
+aperto, offline completo non disponibile. Nessun deploy, Google o commit.
+Dettagli: [rapporto di riallineamento](VERIFICA-RIALLINEAMENTO-CATALOGHI-HABITLOGS-LOCALE.md).
+
 Alla base `1cf9d07` aggiunta una prova Chromium a due pagine con IndexedDB
 condivisa: una mutazione catalogo canonica nel backend sintetico genera un
 commit, il consumer lo applica e il percorso app di riallineamento notifica la

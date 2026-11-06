@@ -1,5 +1,54 @@
 # Riallineamento locale del catalogo HabitLogs — 6 novembre 2026
 
+## Seguito E2E dalla base beed3f9 — 6 novembre 2026
+
+Esteso `tests/verify-habit-catalog-sync-e2e-browser.cjs`: due pagine Chromium
+con profilo persistente e IndexedDB condivisa attraversano l'API/feed
+sintetico, `createSyncConsumer`, repository, handler di riallineamento e
+BroadcastChannel. Il test non chiama `publishHabitCatalogTabChange` e non
+applica delta dal test al repository.
+
+| Caso | Prova e percorso | Esito/limite |
+|---|---|---|
+| Goal e Habit upsert con versione nuova | `saveGoal`/`saveHabit` canonici sintetici → `getChanges` → consumer → handler → IndexedDB/peer | E2E; entrambi i record, cursore/prova e invalidazione conferma verificati |
+| Goal/Habit upsert con `updatedAt` invariato | `verify-habit-log-outbox-repository.cjs` applica direttamente al repository il caso senza bump | Non E2E. Il protocollo feed sintetico assegna al commit una nuova versione e il consumer la applica; non si forza un feed non conforme per simulare l'invarianza |
+| Tombstone Habit | inserimento e cancellazione sintetici tramite commit store recuperabile, poi `getChanges` e consumer | E2E; rappresenta un feed sintetico valido, non una mutazione applicativa Google |
+| Feed incompleto, errore e retry | risposte sintetiche `getChanges` via RPC reale del test, poi refresh UI | E2E; errore/incomplete mantengono `stale`, il retry applica il commit |
+| Conferma → operazione HabitLogs/ACK trattenuto → delta catalogo → ACK | click di conferma, checkbox UI, dispatcher e feed consumato nell'altra pagina con barriere | E2E; la modifica successiva alla stessa cella resta nel draft dopo ACK; nuova intenzione bloccata non viene spedita |
+| Risposta tardiva dopo revoca | risposta feed acquisita e trattenuta al confine RPC; revoca locale reale della cache prima del rilascio | E2E sintetico; la copia cancellata non viene ripopolata |
+| Tracker focalizzato simultaneo al feed | pagina peer mantiene lo stesso nodo checkbox e microazione focalizzata mentre la prima consuma il delta e la UI pubblica l'invalidazione | E2E per focus/nodo tracker |
+| Rich editor e tracker simultanei al feed/ACK | pagina consumer mantiene editor contenteditable con grassetto, testo, nodo, focus e selezione mentre l'altra scheda ha un ACK HabitLogs trattenuto, modifica la stessa cella e la prima applica un delta | E2E; prova nodo/focus/selezione sia nel feed iniziale sia nell'interleaving ACK/delta |
+
+La sequenza concorrente usa barriere sul ritorno `getChanges`/ACK; l'ordine non
+dipende da sleep di scheduling. Il test verifica che catalogo e ACK HabitLogs
+non rendano obsoleto l'indice Entries già fresco. Per il caso `updatedAt`
+immutato resta prova repository diretta. Il contratto `syncCatalogSnapshot_`
+esclude `updatedAt` dal payload canonico e `sync-consumer` assegna al record la
+versione del commit: nel feed valido non esiste un upsert catalogo con
+`updatedAt` invariato dopo l'applicazione. Non si maschera questo limite con un
+delta applicato direttamente.
+
+Il percorso UI rivela un difetto corretto in `frontend/shell.html`: se un
+refresh `getChanges` terminava con errore o feed incompleto, la vecchia prova
+catalogo poteva lasciare lo stato UI `ready`. Ora il risultato fallito porta
+lo stato a `stale` e mostra il retry; la nuova regressione E2E lo verifica.
+Rigenerati `Index.html` e `Demo.html`; bootstrap UTF-8, sei file Apps Script e
+`ROOT_FOLDER_ID` segnaposto controllati.
+
+Verifiche dalla base `beed3f9`: `npm run build`, `node
+tests/verify-habit-catalog-sync-e2e-browser.cjs`, `npm run test:repository`,
+`npm run test:release`, `npm test` e `git diff --check` superati. La suite
+`npm test` ha incluso le regressioni di Days, Weeks e HabitLogs, incluse le
+matrici di recovery e i test UI/browser con IndexedDB reale. Il test E2E
+cataloghi è in `test:repository`.
+
+Il backend è sintetico e non è collaudo Google. La tranche non abilita
+capability, non scrive dati reali e non dichiara completo il pacchetto 11 o
+l'offline. Resta la prova E2E di upsert con versione invariata, impossibile da
+rappresentare con l'attuale versione monotona dei commit; il caso resta coperto
+dal repository diretto. I test diretti non vengono conteggiati come prova
+end-to-end.
+
 ## Seguito: ordini concorrenti fra schede — base f978f4a
 
 Le schede attive ora si scambiano tramite `BroadcastChannel` una sola

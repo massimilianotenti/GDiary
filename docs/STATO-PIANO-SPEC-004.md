@@ -39,13 +39,20 @@ motivo per saltare lo sviluppo locale ancora disponibile.
 
 ## Aggiornamento evidenze cataloghi HabitLogs — 6 novembre 2026
 
-Aggiunta in `test:repository` una prova E2E Chromium a due schede per un
-aggiornamento canonico Habit che attraversa backend sintetico, feed,
-`createSyncConsumer`, IndexedDB e BroadcastChannel/UI. La prova estende
-l'evidenza del pacchetto 11 senza chiuderlo: restano tombstone via consumer,
-ordini concorrenti ulteriori e i gate elencati nel rapporto
-`VERIFICA-RIALLINEAMENTO-CATALOGHI-HABITLOGS-LOCALE.md`. Il conteggio della
-tabella sopra non cambia.
+Aggiornata dalla base beed3f9 la prova `verify-habit-catalog-sync-e2e-browser.cjs`:
+upsert Goals e Habits canonici via feed,
+retry incompleto/errore, tombstone attraverso commit store e feed sintetico,
+sequenza conferma/invio HabitLogs/ACK trattenuto/delta/ACK, modifica successiva
+preservata, intenzione bloccata non inviata e risposta tardiva dopo revoca.
+La prova attraversa consumer, repository, handler UI e BroadcastChannel su due
+pagine Chromium con IndexedDB condivisa; durante il feed mantiene un editor
+rich text sporco con formato, testo, nodo, focus e selezione, più il tracker
+nella scheda peer. Corretto lo stato UI da `ready` a `stale` quando il feed
+fallisce. L'editor resta attivo anche durante l'ACK trattenuto, la modifica
+successiva della stessa cella e il delta. L'upsert con `updatedAt` invariato
+resta dimostrato solo da prova repository diretta. Il conteggio della
+tabella sopra non cambia; pacchetto 11 e offline restano aperti. Limiti e
+risultati: `VERIFICA-RIALLINEAMENTO-CATALOGHI-HABITLOGS-LOCALE.md`.
 
 ## Aggiornamento bootstrap — 6 novembre 2026
 
