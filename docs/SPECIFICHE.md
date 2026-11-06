@@ -272,3 +272,17 @@ editata. Errori conservano la bozza; conflitti offrono confronto e scelta
 locale/Google, con storico. Le capability reali restano false; registrazioni
 abitudini e cataloghi mantengono i contratti precedenti. Dettagli e gate in
 VERIFICA-OUTBOX-SETTIMANE.md. Nessuna dichiarazione di offline completo.
+
+
+## Seguito locale HabitLogs — 6 novembre 2026
+
+Outbox estesa alle registrazioni, oltre a Days/Weeks: snapshot completo con
+identità habitId|data, checklist storica, habitUpdatedAt originario, commit
+IndexedDB atomico e writer con dipendenze dei cataloghi verificate sotto lock.
+UI Abitudini/giorno/diario continuo, ACK senza rimontaggio e conflitti con
+catalogo confrontato. Nessuna scrittura locale dei cataloghi Goals/Habits.
+IndexedDB v11 invariato; indice Entries preservato sui salvataggi/ACK.
+Nuovo test:habit-log-outbox; repository/browser anche in test:repository.
+Capacità directory 128 identità e migrazioni legacy restano gate espliciti;
+nessuna capability reale o offline completo, pacchetto 11 ancora parziale.
+[Contratto, verifiche e attività residue](VERIFICA-OUTBOX-REGISTRAZIONI.md).

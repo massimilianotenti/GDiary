@@ -362,3 +362,17 @@ aggiorna la baseline sul nodo montato e conserva le revisioni effettivamente
 editate dalla scheda. Commit locali e ACK invalidano le letture UI tardive,
 conservando un indice Entries invariato. Contratti/gate e prove in
 VERIFICA-OUTBOX-SETTIMANE.md. Nessuna estensione a registrazioni/cataloghi.
+
+
+## Seguito locale HabitLogs — 6 novembre 2026
+
+Outbox estesa alle registrazioni, oltre a Days/Weeks: snapshot completo con
+identità habitId|data, checklist storica, habitUpdatedAt originario, commit
+IndexedDB atomico e writer con dipendenze dei cataloghi verificate sotto lock.
+UI Abitudini/giorno/diario continuo, ACK senza rimontaggio e conflitti con
+catalogo confrontato. Nessuna scrittura locale dei cataloghi Goals/Habits.
+IndexedDB v11 invariato; indice Entries preservato sui salvataggi/ACK.
+Nuovo test:habit-log-outbox; repository/browser anche in test:repository.
+Capacità directory 128 identità e migrazioni legacy restano gate espliciti;
+nessuna capability reale o offline completo, pacchetto 11 ancora parziale.
+[Contratto, verifiche e attività residue](VERIFICA-OUTBOX-REGISTRAZIONI.md).

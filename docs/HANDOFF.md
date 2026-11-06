@@ -1,6 +1,33 @@
 # Passaggio di consegne — 17 ottobre 2026
 
 
+
+## Outbox locale HabitLogs — 6 novembre
+
+Base ce92b50, con Days/Weeks committati. Estesa la famiglia locale log alla
+chiave habitId|data: snapshot/checklist e operazione atomici, CAS, dipendenze,
+ACK e conflitti sul writer/planner recuperabile già presente. Cataloghi
+verificati sotto lock e catturati nel piano; replay dell'ACK non ricalcola
+la checklist dopo riordino/archiviazione. Creazione senza preimmagine legacy;
+nessuna migrazione implicita. IndexedDB v11 invariato, indice Entries preservato.
+Completata la facade read-only Catalog readOne/mapVersion necessaria al source
+HabitLogs; verificati cataloghi canonici condivisi e baseline ISO/commit.
+
+Collegati pratiche Abitudini, giorno e diario continuo. Conferma locale dopo
+commit; su storage fallito modifica visibile e retry separati dalla coda
+confermata. Controlli e riepiloghi aggiornati sul posto durante commit/ACK;
+conflitti mostrano anche il catalogo confrontato. Snapshot storici non rimappati.
+[Contratto, prove e limiti](VERIFICA-OUTBOX-REGISTRAZIONI.md).
+
+Capability reali spente, nessun Google/deploy/setup o commit. Cataloghi ancora
+fuori outbox, offline completo non disponibile e pacchetto 11 parziale. Restano
+il limite directory di 128 log, migrazioni, compatibilità/retention e iframe
+reale come gate separati. Superati build, npm test sul risultato integrato,
+repository, release, common-periods, ciclo, routing HabitLogs, tracing e
+controller Catalog/HabitLogs; P59/P60.1/P70 e hash finali verificati. Esiti
+ripetibili e limiti nel rapporto.
+
+
 ## Outbox del focus e checkup settimanale — 6 novembre
 
 Weeks esteso all'outbox sulla base Days non committata. Snapshot completo,

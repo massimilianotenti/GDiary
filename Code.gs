@@ -113,7 +113,7 @@ function traceCount_(key,value=1){if(ACTIVE_TRACE)ACTIVE_TRACE.metrics[key]=(ACT
 function traceBytes_(value){let bytes=0;for(let i=0;i<value.length;i++){const c=value.charCodeAt(i);if(c<128)bytes++;else if(c<2048)bytes+=2;else if(c>=0xD800&&c<=0xDBFF&&i+1<value.length&&value.charCodeAt(i+1)>=0xDC00&&value.charCodeAt(i+1)<=0xDFFF){bytes+=4;i++;}else bytes+=3;}return bytes;}
 function traceDistribution_(prefix,count){traceCount_(prefix+(count===1?'1':count<=3?'2to3':count<=9?'4to9':'10plus'));}
 function traceApi(p){
- const handlers={saveWeekOperation,getWeekOperationReceipt,getWeekOperationState,saveDayOperation,getDayOperationReceipt,getDayOperationState,getSyncManifest,getChanges,getSnapshotPage,getJournalOperationReceipt,getJournalDeleteReceipt,getContentsBatch,benchmarkJournalCache,getState,getCommonState,getJournalPage,getJournalContents,getEntryDetail,saveJournalPage,saveDay,saveDays,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
+ const handlers={saveHabitLogOperation,getHabitLogOperationReceipt,getHabitLogOperationState,saveWeekOperation,getWeekOperationReceipt,getWeekOperationState,saveDayOperation,getDayOperationReceipt,getDayOperationState,getSyncManifest,getChanges,getSnapshotPage,getJournalOperationReceipt,getJournalDeleteReceipt,getContentsBatch,benchmarkJournalCache,getState,getCommonState,getJournalPage,getJournalContents,getEntryDetail,saveJournalPage,saveDay,saveDays,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
  if(!p||!Object.prototype.hasOwnProperty.call(handlers,p.operation)||!/^[-a-zA-Z0-9]{10,80}$/.test(p.traceId||''))throw Error('Richiesta diagnostica non valida.');
  const previous=ACTIVE_TRACE,start=Date.now(),trace={metrics:{},depth:{},stack:[],accounted:0};
  const diagnostics=()=>{const totalMs=Date.now()-start;return {traceId:p.traceId,totalMs,unaccountedMs:Math.max(0,totalMs-trace.accounted),...trace.metrics};};
@@ -351,6 +351,27 @@ function getWeekOperationState(p){
  ACTIVE_CONTEXT=p?.context||{};if(!syncValidWeek_(p?.week))throw Object.assign(Error('DataError'),{name:'DataError'});
  const gateway=weekCommitGateway_();if(!gateway?.readOperationState)throw Object.assign(Error('ProtocolUnavailable'),{name:'ProtocolUnavailable'});
  return gateway.readOperationState({week:p.week,expectedScope:p.scope});
+}
+function habitLogOperationInput_(input){
+ const fail=()=>{throw Object.assign(Error('DataError'),{name:'DataError'});};
+ if(!input||Object.keys(input).sort().join(',')!=='baseVersion,habitUpdatedAt,log,operationId'||typeof input.operationId!=='string'||(!/^[a-zA-Z0-9-]{10,80}$/.test(input.operationId)||input.operationId.startsWith('hl-reserve-'))||!(input.baseVersion===null||typeof input.baseVersion==='string'&&(/^commit-[1-9][0-9]{0,15}$/.test(input.baseVersion)||Number.isFinite(Date.parse(input.baseVersion))&&new Date(input.baseVersion).toISOString()===input.baseVersion)))fail();
+ if(typeof input.habitUpdatedAt!=='string'||input.habitUpdatedAt.length>200)fail();
+ const result={operationId:input.operationId,baseVersion:input.baseVersion,habitUpdatedAt:input.habitUpdatedAt,log:syncHabitLogSnapshot_(input.log)};if(syncCommitCanonical_(result).length>30000)fail();return result;
+}
+function saveHabitLogOperation(p){
+ ACTIVE_CONTEXT=p?.context||{};const input=habitLogOperationInput_(p?.operation),gateway=habitLogCommitGateway_();
+ if(!gateway?.saveOperation)throw Object.assign(Error('ProtocolUnavailable'),{name:'ProtocolUnavailable'});
+ return {log:gateway.saveOperation(input,p.scope)};
+}
+function getHabitLogOperationReceipt(p){
+ ACTIVE_CONTEXT=p?.context||{};const input=habitLogOperationInput_(p?.request),gateway=habitLogCommitGateway_();
+ if(!gateway?.lookupHabitLogReceipt)throw Object.assign(Error('ProtocolUnavailable'),{name:'ProtocolUnavailable'});
+ return gateway.lookupHabitLogReceipt({request:input,expectedScope:p.scope});
+}
+function getHabitLogOperationState(p){
+ ACTIVE_CONTEXT=p?.context||{};if(!syncHabitLogIdentity_(p?.key))throw Object.assign(Error('DataError'),{name:'DataError'});
+ const gateway=habitLogCommitGateway_();if(!gateway?.readOperationState)throw Object.assign(Error('ProtocolUnavailable'),{name:'ProtocolUnavailable'});
+ return gateway.readOperationState({key:p.key,expectedScope:p.scope});
 }
 function getJournalOperationReceipt(p){
  const fail=name=>{throw Object.assign(Error(name),{name});},validId=value=>typeof value==='string'&&/^[a-zA-Z0-9-]{10,80}$/.test(value);
@@ -2027,6 +2048,7 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
  const run=fn=>{if(owned)fail('BusyError');try{return copy(store.withLock(()=>{owned=true;try{const value=fn();unwrap(protocol.recover());return value;}finally{owned=false;}}));}catch(error){fail(['DataError','ProtocolUnavailable','ProtocolCorrupt','OperationMismatch','CommitBlocked','ScopeChanged','BusyError','ConflictError','StorageError'].includes(error?.name)?error.name:'StorageError');}};
  const hash=value=>{const digest=store.digest(syncCommitCanonical_(value));if(typeof digest!=='string'||!/^[a-f0-9]{64}$/.test(digest))fail('ProtocolCorrupt');return digest;};
  const fields=(value,keys)=>value&&Object.prototype.toString.call(value)==='[object Object]'&&Object.keys(value).length===keys.length&&Object.keys(value).every(key=>keys.includes(key));
+ const checkExpectedScope=expected=>{if(!fields(expected,['archiveId','principalId','epoch','protocolVersion','schemaVersion'])||expected.archiveId!==scope.archiveId||expected.principalId!==scope.principalId||expected.epoch!==scope.epoch||expected.protocolVersion!==1||expected.schemaVersion!==1)fail('ScopeChanged');};
  const validId=id=>typeof id==='string'&&/^[a-zA-Z0-9-]{10,80}$/.test(id)&&!id.startsWith('hl-reserve-');
  function rawRecord(row,key){
   if(row===null)return null;
@@ -2047,9 +2069,9 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
    if(!fields(data,['format','kind','fingerprint','catalogDigest','request'])||data.format!=='sync-habit-log-plan/v1')fail('ProtocolCorrupt');
    if(!/^[a-f0-9]{64}$/.test(data.catalogDigest))fail('ProtocolCorrupt');
    if(data.kind!==kind||data.fingerprint!==fingerprint)fail('OperationMismatch');
-  const request=data.request;if(!fields(request,['operationId','changes'])||request.operationId!==operationId||!Array.isArray(request.changes)||request.changes.length!==(kind==='migrate'?3:1))fail('ProtocolCorrupt');
+  const request=data.request;if(!fields(request,['operationId','changes'])||request.operationId!==operationId||!Array.isArray(request.changes)||!((kind==='migrate'||kind==='operation')&&request.changes.length===3||kind!=='migrate'&&request.changes.length===1))fail('ProtocolCorrupt');
   const change=request.changes[0];if(!fields(change,['collection','id','baseVersion','action','data'])||change.collection!=='habitLogs'||change.id!==key||change.action!=='upsert'||!fields(change.data,['format','record'])||change.data.format!=='sync-habit-log/v1'||canonicalRecord(change.data.record)!==syncCommitCanonical_(change.data.record)||change.data.record.key!==key)fail('ProtocolCorrupt');
-  if(kind==='migrate'){
+  if(request.changes.length===3){
    const r=request.changes[1],d=request.changes[2];
    if(change.baseVersion!==null||!fields(r,['collection','id','baseVersion','action','data'])||r.collection!=='settings'||r.id!==routeId(key)||r.action!=='upsert'||r.baseVersion!==null||!fields(d,['collection','id','baseVersion','action','data'])||d.collection!=='settings'||d.id!==directoryId||d.action!=='upsert')fail('ProtocolCorrupt');
    routeData(r.data,key);if(!directoryData(d.data).keys.includes(key))fail('ProtocolCorrupt');
@@ -2101,6 +2123,35 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
   return {...plan.request.changes[0].data.record,updatedAt:ack.versions[0].version};
  }
  return Object.freeze({
+  saveOperation(input,expectedScope){return run(()=>{
+   checkExpectedScope(expectedScope);input=habitLogOperationInput_(input);const key=input.log.key;
+   const plan=savedPlan('operation',input,input.operationId,key,()=>{
+    const index=directory(),routed=index.keys.includes(key);let current,base;
+    if(routed){const descriptor=route(key);checkSource(key,descriptor);current=unwrap(writer.read(key));base=input.baseVersion===descriptor.legacyVersion&&current.version===descriptor.version?descriptor.version:/^commit-[1-9][0-9]{0,15}$/.test(input.baseVersion||'')?input.baseVersion:null;}
+    else{if(rawOne(key)!==null||unwrap(writer.read(key)).version!==null)fail('ProtocolUnavailable');if(input.baseVersion!==null)fail('ConflictError');if(index.keys.length>=128)fail('ProtocolUnavailable');base=null;}
+    const catalog=source.readCatalog(key),effective=typeof source.mapHabitVersion==='function'?source.mapHabitVersion(input.log.habitId,input.habitUpdatedAt):input.habitUpdatedAt;
+    if(!catalog?.habit||!catalog?.goal||catalog.habit.archived==='yes')fail('ConflictError');let prepared;try{prepared=syncPrepareHabitLogEdit_({habitId:input.log.habitId,date:input.log.date,status:input.log.status,checked:JSON.parse(input.log.checklist).checked,habitUpdatedAt:effective},current?.log?{...current.log,updatedAt:current.version}:null,catalog);}catch(error){if(error?.name==='CommitBlocked')fail('ConflictError');throw error;}
+    if(syncCommitCanonical_(prepared.record)!==syncCommitCanonical_(input.log))fail('ConflictError');
+    const changes=syncPlanHabitLogOperation_({operationId:input.operationId,baseVersion:base,log:prepared.record}).changes;
+    if(!routed)changes.push(upsert('settings',routeId(key),null,{format:'sync-habit-log-route/v1',key,sourceDigest:hash(null),legacyVersion:''}),upsert('settings',directoryId,index.version,{format:'sync-habit-log-routing/v1',keys:[...index.keys,key].sort()}));
+    return {catalogDigest:hash(catalog),request:{operationId:input.operationId,changes}};
+   });
+   const descriptor=plan.request.changes.length===3?plan.request.changes[1].data:route(key);checkSource(key,descriptor);if(!alreadyApplied(plan.request)&&hash(source.readCatalog(key))!==plan.catalogDigest)fail('ConflictError');const ack=executePlan(plan,key);checkSource(key,descriptor);return {...plan.request.changes[0].data.record,updatedAt:ack.versions[0].version};
+  });},
+  readOperationState(input){return run(()=>{
+   checkExpectedScope(input?.expectedScope);const key=input.key;if(!syncHabitLogIdentity_(key))fail('DataError');let record;
+   if(directory().keys.includes(key)){const descriptor=route(key);checkSource(key,descriptor);const current=unwrap(writer.read(key));record=current.log?{...current.log,updatedAt:current.version}:null;}
+   else{if(unwrap(writer.read(key)).version!==null)fail('CommitBlocked');record=rawOne(key);}
+   return {key,missing:record===null,log:record,catalog:source.readCatalog(key),scope:copy(input.expectedScope)};
+  });},
+  lookupHabitLogReceipt(input){const request=habitLogOperationInput_(input?.request),expected=input?.expectedScope;checkExpectedScope(expected);return run(()=>{
+   const initial=unwrap(protocol.lookupOperationReceipt({operationId:request.operationId})),entity=unwrap(protocol.read('settings','habit-log-plan:'+hash([scope.principalId,request.operationId]))).entity;
+   if(!entity)return {status:'unknown',operationId:request.operationId,scope:copy(expected)};
+   const plan=planValue(entity.data,'operation',hash({kind:'operation',input:request}),request.operationId,request.log.key),receipt=initial.status==='unknown'?initial:unwrap(protocol.lookupOperationReceipt({operationId:request.operationId,request:plan}));
+   if(receipt.status!=='committed')return {status:receipt.status,operationId:request.operationId,scope:copy(expected)};
+   const versions=receipt.versions.filter(item=>item.collection==='habitLogs'&&item.id===request.log.key&&!item.deleted);if(versions.length!==1||versions[0].version!=='commit-'+receipt.sequence)fail('ProtocolCorrupt');
+   return {status:'committed',operationId:request.operationId,id:request.log.key,version:versions[0].version,scope:copy(expected)};
+  });},
   preview(key){return run(()=>{
    if(!syncHabitLogIdentity_(key))fail('DataError');const legacy=rawOne(key),catalog=source.readCatalog(key);
    const record=legacy&&legacy.checklist?snapshot(legacy):null;
@@ -2239,7 +2290,7 @@ function syncRecordRoutingController_(services,domain){
   if(migrate&&services.allowMigration?.()!==true)fail('ProtocolUnavailable');
   const bound=binding(loaded),result=method==='changes'?bound.changes(...args):method==='checkpoint'?bound.checkpoint(...args):bound.gateway[method](...args);check(loaded);return result;
  }));
- const facade=Object.freeze({checkpoint:(...args)=>act('checkpoint',args),changes:(...args)=>act('changes',args),readRows:(...args)=>act('readRows',args),preview:(...args)=>act('preview',args),...(entries?{lookupDeleteReceipt:(...args)=>act('lookupDeleteReceipt',args),lookupPageReceipt:(...args)=>act('lookupPageReceipt',args),read:(...args)=>act('read',args),readContent:(...args)=>act('readContent',args),isRouted:(...args)=>act('isRouted',args),readFiles:(...args)=>act('readFiles',args),readFilesBatch:(...args)=>act('readFilesBatch',args),addFile:(...args)=>act('addFile',args,true),prepareDelete:(...args)=>act('prepareDelete',args,true),commitDelete:(...args)=>act('commitDelete',args,true),setProjects:(...args)=>act('setProjects',args,true),setStatus:(...args)=>act('setStatus',args,true),setTags:(...args)=>act('setTags',args,true),setDue:(...args)=>act('setDue',args,true),setSchedule:(...args)=>act('setSchedule',args,true),setContent:(...args)=>act('setContent',args,true),importContent:(...args)=>act('importContent',args,true),importContentAndTitle:(...args)=>act('importContentAndTitle',args,true),setDocSyncState:(...args)=>act('setDocSyncState',args,true),savePage:(...args)=>act('savePage',args,true)}:{saveLegacy:(...args)=>act('saveLegacy',args,true)}),...(projects?{saveProject:(...args)=>act('saveProject',args,true),convertProjectToTag:(...args)=>act('convertProjectToTag',args,true)}:{}),...(catalog?{readSetting:(...args)=>act('readSetting',args),saveSetting:(...args)=>act('saveSetting',args,true)}:{}),...(weekly?{saveOperation:(...args)=>act('saveOperation',args,true),lookupWeekReceipt:(...args)=>act('lookupWeekReceipt',args),readOperationState:(...args)=>act('readOperationState',args)}:{}),...(domain==='day'?{saveOperation:(...args)=>act('saveOperation',args,true),lookupDayReceipt:(...args)=>act('lookupDayReceipt',args),readOperationState:(...args)=>act('readOperationState',args),saveBatch:(...args)=>act('saveBatch',args,true)}:{}),migrate:(...args)=>act('migrate',args,true,true)});
+ const facade=Object.freeze({checkpoint:(...args)=>act('checkpoint',args),changes:(...args)=>act('changes',args),readRows:(...args)=>act('readRows',args),preview:(...args)=>act('preview',args),...(entries?{lookupDeleteReceipt:(...args)=>act('lookupDeleteReceipt',args),lookupPageReceipt:(...args)=>act('lookupPageReceipt',args),read:(...args)=>act('read',args),readContent:(...args)=>act('readContent',args),isRouted:(...args)=>act('isRouted',args),readFiles:(...args)=>act('readFiles',args),readFilesBatch:(...args)=>act('readFilesBatch',args),addFile:(...args)=>act('addFile',args,true),prepareDelete:(...args)=>act('prepareDelete',args,true),commitDelete:(...args)=>act('commitDelete',args,true),setProjects:(...args)=>act('setProjects',args,true),setStatus:(...args)=>act('setStatus',args,true),setTags:(...args)=>act('setTags',args,true),setDue:(...args)=>act('setDue',args,true),setSchedule:(...args)=>act('setSchedule',args,true),setContent:(...args)=>act('setContent',args,true),importContent:(...args)=>act('importContent',args,true),importContentAndTitle:(...args)=>act('importContentAndTitle',args,true),setDocSyncState:(...args)=>act('setDocSyncState',args,true),savePage:(...args)=>act('savePage',args,true)}:{saveLegacy:(...args)=>act('saveLegacy',args,true)}),...(projects?{saveProject:(...args)=>act('saveProject',args,true),convertProjectToTag:(...args)=>act('convertProjectToTag',args,true)}:{}),...(catalog?{readOne:(...args)=>act('readOne',args),mapVersion:(...args)=>act('mapVersion',args),readSetting:(...args)=>act('readSetting',args),saveSetting:(...args)=>act('saveSetting',args,true)}:{}),...(logs?{saveOperation:(...args)=>act('saveOperation',args,true),lookupHabitLogReceipt:(...args)=>act('lookupHabitLogReceipt',args),readOperationState:(...args)=>act('readOperationState',args)}:{}),...(weekly?{saveOperation:(...args)=>act('saveOperation',args,true),lookupWeekReceipt:(...args)=>act('lookupWeekReceipt',args),readOperationState:(...args)=>act('readOperationState',args)}:{}),...(domain==='day'?{saveOperation:(...args)=>act('saveOperation',args,true),lookupDayReceipt:(...args)=>act('lookupDayReceipt',args),readOperationState:(...args)=>act('readOperationState',args),saveBatch:(...args)=>act('saveBatch',args,true)}:{}),migrate:(...args)=>act('migrate',args,true,true)});
  return Object.freeze({
   resolve:()=>protect(()=>{if(absent(snapshot()))return null;return locked(()=>{load();return facade;});}),
   status:()=>protect(()=>{if(absent(snapshot()))return statusOf(null);return locked(()=>statusOf(load()));}),

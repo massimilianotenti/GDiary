@@ -708,3 +708,17 @@ conservativo e scelte di conflitto nel form del checkup. Infrastruttura
 condivisa limitata a Days/Weeks, regressioni Days preservate. Rapporto
 ../VERIFICA-OUTBOX-SETTIMANE.md; capability reali false, nessun provisioning
 o accesso Google. Pacchetto 11 ancora parziale, altre entità escluse.
+
+
+## Seguito locale HabitLogs — 6 novembre 2026
+
+Outbox estesa alle registrazioni, oltre a Days/Weeks: snapshot completo con
+identità habitId|data, checklist storica, habitUpdatedAt originario, commit
+IndexedDB atomico e writer con dipendenze dei cataloghi verificate sotto lock.
+UI Abitudini/giorno/diario continuo, ACK senza rimontaggio e conflitti con
+catalogo confrontato. Nessuna scrittura locale dei cataloghi Goals/Habits.
+IndexedDB v11 invariato; indice Entries preservato sui salvataggi/ACK.
+Nuovo test:habit-log-outbox; repository/browser anche in test:repository.
+Capacità directory 128 identità e migrazioni legacy restano gate espliciti;
+nessuna capability reale o offline completo, pacchetto 11 ancora parziale.
+[Contratto, verifiche e attività residue](../VERIFICA-OUTBOX-REGISTRAZIONI.md).

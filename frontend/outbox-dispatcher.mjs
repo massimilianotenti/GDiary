@@ -66,7 +66,7 @@ export function createOutboxDispatcher(options={}){
      requireScope();if(operation.action==='delete'&&response?.alreadyAbsent===true)throw Object.assign(Error('ConflictError'),{name:'ConflictError'});if(!entry||entry.id!==operation.id||typeof entry.updatedAt!=='string'||!entry.updatedAt.trim()||entry.updatedAt.length>200)throw Object.assign(Error('ProtocolCorrupt'),{name:'ProtocolCorrupt'});
      if(periodOperation(operation.kind)){
       const spec=periodOperation(operation.kind),{updatedAt,...snapshot}=response[operation.kind];
-      if(!/^commit-[1-9][0-9]{0,15}$/.test(updatedAt)||!Number.isSafeInteger(Number(updatedAt.slice(7)))||!spec.validOperation({operationId:operation.operationId,baseVersion:operation.baseVersion,[operation.kind]:snapshot},operation.id,operation.baseVersion,operation.operationId)||canonicalDayJSON(snapshot)!==canonicalDayJSON(operation.payload[operation.kind]))throw Object.assign(Error('ProtocolCorrupt'),{name:'ProtocolCorrupt'});
+      if(!/^commit-[1-9][0-9]{0,15}$/.test(updatedAt)||!Number.isSafeInteger(Number(updatedAt.slice(7)))||!spec.validOperation({...operation.payload,[operation.kind]:snapshot},operation.id,operation.baseVersion,operation.operationId)||canonicalDayJSON(snapshot)!==canonicalDayJSON(operation.payload[operation.kind]))throw Object.assign(Error('ProtocolCorrupt'),{name:'ProtocolCorrupt'});
      }
      await invoke('settleOutboxOperation',{owner,token,operationId:operation.operationId,outcome:'ack',now:now(),...(entry.updatedAt?{serverVersion:entry.updatedAt}:{})});processed++;
      try{await options.onAck?.(operation,entry);}catch{}
