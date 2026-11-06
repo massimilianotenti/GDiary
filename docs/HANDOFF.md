@@ -1,20 +1,22 @@
 # Passaggio di consegne — 17 ottobre 2026
 
-## Stato locale HabitLogs con cataloghi verificati — 6 novembre
+## Riallineamento esplicito cataloghi HabitLogs — 6 novembre
 
-Seguito locale in corso dalla base 2ee5db3. IndexedDB mantiene ora una prova
-separata del checkpoint di vista: cursore del feed completo e inventari
-`[id, updatedAt]` di Goals/Habits. I delta catalogo invalidano la prova; ACK
-HabitLogs non la invalidano. Il repository ricontrolla la prova e le versioni
-nella stessa transazione del salvataggio HabitLogs; la UI confronta anche
-pianificazione, ciclo, data e baseline e conserva l'intenzione se non può
-dimostrarli. Nessuna mutazione catalogo entra nell'outbox.
+Seguito locale dalla base 9d5a5b4. Il sync/bootstrap esistente aggiorna
+Goals/Habits; la UI espone riprova, revisione locale e conferma utente. La
+conferma durevole è scoped e legata al fingerprint e al cursore del feed
+completo. Un delta effettivo invalida prova e conferma e persiste un flag di
+revisione finché l’utente conferma, anche se `updatedAt` non cambia; un feed
+identico le conserva. Le scritture HabitLogs ricontrollano il guard nella transazione
+IndexedDB. Nessuna mutazione di catalogo è in outbox e nessuna registrazione
+bloccata viene inviata automaticamente.
 
-Build, prove browser/repository HabitLogs, `test:repository`, `test:release` e
-`npm test` sono superati sul risultato integrato. Il riallineamento dopo scelta
-Google è simulato con feed sintetico; non costituisce prova Google né abilita
-scritture catalogo. La tranche resta parziale e il pacchetto 11 aperto.
-Rapporto: [prova locale dei cataloghi HabitLogs](VERIFICA-CATALOGHI-HABITLOGS-LOCALE.md).
+Build, test browser/repository HabitLogs, `test:repository`, `test:release` e
+`npm test` sono superati. Il backend browser è sintetico, non un collaudo
+Google. I tombstone e il cambio scope sono verificati a livello repository;
+resta non coperto il conflitto con entrambe le schede UI in modifica e feed/ACK concorrenti. Il
+pacchetto 11 resta aperto e offline completo non disponibile.
+Risultati e copertura: [rapporto di riallineamento](VERIFICA-RIALLINEAMENTO-CATALOGHI-HABITLOGS-LOCALE.md).
 
 
 

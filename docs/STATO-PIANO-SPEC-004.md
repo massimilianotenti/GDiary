@@ -82,3 +82,17 @@ sono superate sul risultato integrato; il riallineamento catalogo in browser è
 simulato tramite feed sintetico. Pacchetto 11 resta aperto per i limiti elencati
 nel rapporto, non per completamento implicito dell'intero pacchetto.
 [Rapporto e limiti](VERIFICA-CATALOGHI-HABITLOGS-LOCALE.md).
+
+### Seguito: riallineamento esplicito cataloghi HabitLogs — parziale, 6 novembre
+
+Sul commit 9d5a5b4 è stato collegato il sync/bootstrap esistente a un percorso
+visibile di retry, revisione della copia locale e conferma esplicita. La
+conferma durevole è scoped al fingerprint/cursore completo; feed identici la
+mantengono e delta reali la invalidano finché non arriva conferma esplicita,
+anche con versione `updatedAt` invariata. La scrittura HabitLogs controlla la
+conferma nella stessa transazione IndexedDB. Prove browser/repository,
+`test:repository`, `test:release` e `npm test` superati. Il backend è sintetico:
+resta da coprire la gara con entrambe le schede UI in modifica e feed/ACK
+concorrenti; nessun collaudo Google. Pacchetto 11
+aperto, offline completo non disponibile.
+[Rapporto e limiti](VERIFICA-RIALLINEAMENTO-CATALOGHI-HABITLOGS-LOCALE.md).
