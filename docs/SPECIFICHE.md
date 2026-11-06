@@ -250,3 +250,25 @@ delle pratiche resta remoto. I Task mostrano inizialmente 50 risultati con
 «Mostra altri task»; ricerca, conteggi e salvataggio includono tutti i risultati
 caricati, le bozze e le operazioni locali restano visibili. Capability reali
 disattivate; dettagli e limiti nei rapporti del bootstrap applicativo/periodi.
+
+## Salvataggio locale delle riflessioni — 6 novembre 2026
+
+Nel percorso sperimentale con consenso, identità e operations verificati,
+Salva pagina e Salva riflessione accodano Days nel dispositivo prima
+dell'invio. La conferma locale è distinta dalla conferma Google. I lotti
+hanno esiti indipendenti per giornata; errori conservano le bozze.
+Conflitti offrono confronto e scelta locale/Google; invii falliti un retry
+con identità preservata. Editor e modifiche successive restano conservati
+durante l'ACK. Weeks, registrazioni abitudini e cataloghi restano remoti.
+Capability reali false; dettagli e limiti in VERIFICA-OUTBOX-GIORNATE.md.
+
+## Focus e checkup salvati sul dispositivo — 6 novembre 2026
+
+Nel percorso sperimentale con consenso, identità e operations verificati,
+Salva focus e checkup conferma la scrittura locale soltanto dopo il commit
+IndexedDB. L'invio remoto lascia utilizzabili il form e la navigazione.
+ACK preserva nuove modifiche, focus/selezione e la revisione effettivamente
+editata. Errori conservano la bozza; conflitti offrono confronto e scelta
+locale/Google, con storico. Le capability reali restano false; registrazioni
+abitudini e cataloghi mantengono i contratti precedenti. Dettagli e gate in
+VERIFICA-OUTBOX-SETTIMANE.md. Nessuna dichiarazione di offline completo.

@@ -341,3 +341,24 @@ delta quando un form è modificato. DiaryPage monta inizialmente 50 risultati
 Task, espandibili di 50, mantenendo tutte le voci nel modello e bozze/pending
 sempre montati. Vedere VERIFICA-BOOTSTRAP-VISTE-PERIODO.md e
 VERIFICA-BOOTSTRAP-APPLICATIVO.md per contratti, prove e limiti.
+
+## Outbox Days — 6 novembre 2026
+
+Kind day usa data come identità e snapshot completo, separato da Entries.
+Il dispatcher riutilizza lease/claim e trasporta saveDayOperation con scope
+atteso; ricevute verificate sul piano originale riconciliano gli esiti incerti.
+Il gateway resta subordinato al controller Days, senza attivazione implicita.
+ACK aggiorna atomicamente record canonico, baseline e dipendenze non inviate;
+la UI mantiene editor e bozze successive. Contratti/gate e prove in
+VERIFICA-OUTBOX-GIORNATE.md. Le altre entità non acquisiscono l'outbox.
+
+## Outbox Weeks e periodi condivisi — 6 novembre 2026
+
+`period-operation.mjs` registra esclusivamente Days/Weeks. Il repository
+riutilizza transazioni, CAS, dipendenze e settlement con il record comune
+della famiglia corretta; il dispatcher seleziona trasporto e ricevuta in base
+al contratto. La shell condivide accodamento/overlay/confronto; il form Weeks
+aggiorna la baseline sul nodo montato e conserva le revisioni effettivamente
+editate dalla scheda. Commit locali e ACK invalidano le letture UI tardive,
+conservando un indice Entries invariato. Contratti/gate e prove in
+VERIFICA-OUTBOX-SETTIMANE.md. Nessuna estensione a registrazioni/cataloghi.

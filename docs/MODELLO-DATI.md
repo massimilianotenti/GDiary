@@ -310,3 +310,23 @@ vista Task). Gli intervalli condividono commonReadRanges con le anteprime,
 ma richiedono il checkpoint completo per attestare la copertura. La settimana
 include metadati Task globali e corpi delle sole voci nei sette giorni;
 Abitudini non idrata corpi. Dettagli in VERIFICA-BOOTSTRAP-VISTE-PERIODO.md.
+
+## Kind day nell'outbox — 6 novembre 2026
+
+IndexedDB resta v11: store/indici esistenti supportano kind day, id=data,
+action upsert. Payload {operationId,baseVersion,day}, dove day contiene tutti
+i campi DAY_HEADERS escluso updatedAt. La bozza contiene lo stesso snapshot
+e updatedAt della baseline. Revisione CAS distinta dalla versione canonica.
+Le scelte di conflitto conservano snapshot locali/remoti sulle operazioni
+superate. ACK aggiorna anche commonRecords/days nella transazione di settlement,
+proteggendo versioni feed più recenti. Vedere VERIFICA-OUTBOX-GIORNATE.md.
+
+## Kind week — 6 novembre 2026
+
+IndexedDB resta v11. kind week, id=lunedì ISO, action upsert; payload
+{operationId,baseVersion,week}, dove week contiene tutti i WEEK_HEADERS
+escluso updatedAt. La bozza conserva lo stesso snapshot e la baseline.
+Metadati della bozza/CAS distinti dalla versione canonica; Days e Weeks sullo
+stesso lunedì usano namespace e record comuni distinti. ACK aggiorna solo
+commonRecords/weeks e le dipendenze compatibili mai inviate. Vedere
+VERIFICA-OUTBOX-SETTIMANE.md per limiti, versioni e riconciliazione.

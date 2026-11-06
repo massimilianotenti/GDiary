@@ -113,7 +113,7 @@ function traceCount_(key,value=1){if(ACTIVE_TRACE)ACTIVE_TRACE.metrics[key]=(ACT
 function traceBytes_(value){let bytes=0;for(let i=0;i<value.length;i++){const c=value.charCodeAt(i);if(c<128)bytes++;else if(c<2048)bytes+=2;else if(c>=0xD800&&c<=0xDBFF&&i+1<value.length&&value.charCodeAt(i+1)>=0xDC00&&value.charCodeAt(i+1)<=0xDFFF){bytes+=4;i++;}else bytes+=3;}return bytes;}
 function traceDistribution_(prefix,count){traceCount_(prefix+(count===1?'1':count<=3?'2to3':count<=9?'4to9':'10plus'));}
 function traceApi(p){
- const handlers={getSyncManifest,getChanges,getSnapshotPage,getJournalOperationReceipt,getJournalDeleteReceipt,getContentsBatch,benchmarkJournalCache,getState,getCommonState,getJournalPage,getJournalContents,getEntryDetail,saveJournalPage,saveDay,saveDays,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
+ const handlers={saveWeekOperation,getWeekOperationReceipt,getWeekOperationState,saveDayOperation,getDayOperationReceipt,getDayOperationState,getSyncManifest,getChanges,getSnapshotPage,getJournalOperationReceipt,getJournalDeleteReceipt,getContentsBatch,benchmarkJournalCache,getState,getCommonState,getJournalPage,getJournalContents,getEntryDetail,saveJournalPage,saveDay,saveDays,saveWeek,setHabitLog,saveNoteText,addJournal,saveGoal,saveHabit,saveProject,setTaskStatus,saveReflectionSettings,savePrivacySettings,searchArchive,processTaskDocQueue,getDocQueueState,addFileLink,deleteHabit,deleteNote,rebaseDocQueue,refreshNotePreviews,setEntryProjects,setEntryTags,beginProjectExport,continueProjectExport,getDriveInventory,previewProjectAsTag,convertProjectToTag,getAppChangelog};
  if(!p||!Object.prototype.hasOwnProperty.call(handlers,p.operation)||!/^[-a-zA-Z0-9]{10,80}$/.test(p.traceId||''))throw Error('Richiesta diagnostica non valida.');
  const previous=ACTIVE_TRACE,start=Date.now(),trace={metrics:{},depth:{},stack:[],accounted:0};
  const diagnostics=()=>{const totalMs=Date.now()-start;return {traceId:p.traceId,totalMs,unaccountedMs:Math.max(0,totalMs-trace.accounted),...trace.metrics};};
@@ -310,6 +310,47 @@ function getSyncCheckpoint(p){
  const servers=[syncDayRoutingServer_,syncWeekRoutingServer_,syncHabitLogRoutingServer_,syncCatalogRoutingServer_,syncProjectRoutingServer_,syncEntryRoutingServer_];
  for(const create of servers){const facade=create().resolve();if(facade)return facade.checkpoint();}
  throw Object.assign(Error('ProtocolUnavailable'),{name:'ProtocolUnavailable'});
+}
+// Full Days snapshots: explicit transport for the local outbox only.
+function dayOperationInput_(input){
+ const fail=()=>{throw Object.assign(Error('DataError'),{name:'DataError'});};
+ if(!input||Object.keys(input).sort().join(',')!=='baseVersion,day,operationId'||typeof input.operationId!=='string'||!/^[a-zA-Z0-9-]{10,80}$/.test(input.operationId)||!(input.baseVersion===null||typeof input.baseVersion==='string'&&(/^commit-[1-9][0-9]{0,15}$/.test(input.baseVersion)||Number.isFinite(Date.parse(input.baseVersion))&&new Date(input.baseVersion).toISOString()===input.baseVersion)))fail();
+ const result={operationId:input.operationId,baseVersion:input.baseVersion,day:syncDaySnapshot_(input.day)};if(syncCommitCanonical_(result).length>30000)fail();return result;
+}
+function saveDayOperation(p){
+ ACTIVE_CONTEXT=p?.context||{};const input=dayOperationInput_(p?.operation),gateway=dayCommitGateway_();
+ if(!gateway?.saveOperation)throw Object.assign(Error('ProtocolUnavailable'),{name:'ProtocolUnavailable'});
+ return {day:gateway.saveOperation(input,p.scope)};
+}
+function getDayOperationReceipt(p){
+ ACTIVE_CONTEXT=p?.context||{};const input=dayOperationInput_(p?.request),gateway=dayCommitGateway_();
+ if(!gateway?.lookupDayReceipt)throw Object.assign(Error('ProtocolUnavailable'),{name:'ProtocolUnavailable'});
+ return gateway.lookupDayReceipt({request:input,expectedScope:p.scope});
+}
+function getDayOperationState(p){
+ ACTIVE_CONTEXT=p?.context||{};if(!validDate_(p?.date))throw Object.assign(Error('DataError'),{name:'DataError'});
+ const gateway=dayCommitGateway_();if(!gateway?.readOperationState)throw Object.assign(Error('ProtocolUnavailable'),{name:'ProtocolUnavailable'});
+ return gateway.readOperationState({date:p.date,expectedScope:p.scope});
+}
+function weekOperationInput_(input){
+ const fail=()=>{throw Object.assign(Error('DataError'),{name:'DataError'});};
+ if(!input||Object.keys(input).sort().join(',')!=='baseVersion,operationId,week'||typeof input.operationId!=='string'||!/^[a-zA-Z0-9-]{10,80}$/.test(input.operationId)||!(input.baseVersion===null||typeof input.baseVersion==='string'&&(/^commit-[1-9][0-9]{0,15}$/.test(input.baseVersion)||Number.isFinite(Date.parse(input.baseVersion))&&new Date(input.baseVersion).toISOString()===input.baseVersion)))fail();
+ const result={operationId:input.operationId,baseVersion:input.baseVersion,week:syncWeekSnapshot_(input.week)};if(syncCommitCanonical_(result).length>30000)fail();return result;
+}
+function saveWeekOperation(p){
+ ACTIVE_CONTEXT=p?.context||{};const input=weekOperationInput_(p?.operation),gateway=weekCommitGateway_();
+ if(!gateway?.saveOperation)throw Object.assign(Error('ProtocolUnavailable'),{name:'ProtocolUnavailable'});
+ return {week:gateway.saveOperation(input,p.scope)};
+}
+function getWeekOperationReceipt(p){
+ ACTIVE_CONTEXT=p?.context||{};const input=weekOperationInput_(p?.request),gateway=weekCommitGateway_();
+ if(!gateway?.lookupWeekReceipt)throw Object.assign(Error('ProtocolUnavailable'),{name:'ProtocolUnavailable'});
+ return gateway.lookupWeekReceipt({request:input,expectedScope:p.scope});
+}
+function getWeekOperationState(p){
+ ACTIVE_CONTEXT=p?.context||{};if(!syncValidWeek_(p?.week))throw Object.assign(Error('DataError'),{name:'DataError'});
+ const gateway=weekCommitGateway_();if(!gateway?.readOperationState)throw Object.assign(Error('ProtocolUnavailable'),{name:'ProtocolUnavailable'});
+ return gateway.readOperationState({week:p.week,expectedScope:p.scope});
 }
 function getJournalOperationReceipt(p){
  const fail=name=>{throw Object.assign(Error(name),{name});},validId=value=>typeof value==='string'&&/^[a-zA-Z0-9-]{10,80}$/.test(value);
@@ -768,8 +809,8 @@ function syncCommitCanonical_(value,depth=0){
  if(value&&Object.prototype.toString.call(value)==='[object Object]')return '{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+syncCommitCanonical_(value[key],depth+1)).join(',')+'}';
  throw Object.assign(new Error('DataError'),{name:'DataError'});
 }
-// SPEC-004 package 8: first domain writer, internal and opt-in through the
-// injected store only. No RPC, provisioning or legacy saveDay routing.
+// SPEC-004 canonical Days writer, internal behind the scoped routing gateway.
+// The outbox transport does not provision or activate the controller.
 // A complete snapshot is required: planning must not depend on a later read
 // or retry could change the fingerprint after an uncertain commit.
 function syncDaySnapshot_(day){
@@ -1206,9 +1247,9 @@ function syncDayMigrationGateway_(store,trustedScope,source){
  function planValue(data,kind,fingerprint,operationId,date){
    if(!fields(data,['format','kind','fingerprint','request'])||data.format!=='sync-day-plan/v1')fail('ProtocolCorrupt');
    if(data.kind!==kind||data.fingerprint!==fingerprint)fail('OperationMismatch');
-  const request=data.request;if(!fields(request,['operationId','changes'])||request.operationId!==operationId||!Array.isArray(request.changes)||request.changes.length!==(kind==='migrate'?3:1))fail('ProtocolCorrupt');
+  const request=data.request;if(!fields(request,['operationId','changes'])||request.operationId!==operationId||!Array.isArray(request.changes)||!(kind==='operation'?[1,3].includes(request.changes.length):request.changes.length===(kind==='migrate'?3:1)))fail('ProtocolCorrupt');
   const change=request.changes[0];if(!fields(change,['collection','id','baseVersion','action','data'])||change.collection!=='days'||change.id!==date||change.action!=='upsert'||!fields(change.data,['format','record'])||change.data.format!=='sync-day/v1'||syncCommitCanonical_(syncDaySnapshot_(change.data.record))!==syncCommitCanonical_(change.data.record)||change.data.record.date!==date)fail('ProtocolCorrupt');
-  if(kind==='migrate'){
+  if(kind==='migrate'||kind==='operation'&&request.changes.length===3){
    const r=request.changes[1],d=request.changes[2];
    if(change.baseVersion!==null||!fields(r,['collection','id','baseVersion','action','data'])||r.collection!=='settings'||r.id!==routeId(date)||r.action!=='upsert'||r.baseVersion!==null||!fields(d,['collection','id','baseVersion','action','data'])||d.collection!=='settings'||d.id!==directoryId||d.action!=='upsert')fail('ProtocolCorrupt');
    routeData(r.data,date);if(!directoryData(d.data).dates.includes(date))fail('ProtocolCorrupt');
@@ -1230,6 +1271,7 @@ function syncDayMigrationGateway_(store,trustedScope,source){
   }
   if(!entity||entity.deleted)fail('ProtocolCorrupt');return planValue(entity.data,kind,fingerprint,operationId,date);
  }
+ function checkExpectedScope(expected){if(!fields(expected,['archiveId','principalId','epoch','protocolVersion','schemaVersion'])||expected.archiveId!==scope.archiveId||expected.principalId!==scope.principalId||expected.epoch!==scope.epoch||expected.protocolVersion!==1||expected.schemaVersion!==1)fail('ScopeChanged');}
  const upsert=(collection,id,baseVersion,data)=>({collection,id,baseVersion,action:'upsert',data});
  function commit(request){const result=unwrap(protocol.execute(request));if(result.status==='conflict')fail('ConflictError');return {...result,scope:copy(scope)};}
  const delta=record=>({delta:true,entries:[],commonIncluded:false,commonUpserts:{days:[record]}});
@@ -1252,6 +1294,45 @@ function syncDayMigrationGateway_(store,trustedScope,source){
   return {...request.changes[0].data.record,updatedAt:ack.versions[0].version};
  }
  return Object.freeze({
+  saveOperation(input,expectedScope){return run(()=>{
+   checkExpectedScope(expectedScope);input=dayOperationInput_(input);const date=input.day.date;
+   const request=savedPlan('operation',input,input.operationId,date,()=>{
+    const index=directory();
+    if(index.dates.includes(date)){
+     const descriptor=route(date);checkSource(date,descriptor);const current=unwrap(writer.read(date));
+     const base=input.baseVersion===descriptor.legacyVersion&&current.version===descriptor.version?descriptor.version:/^commit-[1-9][0-9]{0,15}$/.test(input.baseVersion||'')?input.baseVersion:null;
+     return syncPlanDayOperation_({...input,baseVersion:base});
+    }
+    // New days may be created canonically. Existing legacy days require the
+    // separately authorized migration; this endpoint never migrates old data.
+    if(rawOne(date)!==null||unwrap(writer.read(date)).version!==null)fail('ProtocolUnavailable');
+    if(input.baseVersion!==null)fail('ConflictError');if(index.dates.length>=128)fail('ProtocolUnavailable');
+    return {operationId:input.operationId,changes:[syncPlanDayOperation_(input).changes[0],upsert('settings',routeId(date),null,{format:'sync-day-route/v1',date,sourceDigest:hash(null),legacyVersion:''}),upsert('settings',directoryId,index.version,{format:'sync-day-routing/v1',dates:[...index.dates,date].sort()})]};
+   });
+   const descriptor=request.changes.length===3?request.changes[1].data:route(date);checkSource(date,descriptor);
+   const ack=commit(request);checkSource(date,descriptor);return {...request.changes[0].data.record,updatedAt:ack.versions[0].version};
+  });},
+  readOperationState(input){return run(()=>{
+   checkExpectedScope(input?.expectedScope);const date=input.date;if(!validDate_(date))fail('DataError');
+   let day;if(directory().dates.includes(date)){const descriptor=route(date);checkSource(date,descriptor);const current=unwrap(writer.read(date));day=current.day?{...current.day,updatedAt:current.version}:null;}
+   else{if(unwrap(writer.read(date)).version!==null)fail('CommitBlocked');day=rawOne(date);}
+   return {date,missing:day===null,day,scope:copy(input.expectedScope)};
+  });},
+  lookupDayReceipt(input){
+   const request=dayOperationInput_(input?.request),expected=input?.expectedScope;
+   if(!fields(expected,['archiveId','principalId','epoch','protocolVersion','schemaVersion'])||expected.archiveId!==scope.archiveId||expected.principalId!==scope.principalId||expected.epoch!==scope.epoch||expected.protocolVersion!==1||expected.schemaVersion!==1)fail('ScopeChanged');
+   // lookupOperationReceipt is a read-only barrier and refuses pending work.
+   return run(()=>{
+    const initial=unwrap(protocol.lookupOperationReceipt({operationId:request.operationId})),entity=unwrap(protocol.read('settings','day-plan:'+hash([scope.principalId,request.operationId]))).entity;
+    if(!entity)return {status:'unknown',operationId:request.operationId,scope:copy(expected)};
+    const plan=planValue(entity.data,'operation',hash({kind:'operation',input:request}),request.operationId,request.day.date);
+    const receipt=initial.status==='unknown'?initial:unwrap(protocol.lookupOperationReceipt({operationId:request.operationId,request:plan}));
+    if(receipt.status!=='committed')return {status:receipt.status,operationId:request.operationId,scope:copy(expected)};
+    const versions=receipt.versions.filter(item=>item.collection==='days'&&item.id===request.day.date&&!item.deleted);
+    if(versions.length!==1||versions[0].version!=='commit-'+receipt.sequence)fail('ProtocolCorrupt');
+    return {status:'committed',operationId:request.operationId,id:request.day.date,version:versions[0].version,scope:copy(expected)};
+   });
+  },
   preview(date){return run(()=>{if(typeof date!=='string'||!validDate_(date))fail('DataError');const row=rawOne(date);const day=row?snapshot(row):syncDaySnapshot_({...Object.fromEntries(DAY_HEADERS.filter(key=>key!=='updatedAt').map(key=>[key,''])),date});return {date,legacy:row,sourceDigest:hash(row),day,migrated:directory().dates.includes(date)};});},
   migrate(input){return run(()=>{
    if(!fields(input,['operationId','date','expectedLegacy'])||!validId(input.operationId)||typeof input.date!=='string'||!validDate_(input.date))fail('DataError');
@@ -1337,9 +1418,9 @@ function syncWeekMigrationGateway_(store,trustedScope,source){
  function planValue(data,kind,fingerprint,operationId,week){
    if(!fields(data,['format','kind','fingerprint','request'])||data.format!=='sync-week-plan/v1')fail('ProtocolCorrupt');
    if(data.kind!==kind||data.fingerprint!==fingerprint)fail('OperationMismatch');
-  const request=data.request;if(!fields(request,['operationId','changes'])||request.operationId!==operationId||!Array.isArray(request.changes)||request.changes.length!==(kind==='migrate'?3:1))fail('ProtocolCorrupt');
+  const request=data.request;if(!fields(request,['operationId','changes'])||request.operationId!==operationId||!Array.isArray(request.changes)||!(kind==='operation'?[1,3].includes(request.changes.length):request.changes.length===(kind==='migrate'?3:1)))fail('ProtocolCorrupt');
   const change=request.changes[0];if(!fields(change,['collection','id','baseVersion','action','data'])||change.collection!=='weeks'||change.id!==week||change.action!=='upsert'||!fields(change.data,['format','record'])||change.data.format!=='sync-week/v1'||syncCommitCanonical_(syncWeekSnapshot_(change.data.record))!==syncCommitCanonical_(change.data.record)||change.data.record.week!==week)fail('ProtocolCorrupt');
-  if(kind==='migrate'){
+  if(kind==='migrate'||kind==='operation'&&request.changes.length===3){
    const r=request.changes[1],d=request.changes[2];
    if(change.baseVersion!==null||!fields(r,['collection','id','baseVersion','action','data'])||r.collection!=='settings'||r.id!==routeId(week)||r.action!=='upsert'||r.baseVersion!==null||!fields(d,['collection','id','baseVersion','action','data'])||d.collection!=='settings'||d.id!==directoryId||d.action!=='upsert')fail('ProtocolCorrupt');
    routeData(r.data,week);if(!directoryData(d.data).weeks.includes(week))fail('ProtocolCorrupt');
@@ -1361,6 +1442,7 @@ function syncWeekMigrationGateway_(store,trustedScope,source){
   }
   if(!entity||entity.deleted)fail('ProtocolCorrupt');return planValue(entity.data,kind,fingerprint,operationId,week);
  }
+ function checkExpectedScope(expected){if(!fields(expected,['archiveId','principalId','epoch','protocolVersion','schemaVersion'])||expected.archiveId!==scope.archiveId||expected.principalId!==scope.principalId||expected.epoch!==scope.epoch||expected.protocolVersion!==1||expected.schemaVersion!==1)fail('ScopeChanged');}
  const upsert=(collection,id,baseVersion,data)=>({collection,id,baseVersion,action:'upsert',data});
  function commit(request){const result=unwrap(protocol.execute(request));if(result.status==='conflict')fail('ConflictError');return {...result,scope:copy(scope)};}
  const delta=record=>({delta:true,entries:[],commonIncluded:false,commonUpserts:{weeks:[record]}});
@@ -1383,6 +1465,45 @@ function syncWeekMigrationGateway_(store,trustedScope,source){
   return {...request.changes[0].data.record,updatedAt:ack.versions[0].version};
  }
  return Object.freeze({
+  saveOperation(input,expectedScope){return run(()=>{
+   checkExpectedScope(expectedScope);input=weekOperationInput_(input);const date=input.week.week;
+   const request=savedPlan('operation',input,input.operationId,date,()=>{
+    const index=directory();
+    if(index.weeks.includes(date)){
+     const descriptor=route(date);checkSource(date,descriptor);const current=unwrap(writer.read(date));
+     const base=input.baseVersion===descriptor.legacyVersion&&current.version===descriptor.version?descriptor.version:/^commit-[1-9][0-9]{0,15}$/.test(input.baseVersion||'')?input.baseVersion:null;
+     return syncPlanWeekOperation_({...input,baseVersion:base});
+    }
+    // New weeks may be created canonically. Existing legacy weeks require the
+    // separately authorized migration; this endpoint never migrates old data.
+    if(rawOne(date)!==null||unwrap(writer.read(date)).version!==null)fail('ProtocolUnavailable');
+    if(input.baseVersion!==null)fail('ConflictError');if(index.weeks.length>=128)fail('ProtocolUnavailable');
+    return {operationId:input.operationId,changes:[syncPlanWeekOperation_(input).changes[0],upsert('settings',routeId(date),null,{format:'sync-week-route/v1',week:date,sourceDigest:hash(null),legacyVersion:''}),upsert('settings',directoryId,index.version,{format:'sync-week-routing/v1',weeks:[...index.weeks,date].sort()})]};
+   });
+   const descriptor=request.changes.length===3?request.changes[1].data:route(date);checkSource(date,descriptor);
+   const ack=commit(request);checkSource(date,descriptor);return {...request.changes[0].data.record,updatedAt:ack.versions[0].version};
+  });},
+  readOperationState(input){return run(()=>{
+   checkExpectedScope(input?.expectedScope);const date=input.week;if(!syncValidWeek_(date))fail('DataError');
+   let record;if(directory().weeks.includes(date)){const descriptor=route(date);checkSource(date,descriptor);const current=unwrap(writer.read(date));record=current.week?{...current.week,updatedAt:current.version}:null;}
+   else{if(unwrap(writer.read(date)).version!==null)fail('CommitBlocked');record=rawOne(date);}
+   return {week:date,missing:record===null,weekRecord:record,scope:copy(input.expectedScope)};
+  });},
+  lookupWeekReceipt(input){
+   const request=weekOperationInput_(input?.request),expected=input?.expectedScope;
+   if(!fields(expected,['archiveId','principalId','epoch','protocolVersion','schemaVersion'])||expected.archiveId!==scope.archiveId||expected.principalId!==scope.principalId||expected.epoch!==scope.epoch||expected.protocolVersion!==1||expected.schemaVersion!==1)fail('ScopeChanged');
+   // lookupOperationReceipt is a read-only barrier and refuses pending work.
+   return run(()=>{
+    const initial=unwrap(protocol.lookupOperationReceipt({operationId:request.operationId})),entity=unwrap(protocol.read('settings','week-plan:'+hash([scope.principalId,request.operationId]))).entity;
+    if(!entity)return {status:'unknown',operationId:request.operationId,scope:copy(expected)};
+    const plan=planValue(entity.data,'operation',hash({kind:'operation',input:request}),request.operationId,request.week.week);
+    const receipt=initial.status==='unknown'?initial:unwrap(protocol.lookupOperationReceipt({operationId:request.operationId,request:plan}));
+    if(receipt.status!=='committed')return {status:receipt.status,operationId:request.operationId,scope:copy(expected)};
+    const versions=receipt.versions.filter(item=>item.collection==='weeks'&&item.id===request.week.week&&!item.deleted);
+    if(versions.length!==1||versions[0].version!=='commit-'+receipt.sequence)fail('ProtocolCorrupt');
+    return {status:'committed',operationId:request.operationId,id:request.week.week,version:versions[0].version,scope:copy(expected)};
+   });
+  },
   preview(week){return run(()=>{if(typeof week!=='string'||!syncValidWeek_(week))fail('DataError');const row=rawOne(week);const record=row?snapshot(row):syncWeekSnapshot_({...Object.fromEntries(WEEK_HEADERS.filter(key=>key!=='updatedAt').map(key=>[key,key==='closed'?'no':''])),week});return {week,legacy:row,sourceDigest:hash(row),record,migrated:directory().weeks.includes(week)};});},
   migrate(input){return run(()=>{
    if(!fields(input,['operationId','week','expectedLegacy'])||!validId(input.operationId)||typeof input.week!=='string'||!syncValidWeek_(input.week))fail('DataError');
@@ -2118,7 +2239,7 @@ function syncRecordRoutingController_(services,domain){
   if(migrate&&services.allowMigration?.()!==true)fail('ProtocolUnavailable');
   const bound=binding(loaded),result=method==='changes'?bound.changes(...args):method==='checkpoint'?bound.checkpoint(...args):bound.gateway[method](...args);check(loaded);return result;
  }));
- const facade=Object.freeze({checkpoint:(...args)=>act('checkpoint',args),changes:(...args)=>act('changes',args),readRows:(...args)=>act('readRows',args),preview:(...args)=>act('preview',args),...(entries?{lookupDeleteReceipt:(...args)=>act('lookupDeleteReceipt',args),lookupPageReceipt:(...args)=>act('lookupPageReceipt',args),read:(...args)=>act('read',args),readContent:(...args)=>act('readContent',args),isRouted:(...args)=>act('isRouted',args),readFiles:(...args)=>act('readFiles',args),readFilesBatch:(...args)=>act('readFilesBatch',args),addFile:(...args)=>act('addFile',args,true),prepareDelete:(...args)=>act('prepareDelete',args,true),commitDelete:(...args)=>act('commitDelete',args,true),setProjects:(...args)=>act('setProjects',args,true),setStatus:(...args)=>act('setStatus',args,true),setTags:(...args)=>act('setTags',args,true),setDue:(...args)=>act('setDue',args,true),setSchedule:(...args)=>act('setSchedule',args,true),setContent:(...args)=>act('setContent',args,true),importContent:(...args)=>act('importContent',args,true),importContentAndTitle:(...args)=>act('importContentAndTitle',args,true),setDocSyncState:(...args)=>act('setDocSyncState',args,true),savePage:(...args)=>act('savePage',args,true)}:{saveLegacy:(...args)=>act('saveLegacy',args,true)}),...(projects?{saveProject:(...args)=>act('saveProject',args,true),convertProjectToTag:(...args)=>act('convertProjectToTag',args,true)}:{}),...(catalog?{readSetting:(...args)=>act('readSetting',args),saveSetting:(...args)=>act('saveSetting',args,true)}:{}),...(domain==='day'?{saveBatch:(...args)=>act('saveBatch',args,true)}:{}),migrate:(...args)=>act('migrate',args,true,true)});
+ const facade=Object.freeze({checkpoint:(...args)=>act('checkpoint',args),changes:(...args)=>act('changes',args),readRows:(...args)=>act('readRows',args),preview:(...args)=>act('preview',args),...(entries?{lookupDeleteReceipt:(...args)=>act('lookupDeleteReceipt',args),lookupPageReceipt:(...args)=>act('lookupPageReceipt',args),read:(...args)=>act('read',args),readContent:(...args)=>act('readContent',args),isRouted:(...args)=>act('isRouted',args),readFiles:(...args)=>act('readFiles',args),readFilesBatch:(...args)=>act('readFilesBatch',args),addFile:(...args)=>act('addFile',args,true),prepareDelete:(...args)=>act('prepareDelete',args,true),commitDelete:(...args)=>act('commitDelete',args,true),setProjects:(...args)=>act('setProjects',args,true),setStatus:(...args)=>act('setStatus',args,true),setTags:(...args)=>act('setTags',args,true),setDue:(...args)=>act('setDue',args,true),setSchedule:(...args)=>act('setSchedule',args,true),setContent:(...args)=>act('setContent',args,true),importContent:(...args)=>act('importContent',args,true),importContentAndTitle:(...args)=>act('importContentAndTitle',args,true),setDocSyncState:(...args)=>act('setDocSyncState',args,true),savePage:(...args)=>act('savePage',args,true)}:{saveLegacy:(...args)=>act('saveLegacy',args,true)}),...(projects?{saveProject:(...args)=>act('saveProject',args,true),convertProjectToTag:(...args)=>act('convertProjectToTag',args,true)}:{}),...(catalog?{readSetting:(...args)=>act('readSetting',args),saveSetting:(...args)=>act('saveSetting',args,true)}:{}),...(weekly?{saveOperation:(...args)=>act('saveOperation',args,true),lookupWeekReceipt:(...args)=>act('lookupWeekReceipt',args),readOperationState:(...args)=>act('readOperationState',args)}:{}),...(domain==='day'?{saveOperation:(...args)=>act('saveOperation',args,true),lookupDayReceipt:(...args)=>act('lookupDayReceipt',args),readOperationState:(...args)=>act('readOperationState',args),saveBatch:(...args)=>act('saveBatch',args,true)}:{}),migrate:(...args)=>act('migrate',args,true,true)});
  return Object.freeze({
   resolve:()=>protect(()=>{if(absent(snapshot()))return null;return locked(()=>{load();return facade;});}),
   status:()=>protect(()=>{if(absent(snapshot()))return statusOf(null);return locked(()=>statusOf(load()));}),

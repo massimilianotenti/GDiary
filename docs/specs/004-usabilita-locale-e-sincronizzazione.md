@@ -692,3 +692,19 @@ Abitudini collegate al checkpoint completo con periodi esatti e guardie sulle
 letture tardive. Rapporti: ../VERIFICA-BOOTSTRAP-APPLICATIVO.md e
 ../VERIFICA-BOOTSTRAP-VISTE-PERIODO.md. Non chiude interi pacchetti, non abilita
 capability reali, non estende l'outbox alle pratiche e non certifica Google.
+
+### Seguito locale del 6 novembre — outbox Days
+
+Estesa l'outbox alle riflessioni giornaliere con snapshot completi, CAS,
+dipendenze, trasporto/ricevute scoped, ACK conservativo e scelte dei conflitti.
+Diario multigiornata, Abitudini e dettaglio giorno collegati; altre entità
+escluse. Rapporto ../VERIFICA-OUTBOX-GIORNATE.md. Capability reali false,
+nessun provisioning o collaudo Google; il pacchetto 11 rimane parziale.
+
+### Seguito locale del 6 novembre — outbox Weeks
+
+Weeks esteso a snapshot locali durevoli, trasporto e ricevute scoped, ACK
+conservativo e scelte di conflitto nel form del checkup. Infrastruttura
+condivisa limitata a Days/Weeks, regressioni Days preservate. Rapporto
+../VERIFICA-OUTBOX-SETTIMANE.md; capability reali false, nessun provisioning
+o accesso Google. Pacchetto 11 ancora parziale, altre entità escluse.

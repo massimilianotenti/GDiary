@@ -46,3 +46,17 @@ completa Settimana/Abitudini. Le righe 7 e 9 sopra descrivono lo stato di base:
 queste viste ora usano il checkpoint coerente; altre viste e collaudi reali
 restano aperti. Nessuna chiusura aggiuntiva di pacchetti interi. Rapporti:
 VERIFICA-BOOTSTRAP-APPLICATIVO.md e VERIFICA-BOOTSTRAP-VISTE-PERIODO.md.
+
+## Aggiornamento pacchetto 11 — outbox Days, 6 novembre 2026
+
+Implementati localmente salvataggio durevole Days, trasporto/ricevute scoped,
+ACK/dipendenze e recupero conflitti nei punti UI del diario e Abitudini.
+Nuovo test:day-outbox; rapporto VERIFICA-OUTBOX-GIORNATE.md. Non chiude il
+pacchetto 11: altre mutazioni, provisioning e convalida Google restano aperti.
+
+## Aggiornamento pacchetto 11 — outbox Weeks, 6 novembre 2026
+
+Weeks collegato localmente al salvataggio durevole, trasporto/ricevute scoped,
+ACK/dependenze e recupero dei conflitti del checkup, riutilizzando Days.
+Rapporto VERIFICA-OUTBOX-SETTIMANE.md. Nessuna chiusura del pacchetto 11:
+registrazioni abitudini, altre mutazioni e gate Google rimangono aperti.

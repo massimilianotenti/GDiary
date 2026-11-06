@@ -1,6 +1,54 @@
 # Passaggio di consegne — 17 ottobre 2026
 
 
+## Outbox del focus e checkup settimanale — 6 novembre
+
+Weeks esteso all'outbox sulla base Days non committata. Snapshot completo,
+identità lunedì, CAS e commit atomico; trasporto/ricevute scoped sul writer
+recuperabile, creazione canonica delle settimane senza preimmagine legacy.
+Gli adattatori Days/Weeks condividono validazione di contratto, accodamento,
+lease/claim, ACK/dipendenze, retry e confronto dei conflitti. IndexedDB v11
+invariato; indice Entries non invalidato dai salvataggi/ACK dei periodi.
+
+Il form resta montato durante l'ACK; nuove modifiche e revisione originaria
+sono conservate, senza adottare la revisione di un'altra scheda. Stato locale
+conservato anche da polishWeek, messaggi distinti locale/Google, entrambe le
+scelte con storico. Risposte comuni tardive e callback di scope precedente
+non rimpiazzano lo stato corrente. Nuovo test:week-outbox (server/repository/UI),
+726 interruzioni simulate update/create, riavvio reale browser, due schede,
+quota/timeout, conflitti, readOnly/retry e confini mese/anno.
+[Contratto, verifiche e limiti](VERIFICA-OUTBOX-SETTIMANE.md).
+
+Le modifiche Days sono conservate; nessun commit, Google, deploy, setup o
+capability reale abilitata. HabitLogs e cataloghi restano fuori tranche;
+il pacchetto 11 rimane parziale. Superati build, npm test (Days e Weeks),
+repository, release, week-browser, bootstrap, common-periods, tracing e
+P59/P60.1/P70. Sei file, UTF-8 e segnaposto preservati; dettagli nel rapporto.
+
+
+## Outbox delle riflessioni giornaliere — 6 novembre
+
+Tranche Days successiva ad ad13f4a: bozza completa e operazione atomiche in
+IndexedDB v11, CAS, accorpamento mai inviato, dipendenze/ACK e ripristino.
+Trasporto dedicato con scope atteso, piano durevole e ricevuta legata allo
+snapshot originale; nuove date canoniche senza scrivere Days legacy. Le date
+legacy esistenti richiedono il routing/migrazione già previsti, senza setup
+implicito. Salvataggi dal diario (esiti per data), Abitudini e dettaglio giorno.
+ACK senza perdita di nuove modifiche, nodo/focus/selezione; retry e scelte
+locale/Google con storico conservato. Limite della tranche: solo Days.
+
+Nuovo test:day-outbox (server, repository e UI), incluso in npm test e, per
+repository/UI, test:repository. Verifiche con backend Demo e Chromium/IndexedDB,
+726 interruzioni Sheets simulate (update/create), riavvio effettivo browser, due schede,
+quota/timeout, ACK lento/perso, conflitti e revoca. Dettagli ed esiti finali in
+[VERIFICA-OUTBOX-GIORNATE](VERIFICA-OUTBOX-GIORNATE.md).
+Superati build, npm test, repository, release, bootstrap, day-outbox/batch/
+browser, cycle, common-periods, tracing e P59/P60.1/P70; sei file, UTF-8 e
+ROOT_FOLDER_ID segnaposto preservati.
+Capability reali ancora false; nessun Google, deploy, setup o commit.
+Pacchetto 11 ancora parziale: Weeks/HabitLogs/cataloghi restano fuori tranche.
+
+
 ## Apertura applicativa e viste per periodo — 6 novembre
 
 Aggiunta misura applicativa al benchmark IndexedDB 10k/50k: lettura, merge,

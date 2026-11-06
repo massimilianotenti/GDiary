@@ -220,3 +220,22 @@ sintetica, nessuna RPC Google; due frame non certificano paint.
 `test:local-bootstrap`/`test:repository` coprono ora periodi week/habits,
 riavvio, bozze/versioni, revoca, letture tardive e finestra editor Task.
 Vedere VERIFICA-BOOTSTRAP-APPLICATIVO.md e VERIFICA-BOOTSTRAP-VISTE-PERIODO.md.
+
+## Verifiche outbox Days — 6 novembre 2026
+
+`npm run test:day-outbox` esegue server Demo/V8, repository Chromium/IndexedDB
+e integrazione UI HTTP con backend inventato. Incluso in npm test; prove
+repository/UI anche in test:repository. Copre 726 interruzioni Sheets simulate (330 update, 396 create),
+riavvio browser, due schede, batch parziale, quota/timeout, rich, ACK e
+conflitti/scelte/retry. Nessun Google. Contratti e gate in
+VERIFICA-OUTBOX-GIORNATE.md.
+
+## Verifiche outbox Weeks — 6 novembre 2026
+
+`npm run test:week-outbox` copre server V8/Sheets sintetico (726 interruzioni
+update/create), repository Chromium/IndexedDB e integrazione UI con backend
+HTTP locale. Incluso in npm test; repository/UI anche in test:repository.
+Copre riavvio browser, due schede, ACK lenti/persi, risposte comuni tardive,
+quota/timeout, conflitti/scelte/retry, readOnly e confini mese/anno. Eseguire
+anche le regressioni Days sulla base condivisa. Rapporto e gate:
+VERIFICA-OUTBOX-SETTIMANE.md. Nessun Google necessario.

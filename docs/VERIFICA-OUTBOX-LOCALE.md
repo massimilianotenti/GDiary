@@ -225,3 +225,17 @@ Il claim memorizza fino a 256 esiti di dipendenze per la sola transazione. Su 1.
 Il claim valuta le dipendenze in gruppi fino a 32 candidati per stato, mantenendo ordine e limite del lotto. Test Chromium attraversa gruppi con 40 operazioni bloccate e verifica il recupero di invii scaduti. Su 1.000 righe, 30 ripetizioni, Chromium 156/Linux/i7-1370P: p95 93,2 ms per dipendenze distinte, precedente misura 410,6 ms; p95 5,0 ms tutte pronte e 31,1 ms con dipendenza condivisa. Build, test:repository, test:release e test:outbox-scale superati. Misure non alternate; la scansione può crescere con la coda e non misura Google.
 
 Il dispatcher fissa lo scope per il lotto: cambio di archivio/principal/epoca durante verifica o RPC blocca ulteriori claim, ACK e rilascio nel nuovo scope. Test unitari e Chromium con due scope nello stesso IndexedDB, build, test:repository, test:identity e test:release superati. Un invio incerto resta da recuperare nello scope originale.
+
+## Estensione Days — 6 novembre 2026
+
+Il seguito VERIFICA-OUTBOX-GIORNATE.md estende a kind day la scrittura atomica,
+le dipendenze, il trasporto scoped, ACK e scelte di conflitto. Le affermazioni
+storiche sopra che limitano l'outbox a note/task sono superate per Days.
+Weeks, HabitLogs e cataloghi restano esclusi. Capability reali ancora false.
+
+## Estensione Weeks — 6 novembre 2026
+
+Il seguito VERIFICA-OUTBOX-SETTIMANE.md aggiunge kind week e il form del
+checkup al meccanismo condiviso Days/Weeks. Le precedenti esclusioni di Weeks
+sono superate per questo percorso locale. HabitLogs e cataloghi restano
+esclusi; capability reali sempre false e collaudo Google separato.

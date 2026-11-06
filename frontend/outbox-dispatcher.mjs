@@ -1,3 +1,5 @@
+import {periodOperation} from './period-operation.mjs';
+import {canonicalDayJSON} from './day-operation.mjs';
 const validId=value=>typeof value==='string'&&/^[a-zA-Z0-9-]{10,80}$/.test(value);
 const errorName=error=>String(error?.name||'');
 const transientCodes=new Set(['BusyError','NetworkError','TimeoutError','RateLimit','ServiceUnavailable','StorageError','ProtocolUnavailable']);
@@ -10,6 +12,7 @@ export function createOutboxDispatcher(options={}){
  const requireScope=()=>{const current=identity.getScope?.();if(!enabled()||!expectedScope||!current||!['archiveId','principalId','epoch'].every(key=>validId(expectedScope[key]))||expectedScope.protocolVersion!==1||expectedScope.schemaVersion!==1||['archiveId','principalId','epoch','protocolVersion','schemaVersion'].some(key=>current[key]!==expectedScope[key]))throw Object.assign(Error('ScopeChangedError'),{name:'ScopeChangedError'});};
  const invoke=async(name,input)=>{requireScope();const result=await repository[name](input);requireScope();if(!result?.ok)throw Object.assign(Error(result?.error||'StorageError'),{name:result?.error||'StorageError'});return result.value;};
  function requestFor(operation){
+  if(periodOperation(operation.kind)){if(operation.action!=='upsert'||!validId(operation.operationId)||!periodOperation(operation.kind).validOperation(operation.payload,operation.id,operation.baseVersion,operation.operationId))throw Object.assign(Error('DataError'),{name:'DataError'});return {method:periodOperation(operation.kind).saveMethod,payload:{operation:operation.payload,scope:{...expectedScope}},clientId:null};}
   if(operation.action==='delete'){
    if(!validId(operation.operationId)||!validId(operation.id)||typeof operation.baseVersion!=='string'||!operation.baseVersion||operation.payload?.id!==operation.id||operation.payload?.operationId!==operation.operationId||operation.payload?.baseVersion!==operation.baseVersion)throw Object.assign(Error('DataError'),{name:'DataError'});
    return {method:'deleteNote',payload:{id:operation.id,updatedAt:operation.baseVersion,operationId:operation.operationId},clientId:null};
@@ -32,7 +35,7 @@ export function createOutboxDispatcher(options={}){
   return 'failed';
  }
  async function lookupReceipt(operation,request){
-  requireScope();const proof=await call(operation.action==='delete'?'getJournalDeleteReceipt':'getJournalOperationReceipt',{scope:{...expectedScope},request:request.payload});requireScope();
+  requireScope();const proof=await call(periodOperation(operation.kind)?periodOperation(operation.kind).receiptMethod:operation.action==='delete'?'getJournalDeleteReceipt':'getJournalOperationReceipt',{scope:{...expectedScope},request:periodOperation(operation.kind)?request.payload.operation:request.payload});requireScope();
   if(!proof||!proof.scope||['archiveId','principalId','epoch','protocolVersion','schemaVersion'].some(key=>proof.scope[key]!==expectedScope[key])||proof.operationId!==operation.operationId||!['committed','conflict','unknown'].includes(proof.status))throw Object.assign(Error('ProtocolCorrupt'),{name:'ProtocolCorrupt'});
   if(proof.status==='committed'&&(proof.id!==operation.id||!/^commit-[1-9][0-9]{0,15}$/.test(proof.version||'')||!Number.isSafeInteger(Number(proof.version.slice(7)))))throw Object.assign(Error('ProtocolCorrupt'),{name:'ProtocolCorrupt'});
   return proof;
@@ -59,8 +62,12 @@ export function createOutboxDispatcher(options={}){
       if(proof.status==='conflict'){await invoke('settleOutboxOperation',{owner,token,operationId:operation.operationId,outcome:'conflict',errorCode:'ConflictError',now:now()});try{await options.onFailure?.(operation,'conflict');}catch{}continue;}
       lease=await invoke('renewOutboxLease',{owner,token,now:now(),leaseMs});
      }
-     sent=true;const response=await call(request.method,request.payload),matches=operation.action==='delete'?null:Array.isArray(response?.entries)?response.entries.filter(item=>item?.clientId===request.clientId):[],entry=operation.action==='delete'?response?.deletedNoteId===operation.id?{id:operation.id,updatedAt:response.updatedAt||''}:null:matches.length===1?matches[0]:null;
+     sent=true;const response=await call(request.method,request.payload),matches=operation.action==='delete'?null:Array.isArray(response?.entries)?response.entries.filter(item=>item?.clientId===request.clientId):[],entry=periodOperation(operation.kind)?response?.[operation.kind]?{...response[operation.kind],id:response[operation.kind][periodOperation(operation.kind).key]}:null:operation.action==='delete'?response?.deletedNoteId===operation.id?{id:operation.id,updatedAt:response.updatedAt||''}:null:matches.length===1?matches[0]:null;
      requireScope();if(operation.action==='delete'&&response?.alreadyAbsent===true)throw Object.assign(Error('ConflictError'),{name:'ConflictError'});if(!entry||entry.id!==operation.id||typeof entry.updatedAt!=='string'||!entry.updatedAt.trim()||entry.updatedAt.length>200)throw Object.assign(Error('ProtocolCorrupt'),{name:'ProtocolCorrupt'});
+     if(periodOperation(operation.kind)){
+      const spec=periodOperation(operation.kind),{updatedAt,...snapshot}=response[operation.kind];
+      if(!/^commit-[1-9][0-9]{0,15}$/.test(updatedAt)||!Number.isSafeInteger(Number(updatedAt.slice(7)))||!spec.validOperation({operationId:operation.operationId,baseVersion:operation.baseVersion,[operation.kind]:snapshot},operation.id,operation.baseVersion,operation.operationId)||canonicalDayJSON(snapshot)!==canonicalDayJSON(operation.payload[operation.kind]))throw Object.assign(Error('ProtocolCorrupt'),{name:'ProtocolCorrupt'});
+     }
      await invoke('settleOutboxOperation',{owner,token,operationId:operation.operationId,outcome:'ack',now:now(),...(entry.updatedAt?{serverVersion:entry.updatedAt}:{})});processed++;
      try{await options.onAck?.(operation,entry);}catch{}
     }catch(error){
