@@ -100,3 +100,38 @@ compatibile.
 Il pacchetto 11 SPEC-004 rimane aperto; offline completo non disponibile.
 Restano integrazione Google, copertura browser mirata dei casi elencati e gate
 di compatibilità/retention già descritti nei rapporti HabitLogs.
+
+## Seguito: feed cross-tab end-to-end, dalla base 1cf9d07 — 6 novembre 2026
+
+Nuovo `tests/verify-habit-catalog-sync-e2e-browser.cjs`, incluso in
+`test:repository`. In Chromium apre due pagine reali con profilo persistente e
+IndexedDB condivisa. Il test inizializza una copia di fixture al cursore del
+backend, poi una mutazione canonica Habit viene inviata al server sintetico
+Apps Script e produce un commit nel feed. La scheda aggiorna la copia tramite
+`createSyncConsumer.sync()` invocato dal percorso applicativo
+`refreshLocalBootstrap`; il publisher BroadcastChannel è quindi eseguito dal
+handler reale dell'applicazione e la seconda scheda rilegge il record dalla
+copia condivisa. Non chiama `publishHabitCatalogTabChange` né applica il delta
+direttamente dal test.
+
+La prova controlla il cursore consumer, il record Habit condiviso, la prova
+catalogo ricostruita sul cursore aggiornato, la conferma precedente rimossa,
+`habitCatalogReviewRequired` e la freshness dell'indice Entries. Il backend è
+sintetico e non equivale a un collaudo Google. L'inizializzazione della fixture
+scrive la baseline direttamente nel repository; il delta oggetto della prova
+passa invece dal commit canonico e dal feed del consumer.
+
+Questa prova non copre ancora via consumer un tombstone Goal/Habit né tutti gli
+ordini di almeno tre eventi fra feed parziali, errori/retry, conferma e ACK
+HabitLogs. Non ripete nel medesimo scenario E2E i due editor attivi: la
+conservazione di editor rich text e tracker cross-tab resta dimostrata dalle
+prove browser/repository precedenti, che applicano direttamente il delta e
+quindi non sono prova del percorso end-to-end. Non si dichiara copertura
+aggiuntiva per risposta remota tardiva, revoca o cambio archivio attraverso il
+consumer di questo nuovo test.
+
+Build, `test:repository` (inclusa la nuova prova), `test:release`, `npm test`
+e `git diff --check` superati il 6 novembre 2026. Nessun sorgente frontend è
+stato modificato; `npm run build` ha rigenerato gli artefatti previsti e
+preparato i sei file Apps Script localmente. Nessun deploy, setupDrive,
+accesso Google o modifica ai dati reali.

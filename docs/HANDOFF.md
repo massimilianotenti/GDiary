@@ -1,5 +1,26 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Feed cataloghi HabitLogs end-to-end fra schede — 6 novembre
+
+Alla base `1cf9d07` aggiunta una prova Chromium a due pagine con IndexedDB
+condivisa: una mutazione catalogo canonica nel backend sintetico genera un
+commit, il consumer lo applica e il percorso app di riallineamento notifica la
+seconda scheda tramite BroadcastChannel. Verificati cursore/prova, conferma
+invalidata, flag revisione e indice Entries fresco. Il test è in
+`test:repository`. Restano fuori da questa prova tombstone via consumer, ordini
+completi di tre o più eventi, ACK HabitLogs concorrenti nello stesso scenario
+e editor attivi simultanei; le prove dirette repository/UI precedenti non sono
+classificate come E2E. Dettagli e limiti:
+[rapporto di riallineamento](VERIFICA-RIALLINEAMENTO-CATALOGHI-HABITLOGS-LOCALE.md).
+
+Conteggio secondo `STATO-PIANO-SPEC-004.md`: 8/12 pacchetti aperti, di cui 6
+con sviluppo locale indicato e 2 in attesa di verifica esterna (pacchetti 2 e
+4). Il pacchetto 4 ha completato lo sviluppo locale del worker coordinato;
+rimane la convalida del fence contro Docs reale. Una sessione di staging di
+qualche ora è una stima se account, documento di prova e capability sono già
+pronti; senza accesso e provisioning non è stimabile. La creazione iniziale
+delle sezioni resta sotto lock, limite documentato separatamente.
+
 ## Ordini concorrenti del riallineamento HabitLogs — 6 novembre
 
 Seguito locale dalla base f978f4a. Il sync/bootstrap esistente aggiorna

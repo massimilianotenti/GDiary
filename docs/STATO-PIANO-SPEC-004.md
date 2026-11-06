@@ -37,6 +37,16 @@ Il piano non autorizza deploy, setup o migrazioni sui dati reali. Le verifiche
 Google richiedono un'azione pertinente autorizzata separatamente; non sono un
 motivo per saltare lo sviluppo locale ancora disponibile.
 
+## Aggiornamento evidenze cataloghi HabitLogs — 6 novembre 2026
+
+Aggiunta in `test:repository` una prova E2E Chromium a due schede per un
+aggiornamento canonico Habit che attraversa backend sintetico, feed,
+`createSyncConsumer`, IndexedDB e BroadcastChannel/UI. La prova estende
+l'evidenza del pacchetto 11 senza chiuderlo: restano tombstone via consumer,
+ordini concorrenti ulteriori e i gate elencati nel rapporto
+`VERIFICA-RIALLINEAMENTO-CATALOGHI-HABITLOGS-LOCALE.md`. Il conteggio della
+tabella sopra non cambia.
+
 ## Aggiornamento bootstrap — 6 novembre 2026
 
 I seguiti del 5 novembre hanno introdotto checkpoint completo del diario,
