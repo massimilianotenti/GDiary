@@ -1,0 +1,3 @@
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawnSync}=require('node:child_process');
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'gdiary-continuous-')),env={...process.env,GDIARY_CONTINUOUS_FIXTURE:path.join(dir,'synthetic-ledger.json')};
+try{for(const file of ['verify-habit-log-continuous-capacity.cjs','verify-habit-log-continuous-contention.cjs','verify-habit-log-continuous-browser.cjs']){const r=spawnSync(process.execPath,[path.join(__dirname,file)],{env,stdio:'inherit'});if(r.status!==0)process.exitCode=r.status||1;if(process.exitCode)break;}}finally{fs.rmSync(dir,{recursive:true,force:true});}

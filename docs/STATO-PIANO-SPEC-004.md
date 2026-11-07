@@ -132,3 +132,22 @@ tutti gli ordini arbitrari di tre o più feed/ACK, ogni tipo di editor e due for
 testuali sporchi simultanei in viste diverse. Rapporto:
 [ordini concorrenti del riallineamento](VERIFICA-RIALLINEAMENTO-CATALOGHI-HABITLOGS-LOCALE.md).
 Il backend è sintetico; pacchetto 11 aperto, offline completo non disponibile.
+
+## Seguito capacità continuativa — 7 novembre 2026
+
+Policy server HabitLogs dietro consenso privato spento, con compattazione
+recuperabile dei riferimenti attivi prima del budget aggregato e nelle
+scritture/recupero: soglia 384, lotti 64, due lotti/128 ritiri per lock, budget
+cooperativo 2 s. Il limite 512 non aumenta; nessuna eliminazione fisica o
+retention. La riga 11 sopra descrive il profilo senza compattazione: il nuovo
+profilo opt-in è documentato nel rapporto di [capacità continuativa HabitLogs](VERIFICA-CAPACITA-CONTINUATIVA-HABITLOGS.md).
+I pacchetti 11/12 restano aperti e il conteggio 8/12 non cambia; non è una
+certificazione Google né un'attivazione per client reali.
+
+Esito del profilo opt-in locale: 1.000 creazioni effettive, 2.000 commit,
+3.648 riferimenti ritirati, 1.401 fault/replay, contesa V8 sullo stesso shard,
+snapshot HTTP e consumer Chromium con 1.012 log e replay di 2.002 commit
+(inclusi due setting). Riapertura IndexedDB verificata. La snapshot rimane
+costosa: 728.201 letture simulate del ledger per pagina HabitLogs; restano
+ottimizzazione delle letture e collaudo quote/latenza Google. Non si dichiara
+chiuso il pacchetto 12 né la compatibilità dei client distribuiti.

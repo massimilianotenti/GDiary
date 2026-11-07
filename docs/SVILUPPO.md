@@ -253,3 +253,15 @@ Nuovo test:habit-log-outbox; repository/browser anche in test:repository.
 Capacità directory 128 identità e migrazioni legacy restano gate espliciti;
 nessuna capability reale o offline completo, pacchetto 11 ancora parziale.
 [Contratto, verifiche e attività residue](VERIFICA-OUTBOX-REGISTRAZIONI.md).
+
+## Capacità continuativa locale HabitLogs — 7 novembre
+
+Policy server privata e spenta per default: preflight resta read-only;
+`ensureWriteCapacity` e la guardia di scrittura riusano `compactReferences`
+per head/entità a 384 riferimenti. Lotti da 64, due lotti/128 ritiri per lock
+dello store, deadline cooperativa 2 s; limite 512 invariato. Nessuna modifica
+a schema IndexedDB, formato dei record o retention fisica. Il solo consenso
+alla manutenzione manuale non avvia la policy; nessun payload client la abilita.
+Prove dedicate: `npm run test:habit-log-continuous`, oltre a
+`node tests/verify-continuous-maintenance-policy.cjs` (in `npm test`).
+Contratto e limiti: [capacità continuativa HabitLogs](VERIFICA-CAPACITA-CONTINUATIVA-HABITLOGS.md). Nessuna capability reale abilitata.

@@ -1,5 +1,10 @@
 # Routing HabitLogs oltre 128 identità — 7 novembre 2026
 
+Seguito locale del 7 novembre: [capacità continuativa HabitLogs](VERIFICA-CAPACITA-CONTINUATIVA-HABITLOGS.md). Aggiunta policy continuativa
+server opt-in sui riferimenti attivi, spenta nei sorgenti. Il profilo senza
+manutenzione e i limiti fisici descritti qui restano validi.
+
+
 ## Esito della tranche
 
 Da `12bfbe8` è stato aggiunto un routing v2 scoped alle identità HabitLogs.

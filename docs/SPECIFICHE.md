@@ -286,3 +286,13 @@ Nuovo test:habit-log-outbox; repository/browser anche in test:repository.
 Capacità directory 128 identità e migrazioni legacy restano gate espliciti;
 nessuna capability reale o offline completo, pacchetto 11 ancora parziale.
 [Contratto, verifiche e attività residue](VERIFICA-OUTBOX-REGISTRAZIONI.md).
+
+## Capacità continuativa HabitLogs — prototipo locale, 7 novembre
+
+La policy server opt-in riusa la compattazione dei riferimenti attivi per
+proseguire le creazioni HabitLogs oltre il tetto del profilo senza manutenzione.
+È disattivata nei sorgenti e non è configurabile dal client. Non modifica i
+contenuti, la checklist storica, il limite di 512 riferimenti per chiave o la
+retention fisica. Contratto, prove e limiti nel
+[rapporto di capacità continuativa](VERIFICA-CAPACITA-CONTINUATIVA-HABITLOGS.md).
+Non è una funzionalità attivata sul deployment Google; pacchetto 12 aperto.

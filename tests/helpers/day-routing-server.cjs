@@ -3,7 +3,7 @@ const fs=require('fs'),vm=require('vm'),path=require('path'),assert=require('ass
 const {createFaultSheets}=require('./fault-sheets.cjs'),{seal}=require('./recoverable-commit-store.cjs');
 const backend=fs.readFileSync(path.resolve(__dirname,'../../Demo.html'),'utf8').match(/<script>([\s\S]*?)<\/script>/)[1],copy=value=>JSON.parse(JSON.stringify(value));
 function createDayRoutingServer(snapshot,options={}){
- const ledger=createFaultSheets(snapshot?.ledger),ctx=vm.createContext({window:{},document:{addEventListener(){}},setTimeout,console});vm.runInContext(backend,ctx);
+ const ledger=options.ledger||createFaultSheets(snapshot?.ledger),ctx=vm.createContext({window:{},document:{addEventListener(){}},setTimeout,console});vm.runInContext(backend,ctx);
  if(snapshot){
   ctx.restored=copy(snapshot);vm.runInContext('Object.assign(mockProps,restored.props);restored.users.forEach(([key,value])=>mockUserProperties.set(key,value));if(restored.rawSheets)Object.entries(restored.rawSheets).forEach(([name,data])=>{(mockSheets[name]||db.insertSheet(name)).data=data;});mockSheets.Days.data=restored.days;demoScriptCache.clear();ioReset_();',ctx);
  }else for(const seed of options.seedDays||[{date:'2026-10-28',reflection:'Riga originaria sintetica'}]){
@@ -20,6 +20,7 @@ function createDayRoutingServer(snapshot,options={}){
  })()`,ctx)));}
  const manifest=copy(ctx.getSyncManifest()),scope={archiveId:manifest.archiveId,epoch:manifest.epoch,principalId:manifest.principalId};assert(manifest.identityVerified);
  ctx.syntheticLedger=ledger;ctx.syntheticUtilities=ledger.globals.Utilities;
+ if(options.sharedLock)vm.runInContext('LockService.getScriptLock=syntheticLedger.globals.LockService.getScriptLock;',ctx);
  vm.runInContext(`Object.assign(Utilities,syntheticUtilities);SpreadsheetApp.flush=syntheticLedger.globals.SpreadsheetApp.flush;
   mockSheets.HabitLogs.getSheetId=()=>14;mockSheets.HabitLogs.getParent=()=>db;
   mockSheets.Habits.getSheetId=()=>15;mockSheets.Habits.getParent=()=>db;

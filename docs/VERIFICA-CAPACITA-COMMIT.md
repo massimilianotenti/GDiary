@@ -1,5 +1,10 @@
 # Capacità e compattazione dei riferimenti del registro
 
+Seguito locale del 7 novembre: [capacità continuativa HabitLogs](VERIFICA-CAPACITA-CONTINUATIVA-HABITLOGS.md). Aggiunta policy continuativa
+server opt-in sui riferimenti attivi, spenta nei sorgenti. Il profilo senza
+manutenzione e i limiti fisici descritti qui restano validi.
+
+
 ## Intervallo di commit a limite fisso — 30 ottobre
 
 `inspectRetainedRange` restituisce `upperSequence`: la prima pagina lo acquisisce dal massimo pubblicato e le successive possono ripassarlo per escludere commit aggiunti nel frattempo. `highWater` riporta invece il massimo al momento della singola pagina. Un limite futuro o un cursore oltre la fine sono rifiutati; il cursore immediatamente dopo la fine produce una pagina vuota. Test in memoria e con Sheets simulato verificano append concorrente, stato corrente aggiornato e assenza di scritture. Build, test:commits, test:commit-storage, test:commit-capacity e test:release superati. Il limite fissa solo l'insieme delle sequenze: stato corrente, ricevute e alias non sono una fotografia coerente fra pagine. Non è un checkpoint recuperabile e non autorizza eliminazioni.

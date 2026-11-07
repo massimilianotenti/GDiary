@@ -1,5 +1,26 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Capacità continuativa HabitLogs — 7 novembre, seguito locale
+
+Dalla base `b8fc11b`, policy server esplicita e spenta per default che riusa
+`compactReferences` sul budget aggregato del planner HabitLogs e durante le
+scritture/il recupero. Soglia 384, lotti da 64, massimo due lotti/128 ritiri
+per lock dello store e deadline cooperativa di 2 s. Preflight read-only,
+limite 512, payload e storico invariati; nessuna abilitazione dal client.
+Corretto il controllo della route nel piano outbox v2 a quattro mutazioni.
+Create progressivamente 1.000 identità via endpoint, con 2.000 commit,
+3.648 riferimenti ritirati e 12.018 righe fisiche; superati 1.401 fault/replay
+e contesa di due client V8 sullo stesso shard. HTTP/Chromium verifica 1.012
+log, 20 pagine snapshot complessive e 401 pagine feed (2.002 commit inclusi
+due setting), con riapertura IndexedDB. Snapshot HabitLogs ancora costoso:
+fino a 728.201 letture simulate del ledger per pagina; nessuna sostenibilità
+Google dimostrata. Superati build, npm test, capacità, repository, release e
+suite continuativa. Contratto, prove e gate nel
+rapporto di [capacità continuativa HabitLogs](VERIFICA-CAPACITA-CONTINUATIVA-HABITLOGS.md).
+La compattazione fisica e la retention non sono implementate; pacchetto 12
+ancora aperto. Nessun Google, deploy, setupDrive, attivazione reale o commit.
+
+
 ## Directory HabitLogs v2 e limiti di capacità — 7 novembre
 
 Dalla base `12bfbe8` il routing HabitLogs legge ancora directory v1 e aggiunge
