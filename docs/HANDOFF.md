@@ -2282,3 +2282,16 @@ Il test di protocollo locale controlla scope, default off e blocco per ogni
 classe di dipendenza mancante. Report: `VERIFICA-RETENTION-FISICA.md`.
 Pacchetto 12 resta aperto; nessuna prova HTTP/Chromium/Google è attribuita a
 questa tranche.
+
+### Audit commit/ricevute/alias paginato
+
+Aggiunto audit riprendibile a massimo cinque commit per chiamata (massimo 25
+cambiamenti per commit), con upper sequence dal checkpoint, digest di pagina e
+cumulativo, scope e CAS persistenti. Il test Demo verifica 29 commit in sei
+pagine, replay e riapertura. La fixture progressiva da 1.000 HabitLogs ha
+visitato 2.023 commit/405 pagine: 6.726.292 righe, 8.690.165 celle,
+759.736.897 byte, con lookup TextFinder fino a 242.544 righe candidate in una
+chiamata. L'inventario di righe fisiche orfane/non pubblicate/sconosciute non
+è implementato; i lookup dell'indice non hanno un budget costante e manca un
+limite server di byte. Finestra idempotenza, Docs, lease lettori e legacy
+restano blocker. Nessun dato viene eliminato e il cursore minimo resta zero.
