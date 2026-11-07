@@ -2266,13 +2266,14 @@ mutazioni applicative, il feed completo e il contratto di provisioning.
 
 ## Retention fisica — tranche di pianificazione fail-closed
 
-Aggiunto il contratto interno `sync-retention-plan/v1`, scoped a archivio,
-principal ed epoch e legato alla generazione/digest/sequenza del checkpoint.
-La policy è spenta per default. Il piano non muta il registro; senza prove
-complete su ricevute, alias, baseline Docs, tombstone/route, lettori e legacy
-mantiene il minimo cursore a zero. Non è implementata approvazione persistente,
-pubblicazione del minimo né cancellazione fisica. Nessun payload o riferimento
-è stato rimosso e nessuno spazio fisico è stato recuperato.
+Aggiunti i contratti interni `sync-retention-plan/v1` e
+`sync-retention-state/v1`, scoped a archivio, principal ed epoch e legati alla
+generazione/digest/sequenza del checkpoint. Lo stato usa revisione CAS e
+approvazione server separata; policy spenta per default. L'avanzamento richiede
+adattatori server di ritiro/verifica/pubblicazione assenti nella build corrente.
+Senza prove complete su checkpoint, ricevute, alias, baseline Docs,
+tombstone/route, lettori e legacy il minimo resta zero. Nessun payload o
+riferimento è stato rimosso e nessuno spazio fisico è stato recuperato.
 
 Il test di protocollo locale controlla scope, default off e blocco per ogni
 classe di dipendenza mancante. Report: `VERIFICA-RETENTION-FISICA.md`.
