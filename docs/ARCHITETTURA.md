@@ -388,3 +388,19 @@ alla manutenzione manuale non avvia la policy; nessun payload client la abilita.
 Prove dedicate: `npm run test:habit-log-continuous`, oltre a
 `node tests/verify-continuous-maintenance-policy.cjs` (in `npm test`).
 Contratto e limiti: [capacità continuativa HabitLogs](VERIFICA-CAPACITA-CONTINUATIVA-HABITLOGS.md). Nessuna capability reale abilitata.
+
+## Snapshot HabitLogs mirate — locale, 7 novembre
+
+`getSnapshotPage` seleziona le identità e poi legge i soli record/preimmagini
+della pagina, con directory v1/v2 validata globalmente e vista del head
+verificata nel lock. Nei nuovi `sync-sheet-ref/v1` HabitLogs, `state` opzionale
+(collection/id/sequence/deleted) appartiene alla stessa pubblicazione del
+riferimento; permette coverage e tombstone senza caricare checklist fuori
+pagina. Vecchi riferimenti restano leggibili ricavando lo stato dal payload,
+senza migrazioni implicite. Nessuna cache persistente o modifica IndexedDB.
+Keyset con confronto coerente per Unicode; cursori, coverage e limiti HTTP
+conservati. Metadati legacy a finestre di 256 righe, indice chiavi a finestre
+di 4.096; costo globale dei metadati ancora da considerare.
+`test:habit-log-snapshot` copre i contratti; `test:habit-log-continuous` include
+matrice di scala, confronto con a06f8ee e collaudo HTTP/consumer/IndexedDB.
+Contratto, risultati e gate: [snapshot HabitLogs mirate](VERIFICA-SNAPSHOT-HABITLOGS-MIRATE.md). Nessuna attivazione reale.

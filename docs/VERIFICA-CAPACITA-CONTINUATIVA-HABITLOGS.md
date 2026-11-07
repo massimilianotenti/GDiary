@@ -1,5 +1,11 @@
 # Capacità continuativa HabitLogs — 7 novembre 2026
 
+Seguito locale dalla base a06f8ee: [snapshot HabitLogs mirate](VERIFICA-SNAPSHOT-HABITLOGS-MIRATE.md). Selezione prima dei
+contenuti e stato minimo per i nuovi riferimenti; nessuna attivazione reale.
+Le misure di costo qui riportate descrivono la base precedente; retention
+e gate Google restano aperti.
+
+
 Tranche locale successiva a `b8fc11b`, nel pacchetto 12 della SPEC-004.
 Solo dati inventati e servizi Sheets simulati; nessun Google, provisioning,
 setupDrive, migrazione reale, deploy o commit.

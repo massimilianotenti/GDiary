@@ -4,6 +4,7 @@ for(let n=0;n<1000;n++){
  if([95,127,128,999].includes(n))checkpoints.set(n,server.snapshot());
  server.ledger.reset();const ack=server.call(n);acks.push(ack);
  assert.equal(ack.log.key,server.request(n).operation.log.key);
+ if(process.env.GDIARY_CONTINUOUS_FIXTURE&&[127,128,129,256].includes(n+1))require('node:fs').writeFileSync(process.env.GDIARY_CONTINUOUS_FIXTURE.replace(/\.json$/,'-'+(n+1)+'.json'),JSON.stringify(server.snapshot()));
  if((n+1)%128===0||[128,999].includes(n)){console.log('Progressive application writes:',n+1);server=open(server.snapshot());}
 }
 const final=server.snapshot();const activeCounts=new Map();for(const row of final.ledger.index.data)if(/^k:/.test(row[0]))activeCounts.set(row[0],(activeCounts.get(row[0])||0)+1);assert(Math.max(...activeCounts.values())<=512,'all active reference keys stay within the original hard limit');retired=final.ledger.index.data.filter(row=>/^retired:/.test(row[0])).length;assert(retired>0);assert.equal(acks.length,1000);

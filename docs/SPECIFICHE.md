@@ -296,3 +296,19 @@ contenuti, la checklist storica, il limite di 512 riferimenti per chiave o la
 retention fisica. Contratto, prove e limiti nel
 [rapporto di capacità continuativa](VERIFICA-CAPACITA-CONTINUATIVA-HABITLOGS.md).
 Non è una funzionalità attivata sul deployment Google; pacchetto 12 aperto.
+
+## Snapshot HabitLogs mirate — locale, 7 novembre
+
+`getSnapshotPage` seleziona le identità e poi legge i soli record/preimmagini
+della pagina, con directory v1/v2 validata globalmente e vista del head
+verificata nel lock. Nei nuovi `sync-sheet-ref/v1` HabitLogs, `state` opzionale
+(collection/id/sequence/deleted) appartiene alla stessa pubblicazione del
+riferimento; permette coverage e tombstone senza caricare checklist fuori
+pagina. Vecchi riferimenti restano leggibili ricavando lo stato dal payload,
+senza migrazioni implicite. Nessuna cache persistente o modifica IndexedDB.
+Keyset con confronto coerente per Unicode; cursori, coverage e limiti HTTP
+conservati. Metadati legacy a finestre di 256 righe, indice chiavi a finestre
+di 4.096; costo globale dei metadati ancora da considerare.
+`test:habit-log-snapshot` copre i contratti; `test:habit-log-continuous` include
+matrice di scala, confronto con a06f8ee e collaudo HTTP/consumer/IndexedDB.
+Contratto, risultati e gate: [snapshot HabitLogs mirate](VERIFICA-SNAPSHOT-HABITLOGS-MIRATE.md). Nessuna attivazione reale.

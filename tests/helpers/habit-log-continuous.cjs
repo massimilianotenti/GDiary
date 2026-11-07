@@ -10,4 +10,8 @@ function open(snapshot,enabled=true,options={}){
  const request=n=>{const result=input(n);if(result.operation.log.date==='2026-10-28')result.operation.log.date='2026-12-30';result.operation.log.key=result.operation.log.habitId+'|'+result.operation.log.date;return result;};
  return {...server,scope,request,call:n=>copy(server.ctx.saveHabitLogOperation(request(n)))};
 }
-module.exports={open,copy};
+function prepareSnapshotSources(server){
+ for(const [controller,binding]of [[server.controller,{daysSheetId:10,indexSheetId:11,blockSheetId:12}],[server.weekController,{weeksSheetId:13,indexSheetId:11,blockSheetId:12}],[server.projectController,{projectsSheetId:17,indexSheetId:11,blockSheetId:12}],[server.entryController,{entriesSheetId:18,indexSheetId:11,blockSheetId:12}]]){controller.register(binding);controller.setMode({mode:'active',expectedRevision:1});}
+ const catalog=server.ctx.syncCatalogRoutingServer_({allowConfigure:true,allowMigration:true});catalog.register({goalsSheetId:16,habitsSheetId:15,indexSheetId:11,blockSheetId:12});catalog.setMode({mode:'active',expectedRevision:1});const settings=catalog.resolve();settings.saveSetting('reflection',{dailyReflectionMode:'essential',version:settings.readSetting('reflection').version});settings.saveSetting('privacy',{privateTags:[],version:settings.readSetting('privacy').privacyVersion});return server;
+}
+module.exports={open,copy,prepareSnapshotSources};

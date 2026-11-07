@@ -737,7 +737,12 @@ function getSnapshotPage(p){
  const fail=name=>{throw Object.assign(Error(name),{name});},spec={entries:{create:syncEntryRoutingServer_,key:'id'},projects:{create:syncProjectRoutingServer_,key:'slug'},days:{create:syncDayRoutingServer_,key:'date'},weeks:{create:syncWeekRoutingServer_,key:'week'},habitLogs:{create:syncHabitLogRoutingServer_,key:'key'},goals:{create:syncCatalogRoutingServer_,key:'id'},habits:{create:syncCatalogRoutingServer_,key:'id'},files:{create:syncEntryRoutingServer_,key:'id'},settings:{create:syncCatalogRoutingServer_,key:'id'},layouts:{create:syncEntryRoutingServer_,key:'entryId'}};
  if(!p||Object.prototype.toString.call(p)!=='[object Object]'||Object.keys(p).some(key=>!['collection','cursor','afterId','limit','maxBytes','context'].includes(key))||!spec[p.collection]||p.afterId!==undefined&&(typeof p.afterId!=='string'||p.afterId.length>200)||p.limit!==undefined&&(!Number.isSafeInteger(p.limit)||p.limit<1||p.limit>100)||p.maxBytes!==undefined&&(!Number.isSafeInteger(p.maxBytes)||p.maxBytes<4096||p.maxBytes>65536))fail('DataError');
  const limit=p.limit??50,maxBytes=p.maxBytes??65536;
- return locked_(function(){const facade=spec[p.collection].create().resolve();if(!facade)fail('ProtocolUnavailable');const current=facade.checkpoint(),cursor=p.cursor??current.cursor;
+ return locked_(function(){const facade=spec[p.collection].create().resolve();if(!facade)fail('ProtocolUnavailable');
+  if(p.collection==='habitLogs'){
+   const page=facade.readSnapshotPage({limit,...(p.afterId===undefined?{}:{afterId:p.afterId}),...(p.cursor===undefined?{}:{cursor:p.cursor})}),response={collection:p.collection,...page};
+   let previous;do{previous=response.bytes;response.bytes=traceBytes_(syncCommitCanonical_(response));}while(response.bytes!==previous);if(response.bytes>maxBytes)fail('DataError');return response;
+  }
+  const current=facade.checkpoint(),cursor=p.cursor??current.cursor;
   if(!cursor||Object.prototype.toString.call(cursor)!=='[object Object]'||Object.keys(cursor).sort().join(',')!=='archiveId,epoch,format,principalId,sequence'||cursor.format!=='sync-cursor/v1'||cursor.archiveId!==current.cursor.archiveId||cursor.epoch!==current.cursor.epoch||cursor.principalId!==current.cursor.principalId||!Number.isSafeInteger(cursor.sequence)||cursor.sequence<0||cursor.sequence>current.highWater)fail('ScopeChanged');
   let rows;if(p.collection==='goals'||p.collection==='habits')rows=facade.readRows(p.collection);else if(p.collection==='files'){
    // The immutable commit feed is replayed from sequence zero during bootstrap
@@ -2361,6 +2366,19 @@ function syncHabitLogSheetSource_(logs,habits,goals){
   const habit=one(habits,HABIT_HEADERS,id),result={habit,goal:habit?one(goals,GOAL_HEADERS,habit.goalId):null};gateway=catalogCommitGateway_();return gateway?canonical(gateway):result;
  };
  return Object.freeze({
+  listIdentities(){
+   verify_(logs,LOG_HEADERS);const count=logs.getLastRow()-1,items=[];
+   for(let offset=0;offset<count;offset+=256){const size=Math.min(256,count-offset),ids=readSheetValues_(logs.getRange(offset+2,1,size,3)),versions=readSheetValues_(logs.getRange(offset+2,5,size,1));
+    for(let n=0;n<size;n++){const [key,habitId,date]=ids[n];if(key!==habitId+'|'+date||!syncHabitLogIdentity_(key)||typeof versions[n][0]!=='string')throw Object.assign(Error('ProtocolCorrupt'),{name:'ProtocolCorrupt'});items.push({key,updatedAt:versions[n][0],sourceRow:offset+2+n});}
+   }return items;
+  },
+  readKeys(keys,identities){
+   verify_(logs,LOG_HEADERS);if(!Array.isArray(keys)||keys.length>100||new Set(keys).size!==keys.length||!Array.isArray(identities))throw Object.assign(Error('DataError'),{name:'DataError'});
+   const last=logs.getLastRow(),positions=new Map();for(const item of identities){if(!item||typeof item.key!=='string'||positions.has(item.key)||!Number.isSafeInteger(item.sourceRow)||item.sourceRow<2||item.sourceRow>last)throw Object.assign(Error('ProtocolCorrupt'),{name:'ProtocolCorrupt'});positions.set(item.key,item.sourceRow);}
+   const rows=keys.filter(key=>positions.has(key)).map(key=>({key,row:positions.get(key)})).sort((a,b)=>a.row-b.row),groups=[];
+   for(const item of rows){const group=groups[groups.length-1];if(group&&group.length<100&&item.row===group[group.length-1].row+1)group.push(item);else groups.push([item]);}
+   const records=[];for(const group of groups){const values=readSheetValues_(logs.getRange(group[0].row,1,group.length,LOG_HEADERS.length));for(let n=0;n<group.length;n++){if(values[n][0]!==group[n].key)throw Object.assign(Error('ScopeChanged'),{name:'ScopeChanged'});records.push(Object.fromEntries(LOG_HEADERS.map((key,j)=>[key,values[n][j]])));}}return records;
+  },
   read,readCatalog,
   mapHabitVersion(id,version){const gateway=catalogCommitGateway_();return gateway?gateway.mapVersion('habits',id,version):version;},
   readRows(ranges){
@@ -2382,12 +2400,13 @@ function syncHabitLogSheetSource_(logs,habits,goals){
 function syncHabitLogMigrationGateway_(store,trustedScope,source){
  const fail=name=>{throw Object.assign(Error(name==='ConflictError'?'Registrazione modificata altrove. Conserva la bozza e aggiorna.':name),{name});},copy=value=>JSON.parse(syncCommitCanonical_(value));
  const scope=copy(trustedScope),directoryId='habit-log-routing-v1',routingV2Id='habit-log-routing-v2',shardCount=16,shardLimit=128,routeId=key=>'habit-log-route:'+hash(key),shardId=n=>'habit-log-routing-v2-shard:'+n;
- let owned=false;
+ let owned=false,readView=null;
  const nested={...store,withLock(fn){if(!owned)fail('ProtocolUnavailable');return fn();}};
  const protocol=syncCommitProtocol_(nested,scope),writer=syncHabitLogWriter_(nested,scope);
  for(const method of ['read','readRows','saveLegacy','readCatalog'])if(typeof source?.[method]!=='function')fail('DataError');
  const unwrap=result=>{if(!result.ok)fail(result.error);return result.value;};
- const run=fn=>{if(owned)fail('BusyError');try{return copy(store.withLock(()=>{owned=true;try{const value=fn();unwrap(protocol.recover());return value;}finally{owned=false;}}));}catch(error){fail(['DataError','ProtocolUnavailable','ProtocolCorrupt','OperationMismatch','CommitBlocked','ScopeChanged','BusyError','ConflictError','StorageError'].includes(error?.name)?error.name:'StorageError');}};
+ const run=(fn,recoverAfter=true)=>{if(owned)fail('BusyError');try{return copy(store.withLock(()=>{owned=true;try{const value=fn();if(recoverAfter)unwrap(protocol.recover());return value;}finally{owned=false;}}));}catch(error){fail(['DataError','ProtocolUnavailable','ProtocolCorrupt','OperationMismatch','CommitBlocked','ScopeChanged','BusyError','ConflictError','StorageError'].includes(error?.name)?error.name:'StorageError');}};
+ const readEntity=(collection,id)=>readView?readView.read(collection,id):unwrap(protocol.read(collection,id));
  const hash=value=>{const digest=store.digest(syncCommitCanonical_(value));if(typeof digest!=='string'||!/^[a-f0-9]{64}$/.test(digest))fail('ProtocolCorrupt');return digest;};
  const fields=(value,keys)=>value&&Object.prototype.toString.call(value)==='[object Object]'&&Object.keys(value).length===keys.length&&Object.keys(value).every(key=>keys.includes(key));
  const checkExpectedScope=expected=>{if(!fields(expected,['archiveId','principalId','epoch','protocolVersion','schemaVersion'])||expected.archiveId!==scope.archiveId||expected.principalId!==scope.principalId||expected.epoch!==scope.epoch||expected.protocolVersion!==1||expected.schemaVersion!==1)fail('ScopeChanged');};
@@ -2402,14 +2421,14 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
  function directoryData(data){
   if(!fields(data,['format','keys'])||data.format!=='sync-habit-log-routing/v1'||!Array.isArray(data.keys)||data.keys.length>128||data.keys.some(key=>typeof key!=='string'||!syncHabitLogIdentity_(key))||new Set(data.keys).size!==data.keys.length||syncCommitCanonical_([...data.keys].sort())!==syncCommitCanonical_(data.keys))fail('ProtocolCorrupt');return data;
  }
- function directory(){const entity=unwrap(protocol.read('settings',directoryId)).entity;if(!entity)return {keys:[],version:null,digest:hash(null)};if(entity.deleted)fail('ProtocolCorrupt');directoryData(entity.data);return {...entity.data,version:entity.version,digest:hash(entity.data)};}
+ function directory(){const entity=readEntity('settings',directoryId).entity;if(!entity)return {keys:[],version:null,digest:hash(null)};if(entity.deleted)fail('ProtocolCorrupt');directoryData(entity.data);return {...entity.data,version:entity.version,digest:hash(entity.data)};}
  function shardFor(key){return parseInt(hash(key).slice(0,2),16)%shardCount;}
  function rootData(data){if(!fields(data,['format','legacyVersion','legacyDigest','legacyCount','shardMask'])||data.format!=='sync-habit-log-routing/v2'||!(data.legacyVersion===null||typeof data.legacyVersion==='string')||!/^[a-f0-9]{64}$/.test(data.legacyDigest)||!Number.isInteger(data.legacyCount)||data.legacyCount!==128||typeof data.shardMask!=='string'||!new RegExp('^[01]{'+shardCount+'}$').test(data.shardMask)||!data.shardMask.includes('1'))fail('ProtocolCorrupt');return data;}
  function shardData(data,n){if(!fields(data,['format','shard','keys'])||data.format!=='sync-habit-log-shard/v1'||data.shard!==n||!Array.isArray(data.keys)||data.keys.length>shardLimit||data.keys.some(key=>typeof key!=='string'||!syncHabitLogIdentity_(key)||shardFor(key)!==n)||new Set(data.keys).size!==data.keys.length||syncCommitCanonical_([...data.keys].sort())!==syncCommitCanonical_(data.keys))fail('ProtocolCorrupt');return data;}
- function routing(){const legacy=directory(),entity=unwrap(protocol.read('settings',routingV2Id)).entity;if(!entity){for(let n=0;n<shardCount;n++)if(unwrap(protocol.read('settings',shardId(n))).entity)fail('ProtocolCorrupt');return {...legacy,root:null,shards:new Map(),legacy};}if(entity.deleted)fail('ProtocolCorrupt');const root=rootData(entity.data);if(root.legacyVersion!==legacy.version||root.legacyDigest!==legacy.digest||root.legacyCount!==legacy.keys.length)fail('ProtocolCorrupt');const shards=new Map(),keys=[...legacy.keys];for(let n=0;n<shardCount;n++){const stored=unwrap(protocol.read('settings',shardId(n))).entity;if(root.shardMask[n]==='1'){if(!stored||stored.deleted)fail('ProtocolCorrupt');const data=shardData(stored.data,n);shards.set(n,{...data,version:stored.version});keys.push(...data.keys);}else if(stored)fail('ProtocolCorrupt');}if(new Set(keys).size!==keys.length)fail('ProtocolCorrupt');return {keys,version:legacy.version,digest:legacy.digest,root:{...root,version:entity.version},shards,legacy};}
+ function routing(){const legacy=directory(),entity=readEntity('settings',routingV2Id).entity;if(!entity){for(let n=0;n<shardCount;n++)if(readEntity('settings',shardId(n)).entity)fail('ProtocolCorrupt');return {...legacy,root:null,shards:new Map(),legacy};}if(entity.deleted)fail('ProtocolCorrupt');const root=rootData(entity.data);if(root.legacyVersion!==legacy.version||root.legacyDigest!==legacy.digest||root.legacyCount!==legacy.keys.length)fail('ProtocolCorrupt');const shards=new Map(),keys=[...legacy.keys];for(let n=0;n<shardCount;n++){const stored=readEntity('settings',shardId(n)).entity;if(root.shardMask[n]==='1'){if(!stored||stored.deleted)fail('ProtocolCorrupt');const data=shardData(stored.data,n);shards.set(n,{...data,version:stored.version});keys.push(...data.keys);}else if(stored)fail('ProtocolCorrupt');}if(new Set(keys).size!==keys.length)fail('ProtocolCorrupt');return {keys,version:legacy.version,digest:legacy.digest,root:{...root,version:entity.version},shards,legacy};}
  function routeChanges(key,index){const descriptor={format:'sync-habit-log-route/v1',key,sourceDigest:hash(null),legacyVersion:''},changes=[upsert('settings',routeId(key),null,descriptor)];if(!index.root){if(index.keys.length<128){changes.push(upsert('settings',directoryId,index.version,{format:'sync-habit-log-routing/v1',keys:[...index.keys,key].sort()}));return changes;}const n=shardFor(key),data={format:'sync-habit-log-shard/v1',shard:n,keys:[key]},root={format:'sync-habit-log-routing/v2',legacyVersion:index.legacy.version,legacyDigest:index.legacy.digest,legacyCount:index.legacy.keys.length,shardMask:Array.from({length:shardCount},(_,i)=>i===n?'1':'0').join('')};changes.push(upsert('settings',shardId(n),null,data),upsert('settings',routingV2Id,null,root));return changes;}const n=shardFor(key),existing=index.shards.get(n);if(existing&&existing.keys.length>=shardLimit)fail('ProtocolUnavailable');changes.push(upsert('settings',shardId(n),existing?.version||null,{format:'sync-habit-log-shard/v1',shard:n,keys:[...(existing?.keys||[]),key].sort()}));if(!existing){const mask=index.root.shardMask.split('');mask[n]='1';const {version,...rootDataValue}=index.root;changes.push(upsert('settings',routingV2Id,index.root.version,{...rootDataValue,shardMask:mask.join('')}));}return changes;}
  function routeData(data,key){if(!fields(data,['format','key','sourceDigest','legacyVersion'])||data.format!=='sync-habit-log-route/v1'||data.key!==key||!/^[a-f0-9]{64}$/.test(data.sourceDigest)||typeof data.legacyVersion!=='string')fail('ProtocolCorrupt');return data;}
- function route(key){const entity=unwrap(protocol.read('settings',routeId(key))).entity;if(!entity||entity.deleted)fail('ProtocolCorrupt');return {...routeData(entity.data,key),version:entity.version};}
+ function route(key){const entity=readEntity('settings',routeId(key)).entity;if(!entity||entity.deleted)fail('ProtocolCorrupt');return {...routeData(entity.data,key),version:entity.version};}
  function checkSource(key,descriptor,rows){if(hash(rawOne(key,rows))!==descriptor.sourceDigest)fail('CommitBlocked');}
  const canonicalRecord=record=>{try{return syncCommitCanonical_(syncHabitLogSnapshot_(record));}catch(ignore){fail('ProtocolCorrupt');}};
  function planValue(data,kind,fingerprint,operationId,key){
@@ -2427,7 +2446,7 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
  }
  function savedPlan(kind,input,operationId,key,prepare){
   const fingerprint=hash({kind,input}),planKey=hash([scope.principalId,operationId]),id='habit-log-plan:'+planKey;
-  let entity=unwrap(protocol.read('settings',id)).entity;
+  let entity=readEntity('settings',id).entity;
   if(!entity){
    const prepared=prepare(),data={format:'sync-habit-log-plan/v1',kind,fingerprint,...prepared};planValue(data,kind,fingerprint,operationId,key);if(syncCommitCanonical_(data.request).length>32768)fail('ProtocolUnavailable');
    const reservation={operationId:'hl-reserve-'+planKey,changes:[{collection:'settings',id,baseVersion:null,action:'upsert',data}]};
@@ -2436,7 +2455,7 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
     if(!(store.ensureWriteCapacity||store.preflightWrites)([...syncCommitWriteBudget_(reservation,scope.principalId,sequence+1),...syncCommitWriteBudget_(data.request,scope.principalId,sequence+2)]).available)fail('ProtocolUnavailable');
    }
    const reserved=unwrap(protocol.execute(reservation));
-   if(reserved.status!=='committed')fail('CommitBlocked');entity=unwrap(protocol.read('settings',id)).entity;
+   if(reserved.status!=='committed')fail('CommitBlocked');entity=readEntity('settings',id).entity;
   }
   if(!entity||entity.deleted)fail('ProtocolCorrupt');planValue(entity.data,kind,fingerprint,operationId,key);return entity.data;
  }
@@ -2456,7 +2475,7 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
   const operationId=payload.operationId===undefined?'habit-log-edit-'+hash(input):payload.operationId;
   if(!validId(operationId))fail('DataError');const index=routing();
   if(!index.keys.includes(key)){
-   if(unwrap(protocol.read('settings',routeId(key))).entity!==null||unwrap(writer.read(key)).version!==null)fail('CommitBlocked');
+   if(readEntity('settings',routeId(key)).entity!==null||unwrap(writer.read(key)).version!==null)fail('CommitBlocked');
    return source.saveLegacy(payload);
   }
   const descriptor=route(key);checkSource(key,descriptor);
@@ -2492,7 +2511,7 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
    return {key,missing:record===null,log:record,catalog:source.readCatalog(key),scope:copy(input.expectedScope)};
   });},
   lookupHabitLogReceipt(input){const request=habitLogOperationInput_(input?.request),expected=input?.expectedScope;checkExpectedScope(expected);return run(()=>{
-   const initial=unwrap(protocol.lookupOperationReceipt({operationId:request.operationId})),entity=unwrap(protocol.read('settings','habit-log-plan:'+hash([scope.principalId,request.operationId]))).entity;
+   const initial=unwrap(protocol.lookupOperationReceipt({operationId:request.operationId})),entity=readEntity('settings','habit-log-plan:'+hash([scope.principalId,request.operationId])).entity;
    if(!entity)return {status:'unknown',operationId:request.operationId,scope:copy(expected)};
    const plan=planValue(entity.data,'operation',hash({kind:'operation',input:request}),request.operationId,request.log.key),receipt=initial.status==='unknown'?initial:unwrap(protocol.lookupOperationReceipt({operationId:request.operationId,request:plan}));
    if(receipt.status!=='committed')return {status:receipt.status,operationId:request.operationId,scope:copy(expected)};
@@ -2527,6 +2546,23 @@ function syncHabitLogMigrationGateway_(store,trustedScope,source){
    if(hash(rawOne(key))!==sourceDigest)fail('CommitBlocked');const ack=executePlan(plan,key);if(hash(rawOne(key))!==sourceDigest)fail('CommitBlocked');return ack;
   });},
   saveLegacy(payload){return run(()=>delta(save(payload)));},
+  readSnapshotPage(input){return run(()=>unwrap(protocol.withReadView(view=>{
+   if(!input||Object.keys(input).some(key=>!['afterId','limit','cursor'].includes(key))||!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>100||input.afterId!==undefined&&(typeof input.afterId!=='string'||input.afterId.length>200))fail('DataError');
+   const expected=input.cursor??null;if(expected!==null&&(!fields(expected,['format','archiveId','principalId','epoch','sequence'])||expected.format!=='sync-cursor/v1'||expected.archiveId!==scope.archiveId||expected.principalId!==scope.principalId||expected.epoch!==scope.epoch||!Number.isSafeInteger(expected.sequence)||expected.sequence<0||expected.sequence>view.cursor.sequence))fail('ScopeChanged');
+   readView=view;try{
+    const index=routing(),legacy=typeof source.listIdentities==='function'?source.listIdentities():source.readRows().map(row=>({key:row.key,updatedAt:row.updatedAt})),identities=new Map(),legacyKeys=new Set();
+    if(!Array.isArray(legacy))fail('ProtocolCorrupt');for(const row of legacy){if(!row||!syncHabitLogIdentity_(row.key)||typeof row.updatedAt!=='string'||legacyKeys.has(row.key))fail('ProtocolCorrupt');legacyKeys.add(row.key);identities.set(row.key,{canonical:/^commit-[1-9][0-9]{0,15}$/.test(row.updatedAt),routed:false});}
+    for(const key of index.keys){const state=view.metadata('habitLogs',key);if(!state)fail('ProtocolCorrupt');if(state.deleted)identities.delete(key);else identities.set(key,{canonical:true,routed:true});}
+    const keys=[...identities.keys()].sort(),eligible=keys.filter(key=>input.afterId===undefined||key>input.afterId),selected=eligible.slice(0,input.limit),rows=typeof source.readKeys==='function'?source.readKeys(selected,legacy):source.readRows().filter(row=>selected.includes(row.key));
+    if(!Array.isArray(rows))fail('ProtocolCorrupt');const records=[];
+    for(const key of selected){const meta=identities.get(key);if(!meta.routed){const row=rawOne(key,rows.filter(row=>row.key===key));if(!row)fail('ProtocolCorrupt');records.push(row);continue;}
+     const descriptor=route(key);checkSource(key,descriptor,rows.filter(row=>row.key===key));const entity=readEntity('habitLogs',key).entity;
+     if(!entity||entity.deleted||!fields(entity.data,['format','record'])||entity.data.format!=='sync-habit-log/v1'||canonicalRecord(entity.data.record)!==syncCommitCanonical_(entity.data.record)||entity.data.record.key!==key)fail('ProtocolCorrupt');records.push({...entity.data.record,updatedAt:entity.version});
+    }
+    const canonical=[...identities.values()].filter(value=>value.canonical).length,hasMore=eligible.length>selected.length;
+    return {records,checkpoint:expected??view.cursor,observedCursor:view.cursor,hasMore,nextAfter:hasMore?selected[selected.length-1]:null,coverage:{total:keys.length,canonical,complete:canonical===keys.length}};
+   }finally{readView=null;}
+  })),false);},
   readRows(ranges=null){return run(()=>{
    if(ranges!==null&&(!Array.isArray(ranges)||!ranges.length||ranges.length>10||ranges.some(range=>!range||typeof range.from!=='string'||typeof range.to!=='string'||!validDate_(range.from)||!validDate_(range.to)||range.from>range.to||(Date.parse(range.to)-Date.parse(range.from))/86400000>400)))fail('DataError');
    const index=routing(),rows=source.readRows(ranges);if(!Array.isArray(rows))fail('ProtocolCorrupt');
@@ -2638,7 +2674,7 @@ function syncRecordRoutingController_(services,domain){
   if(migrate&&services.allowMigration?.()!==true)fail('ProtocolUnavailable');
   const bound=binding(loaded),result=method==='changes'?bound.changes(...args):method==='checkpoint'?bound.checkpoint(...args):bound.gateway[method](...args);check(loaded);return result;
  }));
- const facade=Object.freeze({checkpoint:(...args)=>act('checkpoint',args),changes:(...args)=>act('changes',args),readRows:(...args)=>act('readRows',args),preview:(...args)=>act('preview',args),...(entries?{lookupDeleteReceipt:(...args)=>act('lookupDeleteReceipt',args),lookupPageReceipt:(...args)=>act('lookupPageReceipt',args),read:(...args)=>act('read',args),readContent:(...args)=>act('readContent',args),isRouted:(...args)=>act('isRouted',args),readFiles:(...args)=>act('readFiles',args),readFilesBatch:(...args)=>act('readFilesBatch',args),addFile:(...args)=>act('addFile',args,true),prepareDelete:(...args)=>act('prepareDelete',args,true),commitDelete:(...args)=>act('commitDelete',args,true),setProjects:(...args)=>act('setProjects',args,true),setStatus:(...args)=>act('setStatus',args,true),setTags:(...args)=>act('setTags',args,true),setDue:(...args)=>act('setDue',args,true),setSchedule:(...args)=>act('setSchedule',args,true),setContent:(...args)=>act('setContent',args,true),importContent:(...args)=>act('importContent',args,true),importContentAndTitle:(...args)=>act('importContentAndTitle',args,true),setDocSyncState:(...args)=>act('setDocSyncState',args,true),savePage:(...args)=>act('savePage',args,true)}:{saveLegacy:(...args)=>act('saveLegacy',args,true)}),...(projects?{saveProject:(...args)=>act('saveProject',args,true),convertProjectToTag:(...args)=>act('convertProjectToTag',args,true)}:{}),...(catalog?{readOne:(...args)=>act('readOne',args),mapVersion:(...args)=>act('mapVersion',args),readSetting:(...args)=>act('readSetting',args),saveSetting:(...args)=>act('saveSetting',args,true)}:{}),...(logs?{saveOperation:(...args)=>act('saveOperation',args,true),lookupHabitLogReceipt:(...args)=>act('lookupHabitLogReceipt',args),readOperationState:(...args)=>act('readOperationState',args)}:{}),...(weekly?{saveOperation:(...args)=>act('saveOperation',args,true),lookupWeekReceipt:(...args)=>act('lookupWeekReceipt',args),readOperationState:(...args)=>act('readOperationState',args)}:{}),...(domain==='day'?{saveOperation:(...args)=>act('saveOperation',args,true),lookupDayReceipt:(...args)=>act('lookupDayReceipt',args),readOperationState:(...args)=>act('readOperationState',args),saveBatch:(...args)=>act('saveBatch',args,true)}:{}),migrate:(...args)=>act('migrate',args,true,true)});
+ const facade=Object.freeze({checkpoint:(...args)=>act('checkpoint',args),changes:(...args)=>act('changes',args),readRows:(...args)=>act('readRows',args),preview:(...args)=>act('preview',args),...(entries?{lookupDeleteReceipt:(...args)=>act('lookupDeleteReceipt',args),lookupPageReceipt:(...args)=>act('lookupPageReceipt',args),read:(...args)=>act('read',args),readContent:(...args)=>act('readContent',args),isRouted:(...args)=>act('isRouted',args),readFiles:(...args)=>act('readFiles',args),readFilesBatch:(...args)=>act('readFilesBatch',args),addFile:(...args)=>act('addFile',args,true),prepareDelete:(...args)=>act('prepareDelete',args,true),commitDelete:(...args)=>act('commitDelete',args,true),setProjects:(...args)=>act('setProjects',args,true),setStatus:(...args)=>act('setStatus',args,true),setTags:(...args)=>act('setTags',args,true),setDue:(...args)=>act('setDue',args,true),setSchedule:(...args)=>act('setSchedule',args,true),setContent:(...args)=>act('setContent',args,true),importContent:(...args)=>act('importContent',args,true),importContentAndTitle:(...args)=>act('importContentAndTitle',args,true),setDocSyncState:(...args)=>act('setDocSyncState',args,true),savePage:(...args)=>act('savePage',args,true)}:{saveLegacy:(...args)=>act('saveLegacy',args,true)}),...(projects?{saveProject:(...args)=>act('saveProject',args,true),convertProjectToTag:(...args)=>act('convertProjectToTag',args,true)}:{}),...(catalog?{readOne:(...args)=>act('readOne',args),mapVersion:(...args)=>act('mapVersion',args),readSetting:(...args)=>act('readSetting',args),saveSetting:(...args)=>act('saveSetting',args,true)}:{}),...(logs?{readSnapshotPage:(...args)=>act('readSnapshotPage',args),saveOperation:(...args)=>act('saveOperation',args,true),lookupHabitLogReceipt:(...args)=>act('lookupHabitLogReceipt',args),readOperationState:(...args)=>act('readOperationState',args)}:{}),...(weekly?{saveOperation:(...args)=>act('saveOperation',args,true),lookupWeekReceipt:(...args)=>act('lookupWeekReceipt',args),readOperationState:(...args)=>act('readOperationState',args)}:{}),...(domain==='day'?{saveOperation:(...args)=>act('saveOperation',args,true),lookupDayReceipt:(...args)=>act('lookupDayReceipt',args),readOperationState:(...args)=>act('readOperationState',args),saveBatch:(...args)=>act('saveBatch',args,true)}:{}),migrate:(...args)=>act('migrate',args,true,true)});
  return Object.freeze({
   resolve:()=>protect(()=>{if(absent(snapshot()))return null;return locked(()=>{load();return facade;});}),
   status:()=>protect(()=>{if(absent(snapshot()))return statusOf(null);return locked(()=>statusOf(load()));}),
@@ -2860,6 +2896,14 @@ function syncCommitProtocol_(store,trustedScope){
    return receiptValue(store.readReceipt(scope.principalId,request.operationId),scope.principalId,request.operationId).response;
   }),
   recover:()=>guarded(()=>{const head=recoverLocked(headValue());return {committedThrough:head.committedThrough};}),
+  withReadView:fn=>guarded(()=>{
+   if(typeof fn!=='function')fail('DataError');const head=recoverLocked(headValue()),generation=typeof store.readGeneration==='function'?store.readGeneration():null;
+   let open=true;
+   const check=()=>{if(!open)fail('ProtocolUnavailable');if(generation!==null&&store.readGeneration()!==generation)fail('ScopeChanged');};
+   const valid=(collection,id)=>{check();if(!collections.includes(collection)||typeof id!=='string'||!id||id.length>200)fail('DataError');};
+   const view=Object.freeze({cursor:cursor(head.committedThrough),read(collection,id){valid(collection,id);return {cursor:cursor(head.committedThrough),entity:entityValue(store.readEntity(collection,id),collection,id,head.committedThrough)};},metadata(collection,id){valid(collection,id);if(typeof store.readEntityMetadata!=='function'){const entity=entityValue(store.readEntity(collection,id),collection,id,head.committedThrough);return entity?{collection,id,sequence:entity.sequence,deleted:entity.deleted}:null;}const state=store.readEntityMetadata(collection,id);if(state!==null&&(!state||state.collection!==collection||state.id!==id||!Number.isSafeInteger(state.sequence)||state.sequence<1||state.sequence>head.committedThrough||typeof state.deleted!=='boolean'))fail('ProtocolCorrupt');return state;}});
+   try{const value=fn(view);if(value&&typeof value.then==='function')fail('DataError');check();if(!same(headValue(),head))fail('ScopeChanged');return value;}finally{open=false;}
+  }),
   read:(collection,id)=>guarded(()=>{if(!collections.includes(collection)||typeof id!=='string'||!id||id.length>200)fail('DataError');const head=recoverLocked(headValue());return {cursor:cursor(head.committedThrough),entity:entityValue(store.readEntity(collection,id),collection,id,head.committedThrough)};}),
   changes:input=>guarded(()=>{
    if(!fields(input,['cursor','limit'])||!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>5)fail('DataError');
@@ -2890,7 +2934,7 @@ function syncSheetsCommitStore_(indexSheet,blockSheet,trustedArchive,services={}
  const decode=services.decode||function(text){return Utilities.newBlob(Utilities.base64Decode(text)).getDataAsString('UTF-8');};
  const flush=services.flush||function(){SpreadsheetApp.flush();},uuid=services.uuid||function(){return Utilities.getUuid();};
  const lock=services.withLock||function(fn){if(APP_LOCK_DEPTH>0)return fn();const handle=LockService.getScriptLock();if(!handle.tryLock(0))fail('BusyError');try{if(typeof PropertiesService!=='undefined'&&typeof readDocWorkerReservation_==='function'&&readDocWorkerReservation_())fail('BusyError');return fn();}finally{handle.releaseLock();}};
- let active=false,lookupCache=null,lookupProbes=null,maintenanceBudget=null;
+ let active=false,lookupCache=null,lookupProbes=null,maintenanceBudget=null,readGeneration=0;
  const guard=()=>{if(!active||services.enabled?.()!==true)fail('ProtocolUnavailable');if(services.authorize?.(copy(archive))!==true)fail('ScopeChanged');};
  const hash=text=>{const result=digest(text);if(typeof result!=='string'||!/^[a-f0-9]{64}$/.test(result))fail('ProtocolCorrupt');return result;};
  const key=(kind,id)=>'k:'+hash(syncCommitCanonical_([archive,kind,id]));
@@ -2924,13 +2968,16 @@ function syncSheetsCommitStore_(indexSheet,blockSheet,trustedArchive,services={}
    if(marker!=='ok:'+hash(syncCommitCanonical_(cells.slice(0,3)))||typeof cells[2]!=='string'||cells[2].length>2048||!cells[2].startsWith('r1:'))fail('ProtocolCorrupt');
    let ref;try{ref=JSON.parse(unpack(cells[2].slice(3)));}catch(error){fail('ProtocolCorrupt');}
    if(!ref||ref.format!=='sync-sheet-ref/v1'||ref.key!==cells[0]||expectedKey&&ref.key!==expectedKey||operation!==undefined&&cells[1]!==operation||!Number.isSafeInteger(ref.revision)||ref.revision<1||ref.revision>=Number.MAX_SAFE_INTEGER||!Number.isSafeInteger(ref.start)||ref.start<2||!Number.isSafeInteger(ref.count)||ref.count<1||ref.count>256||typeof ref.generation!=='string'||!/^g:[a-zA-Z0-9-]{10,80}$/.test(ref.generation)||!/^[a-f0-9]{64}$/.test(ref.digest||''))fail('ProtocolCorrupt');
+   if(Object.prototype.hasOwnProperty.call(ref,'state')){
+    const state=ref.state;if(!state||Object.keys(state).sort().join(',')!=='collection,deleted,id,sequence'||state.collection!=='habitLogs'||typeof state.id!=='string'||!state.id||state.id.length>200||!Number.isSafeInteger(state.sequence)||state.sequence<1||typeof state.deleted!=='boolean'||ref.key!==key('entity',[state.collection,state.id]))fail('ProtocolCorrupt');
+   }
    refs.push({row,operation:cells[1],...ref});
   }
   return refs;
  }
  function latest(refs){
   if(!refs.length)return null;const revision=Math.max(...refs.map(ref=>ref.revision)),candidates=refs.filter(ref=>ref.revision===revision),first=candidates[0];
-  if(candidates.some(ref=>ref.key!==first.key||ref.operation!==first.operation||ref.digest!==first.digest))fail('ProtocolCorrupt');return first;
+  if(candidates.some(ref=>ref.key!==first.key||ref.operation!==first.operation||ref.digest!==first.digest||!same(ref.state??null,first.state??null)))fail('ProtocolCorrupt');return first;
  }
  function load(ref,acceptForeign=false){
   if(ref===null)return null;guard();
@@ -2939,11 +2986,11 @@ function syncSheetsCommitStore_(indexSheet,blockSheet,trustedArchive,services={}
   if(rows.some((row,i)=>row[0]!==ref.generation||row[1]!=='n:'+i||typeof row[2]!=='string'||!row[2].startsWith('b1:')||row[2].length>8195))fail('ProtocolCorrupt');
   const encoded=rows.map(row=>row[2].slice(3)).join(''),raw=unpack(encoded);if(raw.length>262144||hash(raw)!==ref.digest)fail('ProtocolCorrupt');
   let value;try{value=JSON.parse(raw);}catch(error){fail('ProtocolCorrupt');}
-  if(!value||!acceptForeign&&!same(value.archive,archive)||syncCommitCanonical_(value)!==raw)fail('ProtocolCorrupt');return value;
+  if(!value||!acceptForeign&&!same(value.archive,archive)||syncCommitCanonical_(value)!==raw)fail('ProtocolCorrupt');if(ref.state&&(value.collection!==ref.state.collection||value.id!==ref.state.id||value.sequence!==ref.state.sequence||value.deleted!==ref.state.deleted||value.version!=='commit-'+ref.state.sequence))fail('ProtocolCorrupt');return value;
  }
  function read(kind,id,operation){guard();return load(latest(references(find(1,key(kind,id)),key(kind,id),operation)));}
  function write(kind,id,value,operation='',immutable=false){
-  guard();if(!same(value.archive,archive))fail('ScopeChanged');const lookup=key(kind,id);let matched=find(1,lookup);if(['head','entity'].includes(kind)&&matched.length>=384&&services.continuousMaintenanceEnabled?.()===true){ensureWriteCapacity([{kind,id,writes:1}]);matched=find(1,lookup);}const refs=references(matched,lookup,operation),prior=latest(refs),raw=syncCommitCanonical_(value);
+  guard();readGeneration++;if(!same(value.archive,archive))fail('ScopeChanged');const lookup=key(kind,id);let matched=find(1,lookup);if(['head','entity'].includes(kind)&&matched.length>=384&&services.continuousMaintenanceEnabled?.()===true){ensureWriteCapacity([{kind,id,writes:1}]);matched=find(1,lookup);}const refs=references(matched,lookup,operation),prior=latest(refs),raw=syncCommitCanonical_(value);
   if(raw.length>262144)fail('DataError');
   if(prior){const previous=load(prior);if(same(previous,value))return;if(immutable)fail('OperationMismatch');if(prior.revision>=Number.MAX_SAFE_INTEGER-1)fail('ProtocolUnavailable');}
   if(matched.length>=512)fail('ProtocolUnavailable');
@@ -2952,6 +2999,7 @@ function syncSheetsCommitStore_(indexSheet,blockSheet,trustedArchive,services={}
   const parts=[];for(let offset=0;offset<encoded.length;offset+=8192)parts.push([generation,'n:'+parts.length,'b1:'+encoded.slice(offset,offset+8192)]);
   if(!parts.length||parts.length>256)fail('DataError');
   const start=append(blockSheet,parts),ref={format:'sync-sheet-ref/v1',key:lookup,revision:(prior?.revision||0)+1,generation,start,count:parts.length,digest:hash(raw)};
+  if(kind==='entity'&&id[0]==='habitLogs')ref.state={collection:id[0],id:id[1],sequence:value.sequence,deleted:value.deleted};
   const cells=[lookup,operation,'r1:'+encode(syncCommitCanonical_(ref)),''],row=append(indexSheet,[cells]);
   const marker='ok:'+hash(syncCommitCanonical_(cells.slice(0,3)));
   guard();indexSheet.getRange(row,4).setNumberFormat('@').setValue(marker);flush();guard();
@@ -2998,7 +3046,7 @@ function syncSheetsCommitStore_(indexSheet,blockSheet,trustedArchive,services={}
   const report={kind:input.kind,matched:matched.length,eligible:obsolete.length,planned:planned.length,retired:0,remaining:matched.length,hasMore:obsolete.length>0};
   if(input.dryRun)return report;
   const maintenanceGuard=()=>{guard();if(services.maintenanceEnabled?.()!==true)fail('ProtocolUnavailable');};
-  maintenanceGuard();
+  maintenanceGuard();if(planned.length)readGeneration++;
   for(const row of planned){
    if(maintenanceBudget&&(maintenanceBudget.remaining<=0||Date.now()>=maintenanceBudget.deadline))break;
    maintenanceGuard();
@@ -3012,6 +3060,14 @@ function syncSheetsCommitStore_(indexSheet,blockSheet,trustedArchive,services={}
  return Object.freeze({
   digest:hash,
   preflightWrites,ensureWriteCapacity,compactReferences,
+  readGeneration(){guard();return readGeneration;},
+  readEntityMetadata(collection,id){
+   guard();const lookup=key('entity',[collection,id]),ref=latest(references(find(1,lookup),lookup,''));if(!ref)return null;
+   if(ref.state)return copy(ref.state);
+   // Pre-projection references remain readable; their metadata is checked from
+   // the original payload. No implicit backfill or persistent cache is written.
+   const value=load(ref);return {collection:value.collection,id:value.id,sequence:value.sequence,deleted:value.deleted};
+  },
   scanReceiptReferences(input){
    guard();if(!input||Object.keys(input).sort().join(',')!=='afterRow,limit,principalId,upperRow'||typeof input.principalId!=='string'||!/^[a-zA-Z0-9-]{10,80}$/.test(input.principalId)||!Number.isSafeInteger(input.afterRow)||input.afterRow<1||!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>25||!(input.upperRow===null||Number.isSafeInteger(input.upperRow)&&input.upperRow>=input.afterRow))fail('DataError');
    const last=indexSheet.getLastRow(),upperRow=input.upperRow===null?last:input.upperRow;if(upperRow>last||input.afterRow>upperRow)fail('DataError');const throughRow=Math.min(upperRow,input.afterRow+input.limit),receipts=[];let unpublished=0,retired=0,unrecognized=0;

@@ -151,3 +151,20 @@ snapshot HTTP e consumer Chromium con 1.012 log e replay di 2.002 commit
 costosa: 728.201 letture simulate del ledger per pagina HabitLogs; restano
 ottimizzazione delle letture e collaudo quote/latenza Google. Non si dichiara
 chiuso il pacchetto 12 né la compatibilità dei client distribuiti.
+
+## Seguito snapshot HabitLogs mirate — 7 novembre 2026
+
+Implementata selezione keyset prima dell'idratazione, stato minimo nei nuovi
+riferimenti verificati e vista del head limitata al lock. Restano metadati
+globali per coverage e lettura compatibile dei riferimenti precedenti senza
+proiezione. Nessun cambio a retention fisica o capability reali. Prove,
+misure e limiti: [snapshot HabitLogs mirate](VERIFICA-SNAPSHOT-HABITLOGS-MIRATE.md). Il conteggio 8/12 pacchetti aperti
+rimane invariato; il seguito non chiude pacchetto 12 o offline completo.
+
+Esito: matrice 127/128/129/256/1.000 con pagine 1/25/100, confronto di risposte
+identiche sulla stessa fixture con a06f8ee, massimo letture ledger+legacy
+728.203→3.156 (−99,57%), celle 32.129.427→267.886 su 11 pagine, batch massimo
+invariato. Consumer HTTP/Chromium applica 2.002 commit, oppure 2.004 con
+aggiornamento concorrente, e riapre IndexedDB. Tutte le suite richieste
+superate. Restano metadati globali e costo di compatibilità dei riferimenti
+precedenti senza state; nessuna sostenibilità Google dichiarata.

@@ -3,7 +3,7 @@ const fs=require('fs'),vm=require('vm'),path=require('path'),assert=require('ass
 const {createFaultSheets}=require('./fault-sheets.cjs'),{seal}=require('./recoverable-commit-store.cjs');
 const backend=fs.readFileSync(path.resolve(__dirname,'../../Demo.html'),'utf8').match(/<script>([\s\S]*?)<\/script>/)[1],copy=value=>JSON.parse(JSON.stringify(value));
 function createDayRoutingServer(snapshot,options={}){
- const ledger=options.ledger||createFaultSheets(snapshot?.ledger),ctx=vm.createContext({window:{},document:{addEventListener(){}},setTimeout,console});vm.runInContext(backend,ctx);
+ const ledger=options.ledger||createFaultSheets(snapshot?.ledger),ctx=vm.createContext({window:{},document:{addEventListener(){}},setTimeout,console});vm.runInContext(options.backendSource||backend,ctx);
  if(snapshot){
   ctx.restored=copy(snapshot);vm.runInContext('Object.assign(mockProps,restored.props);restored.users.forEach(([key,value])=>mockUserProperties.set(key,value));if(restored.rawSheets)Object.entries(restored.rawSheets).forEach(([name,data])=>{(mockSheets[name]||db.insertSheet(name)).data=data;});mockSheets.Days.data=restored.days;demoScriptCache.clear();ioReset_();',ctx);
  }else for(const seed of options.seedDays||[{date:'2026-10-28',reflection:'Riga originaria sintetica'}]){

@@ -1,5 +1,27 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Snapshot HabitLogs mirate — 7 novembre, seguito locale
+
+Dalla base `a06f8ee`, l'endpoint seleziona le identità prima di caricare route,
+record e preimmagini. La vista di lettura recupera i pending e verifica il
+head all'ingresso/uscita del lock, senza ripeterlo per ogni record; scritture
+e compattazione invalidano la vista. Directory e shard sono verificati
+anche per pagine vuote. Legacy key/date/version a finestre di 256 righe;
+checklist soltanto della pagina. Nuovi riferimenti HabitLogs con stato
+minimo verificato nella stessa pubblicazione, utile a conteggi/tombstone.
+Vecchi riferimenti leggibili senza backfill implicito, con costo aggiuntivo
+per ricavare lo stato dal payload. Nessuna cache persistente aggiunta.
+Superati matrice 127/128/129/256/1.000, limiti 1/25/100, 1.401 fault/replay,
+contesa e HTTP/consumer con riapertura IndexedDB (2.002 commit statici,
+2.004 con modifica concorrente). Stessa fixture/stesse risposte: massimo
+letture ledger+legacy 728.203→3.156 (−99,57%), celle 32.129.427→267.886 su
+11 pagine, head 2.020→2 caricamenti. Nessun aumento dei batch massimi.
+Superati build, npm test, capacità, repository, release, tracing e suite
+snapshot/continuativa. Prove, misure prima/dopo e limiti nel rapporto di
+[snapshot HabitLogs mirate](VERIFICA-SNAPSHOT-HABITLOGS-MIRATE.md).
+Capability reali spente; nessun Google, setup, deploy, migrazione reale o commit.
+
+
 ## Capacità continuativa HabitLogs — 7 novembre, seguito locale
 
 Dalla base `b8fc11b`, policy server esplicita e spenta per default che riusa
