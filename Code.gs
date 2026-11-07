@@ -2400,6 +2400,23 @@ function syncRecordRoutingServer_(permissions,domain){
 // Separate, explicit server operation. No bootstrap request invokes the builder.
 function syncBootstrapCheckpointEnabled_(){return false;}
 function syncBootstrapCheckpointBuildEnabled_(){return false;}
+// Physical retention is deliberately a separate server policy. It remains
+// unavailable until every dependency class has an audited verifier.
+function syncPhysicalRetentionEnabled_(){return false;}
+function syncPhysicalRetentionPolicy_(input,services={}){
+ const fail=name=>{throw Object.assign(Error(name),{name});},keys=['archiveId','epoch','principalId'];
+ if(!input||Object.keys(input).sort().join(',')!=='checkpointDigest,checkpointGeneration,checkpointSequence,scope'||!input.scope||Object.keys(input.scope).sort().join(',')!==keys.slice().sort().join(',')||keys.some(key=>typeof input.scope[key]!=='string'||!/^[a-zA-Z0-9-]{10,80}$/.test(input.scope[key]))||typeof input.checkpointGeneration!=='string'||!/^[a-zA-Z0-9-]{10,80}$/.test(input.checkpointGeneration)||!Number.isSafeInteger(input.checkpointSequence)||input.checkpointSequence<0||typeof input.checkpointDigest!=='string'||!/^[a-f0-9]{64}$/.test(input.checkpointDigest))fail('DataError');
+ const scope={archiveId:input.scope.archiveId,epoch:input.scope.epoch,principalId:input.scope.principalId},enabled=()=>services.enabled?.()===true;
+ const blockers=[];
+ if(services.scope&&['archiveId','epoch','principalId'].some(key=>services.scope[key]!==scope[key]))fail('ScopeChanged');
+ if(!enabled())blockers.push('serverPolicyDisabled');
+ // These are independent proofs, not client supplied booleans. Until the
+ // ledger has a verifiable inventory for each, the floor must remain zero.
+ for(const [key,verify] of [['checkpoint',services.verifyCheckpoint],['receiptWindow',services.verifyReceiptWindow],['operationAliases',services.verifyOperationAliases],['docsBaselines',services.verifyDocsBaselines],['tombstonesAndRoutes',services.verifyTombstonesAndRoutes],['readerLeases',services.verifyReaderLeases],['legacyCoverage',services.verifyLegacyCoverage]])if(typeof verify!=='function'||verify(scope,input)!==true)blockers.push(key+'Unverified');
+ const proven=blockers.length===0;
+ const core={format:'sync-retention-plan/v1',scope,checkpoint:{generation:input.checkpointGeneration,sequence:input.checkpointSequence,digest:input.checkpointDigest},requestedFloor:input.checkpointSequence,minimumAvailable:proven?input.checkpointSequence:0,eligibleCommits:proven?input.checkpointSequence:0,eligiblePayloads:0,retired:0,blockers};
+ return {...core,digest:syncCommitCanonical_(core)};
+}
 function syncBootstrapCheckpointFacade_(){
  for(const create of [syncHabitLogRoutingServer_,syncEntryRoutingServer_,syncDayRoutingServer_,syncWeekRoutingServer_,syncCatalogRoutingServer_,syncProjectRoutingServer_]){const facade=create().resolve();if(facade)return facade;}
  throw Object.assign(Error('ProtocolUnavailable'),{name:'ProtocolUnavailable'});

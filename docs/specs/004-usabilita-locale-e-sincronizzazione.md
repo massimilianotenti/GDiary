@@ -371,6 +371,10 @@ di testo o falsa conferma Google.
 - Retention esplicita per revisioni, feed, tombstone e ricevute; proteggere
   baseline dei conflitti e lavori pending. Implementare prima dry-run e
   controllo referenze, poi compattazione a checkpoint recuperabile.
+- Un piano di retention non è un minimo cursore pubblicato: quest'ultimo
+  richiede prove scoped di scadenza ricevute/alias, baseline Docs, tombstone e
+  route, lettori in corso e copertura legacy. Se una prova manca, conservare
+  il minimo disponibile e tutti i payload coinvolti.
 - Migrazioni additive, versionate e ripetibili. Conservare il percorso precedente
   finché la nuova rappresentazione non è verificata.
 - Valutare partizioni per anno/periodo soltanto se richieste dalle misure;

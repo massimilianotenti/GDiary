@@ -2263,3 +2263,18 @@ conflitto Catalog che indicava erroneamente la Giornata. Superati build,
 `npm test`, `npm run test:e2e`, `npm run test:release` e `git diff --check`.
 Il pacchetto 8 resta aperto per le altre
 mutazioni applicative, il feed completo e il contratto di provisioning.
+
+## Retention fisica — tranche di pianificazione fail-closed
+
+Aggiunto il contratto interno `sync-retention-plan/v1`, scoped a archivio,
+principal ed epoch e legato alla generazione/digest/sequenza del checkpoint.
+La policy è spenta per default. Il piano non muta il registro; senza prove
+complete su ricevute, alias, baseline Docs, tombstone/route, lettori e legacy
+mantiene il minimo cursore a zero. Non è implementata approvazione persistente,
+pubblicazione del minimo né cancellazione fisica. Nessun payload o riferimento
+è stato rimosso e nessuno spazio fisico è stato recuperato.
+
+Il test di protocollo locale controlla scope, default off e blocco per ogni
+classe di dipendenza mancante. Report: `VERIFICA-RETENTION-FISICA.md`.
+Pacchetto 12 resta aperto; nessuna prova HTTP/Chromium/Google è attribuita a
+questa tranche.

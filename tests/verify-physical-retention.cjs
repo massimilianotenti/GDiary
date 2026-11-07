@@ -1,0 +1,9 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('Code.gs','utf8'),ctx=vm.createContext({});vm.runInContext(source,ctx);
+const scope={archiveId:'retention-archive-01',epoch:'retention-epoch-01',principalId:'retention-principal-01'},request={scope,checkpointGeneration:'retention-generation-01',checkpointSequence:1000,checkpointDigest:'a'.repeat(64)};
+assert.equal(ctx.syncPhysicalRetentionEnabled_(),false,'real-source policy defaults off');
+const disabled=ctx.syncPhysicalRetentionPolicy_(request);assert.equal(disabled.minimumAvailable,0);assert.equal(disabled.eligibleCommits,0);assert(disabled.blockers.includes('serverPolicyDisabled'));
+const enabled=ctx.syncPhysicalRetentionPolicy_(request,{enabled:()=>true});assert.equal(enabled.minimumAvailable,0);assert.deepEqual(Array.from(enabled.blockers).sort(),['checkpointUnverified','docsBaselinesUnverified','legacyCoverageUnverified','operationAliasesUnverified','receiptWindowUnverified','readerLeasesUnverified','tombstonesAndRoutesUnverified'].sort());
+const proven=ctx.syncPhysicalRetentionPolicy_(request,{enabled:()=>true,...Object.fromEntries(['verifyCheckpoint','verifyReceiptWindow','verifyOperationAliases','verifyDocsBaselines','verifyTombstonesAndRoutes','verifyReaderLeases','verifyLegacyCoverage'].map(name=>[name,()=>true]))});assert.equal(proven.minimumAvailable,1000);assert.equal(proven.eligibleCommits,1000);assert.equal(proven.eligiblePayloads,0,'planning never performs deletion');
+assert.throws(()=>ctx.syncPhysicalRetentionPolicy_({...request,scope:{...scope,principalId:'foreign-principal-01'}},{enabled:()=>false,scope}));
+console.log('Physical retention planner: versioned scope-bound fail-closed plan, default-off policy, all seven dependency proofs required, planning performs no physical deletion OK.');
