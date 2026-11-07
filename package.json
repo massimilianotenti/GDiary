@@ -79,7 +79,8 @@
     "test:week-outbox": "node tests/verify-week-outbox-server.cjs && node tests/verify-week-outbox-repository.cjs && node tests/verify-week-outbox-browser.cjs",
     "test:habit-log-outbox": "node tests/verify-habit-log-outbox-server.cjs && node tests/verify-habit-log-outbox-repository.cjs && node tests/verify-habit-log-outbox-browser.cjs",
     "test:habit-log-continuous": "node tests/verify-habit-log-continuous.cjs",
-    "test:habit-log-snapshot": "node tests/verify-habit-log-snapshot-safety.cjs"
+    "test:habit-log-snapshot": "node tests/verify-habit-log-snapshot-safety.cjs",
+    "test:bootstrap-checkpoint": "node tests/verify-bootstrap-checkpoint.cjs && node tests/verify-bootstrap-checkpoint-browser.cjs"
   },
   "dependencies": {
     "vue": "3.5.44"

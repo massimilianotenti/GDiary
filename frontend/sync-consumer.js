@@ -1,3 +1,4 @@
+import {discoverBootstrapCheckpoint,applyBootstrapCheckpoint} from './bootstrap-checkpoint.mjs';
 // Read-only remote snapshot/feed consumer. It is inert until the caller opts
 // in and the verified identity plus both server capabilities are ready.
 import {createLocalSearchIndex} from './local-search-index.mjs';
@@ -219,13 +220,13 @@ export function createSyncConsumer({repository,identity,call,enabled=()=>false}=
   bootstrap:()=>result(async()=>{
    const scope=authorize(),manifest=await invoke('getSyncManifest',{});ensureScope(scope);
    if(manifest?.identityVerified!==true||manifest.archiveId!==scope.archiveId||manifest.principalId!==scope.principalId||manifest.epoch!==scope.epoch||manifest.capabilities?.changes!==true||manifest.capabilities?.localReadCache!==true)throw fail('ProtocolUnavailable');
+   const baseline=await discoverBootstrapCheckpoint({manifest,scope,call:invoke,check:()=>ensureScope(scope)});
    const start=await invoke('getSyncCheckpoint',{});if(!cursor(start?.cursor,scope)||start.highWater!==start.cursor.sequence)throw fail('DataError');
-   // Replay the retained immutable feed from its origin after the legacy
-   // snapshot. This supplies canonical Files/Layouts without enumerating all
-   // Entries on each page; newer snapshot rows remain protected by repository
-   // version checks. If history is ever compacted, bootstrap must receive an
-   // explicit retained checkpoint before the server enables this capability.
-   const pinned={...start.cursor,sequence:0};
+   // Pin the advertised canonical checkpoint, or retain origin replay for
+   // clients without the capability. Current snapshot rows may be newer than
+   // the baseline; repository version guards preserve them until delta catchup.
+   if(baseline&&baseline.sequence>start.highWater)throw fail('DataError');
+   const pinned={...start.cursor,sequence:baseline?.sequence??0};
    const cleared=await checked(repository.clearRemote({bootstrap:true}));let revision=cleared.revision;const totals={};
    for(const collection of COLLECTIONS){let afterId,seen=new Set(),count=0,coverage=null;
     do{ensureScope(scope);const page=await invoke('getSnapshotPage',{collection,cursor:pinned,...(afterId===undefined?{}:{afterId}),limit:100,maxBytes:65536});
@@ -240,11 +241,12 @@ export function createSyncConsumer({repository,identity,call,enabled=()=>false}=
     }while(afterId!==undefined);
     if(!coverage||count!==coverage.total)throw fail('DataError');totals[collection]={total:count,canonical:coverage.canonical,complete:coverage.complete===true};
    }
+   const checkpoint=baseline?await applyBootstrapCheckpoint({manifest:baseline,scope,call:invoke,check:()=>ensureScope(scope),repository,revision,normalize:snapshotRecord}):null;if(checkpoint)revision=checkpoint.revision;
    const head=await invoke('getSyncCheckpoint',{});if(!cursor(head?.cursor,scope)||head.highWater!==head.cursor.sequence||head.highWater<start.highWater)throw fail('DataError');
-   const caught=await readChanges(scope,pinned,head.cursor);await hydrate(caught.changedContent,caught.cursor,scope);revision=(await checked(repository.getMeta())).revision;
+   const caught=await readChanges(scope,pinned,head.cursor);await hydrate([...new Set([...caught.changedContent,...(checkpoint?.contentIds||[])])],caught.cursor,scope);revision=(await checked(repository.getMeta())).revision;
    const complete=Object.values(totals).every(item=>item.complete)&&totals.entries.canonical===totals.entries.total;
-   const saved=await checked(repository.applyRemoteBatch({expectedRevision:revision,cursor:caught.cursor,coverage:{consumer:{format:'sync-consumer/v1',complete,docsScanComplete:complete,collections:totals,appliedThrough:caught.cursor.sequence}}}));ensureScope(scope);
-   await checked(repository.finishBootstrap(saved.revision));const search=await persistSearchSnapshot(scope,complete);await checked(repository.markReadCheckpoint(saved.revision));return {cursor:caught.cursor,appliedCommits:caught.applied,collections:totals,complete,revision:saved.revision,search};
+   const saved=await checked(repository.applyRemoteBatch({expectedRevision:revision,cursor:caught.cursor,coverage:{consumer:{format:'sync-consumer/v1',complete,docsScanComplete:complete,collections:totals,appliedThrough:caught.cursor.sequence,...(baseline?{checkpoint:{generation:baseline.generation,sequence:baseline.sequence,digest:baseline.digest,verifiedPages:baseline.pages}}:{})}}}));ensureScope(scope);
+   await checked(repository.finishBootstrap(saved.revision));const search=await persistSearchSnapshot(scope,complete);await checked(repository.markReadCheckpoint(saved.revision));return {cursor:caught.cursor,appliedCommits:caught.applied,collections:totals,complete,revision:saved.revision,search,...(baseline?{bootstrapCheckpoint:{generation:baseline.generation,sequence:baseline.sequence,pages:baseline.pages,records:baseline.records}}:{})};
   }),
   sync:()=>result(async()=>{
    const scope=authorize(),initial=await checked(repository.getMeta());if(initial.requiresBootstrap)return checked(consumer.bootstrap());await ensureSearchIndex(scope);const meta=await checked(repository.getMeta());if(!cursor(meta.cursor,scope))throw fail('ProtocolUnavailable');if(meta.coverage?.localSearch?.fresh!==true||meta.coverage.localSearch.revision!==meta.revision)throw fail('ConflictError');const searchComplete=(await searchIndex.status()).complete;
