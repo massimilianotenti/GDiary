@@ -2268,12 +2268,15 @@ mutazioni applicative, il feed completo e il contratto di provisioning.
 
 Aggiunti i contratti interni `sync-retention-plan/v1` e
 `sync-retention-state/v1`, scoped a archivio, principal ed epoch e legati alla
-generazione/digest/sequenza del checkpoint. Lo stato usa revisione CAS e
-approvazione server separata; policy spenta per default. L'avanzamento richiede
-adattatori server di ritiro/verifica/pubblicazione assenti nella build corrente.
-Senza prove complete su checkpoint, ricevute, alias, baseline Docs,
-tombstone/route, lettori e legacy il minimo resta zero. Nessun payload o
-riferimento è stato rimosso e nessuno spazio fisico è stato recuperato.
+generazione/digest/sequenza del checkpoint. Il controller Demo verifica il
+manifest pubblicato e conteggi Entry/File/Layout; verifica alias/commit solo
+per prefissi fino a 25 commit. Le prove sono record scoped con digest,
+sequenza e conteggio; i booleani sono rifiutati. Lo stato usa revisione CAS e
+approvazione server separata; policy spenta per default. Ricevute/alias oltre
+il budget, baseline Docs, lease lettori e copertura legacy restano blocker; non
+esistono adattatori server di ritiro/pubblicazione. Il minimo resta zero.
+Nessun payload o riferimento è stato rimosso e nessuno spazio fisico è stato
+recuperato.
 
 Il test di protocollo locale controlla scope, default off e blocco per ogni
 classe di dipendenza mancante. Report: `VERIFICA-RETENTION-FISICA.md`.

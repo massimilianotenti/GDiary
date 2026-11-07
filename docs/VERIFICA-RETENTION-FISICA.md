@@ -14,6 +14,13 @@ Il passo di ritiro richiede adattatori server per lotto, verifica del residuo e
 pubblicazione del minimo: se mancano, restituisce `ProtocolUnavailable` senza
 modificare lo stato approvato. Il test simula pianificazione, lettura e
 approvazione e verifica che l'assenza degli adattatori blocchi l'avanzamento.
+I verificatori devono restituire una prova strutturata con scope, digest,
+sequenza e conteggio; un booleano o un digest/scope diverso viene rifiutato.
+Il controller Demo verifica davvero il manifest pubblicato e i conteggi di
+Entries/Files/Layouts attraverso il checkpoint scoped. Per prefissi fino a 25
+commit verifica anche alias e commit tramite l'ispezione del protocollo. Oltre
+25 commit l'inventario alias non è completato entro il budget della chiamata e
+resta blocker. Le altre prove positive di contratto usano adapter sintetici.
 
 Il minimo cursore resta zero finché non risultano verificati tutti questi
 insiemi: checkpoint, finestra delle ricevute, alias operationId, baseline Docs, tombstone
@@ -32,7 +39,8 @@ ricevute, alias, commit e baseline restano
 intatti; nessun minimo cursore viene pubblicato.
 
 Il test `verify-physical-retention.cjs` controlla default off, scope,
-contratto, blocco quando manca anche una sola prova e assenza di cancellazioni
-durante la pianificazione. È una prova di protocollo locale, non una prova
-HTTP, Chromium, Apps Script o Google. Nessun recupero di spazio fisico è
+contratto, prove strutturate, digest errato, blocco quando manca una prova,
+CAS, il controller Demo con checkpoint realmente pubblicato e assenza degli
+adapter di ritiro. È una prova di protocollo/integratione locale, non una
+prova HTTP, Chromium, Apps Script o Google. Nessun recupero di spazio fisico è
 dimostrato; pacchetto 12 resta aperto.
