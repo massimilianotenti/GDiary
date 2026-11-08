@@ -1,5 +1,45 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Inventario fisico retention paginato — 8 novembre 2026
+
+Da `555178b` aggiunto `sync-retention-inventory/v1`, server-only e separato
+dallo snapshot/feed. Fissa checkpoint, scope archive/principal/epoch e ultima
+riga fisica; persiste cursore, conteggi e digest di pagina/cumulativo con
+revisioni append-only ancorate alla riga finale. Scansione: massimo 25 righe,
+20 record, 512 KiB e 4.096 unità per pagina; stato max 196.608 byte e pagina più
+stato max 1 MiB. ACK replay restituisce la revisione salvata; un append
+concorrente invalida la fotografia esplicitamente. Nessuna eliminazione e
+minimo cursore sempre zero.
+
+Fixture protocollo da 29 commit: nell’ultima esecuzione 319 righe/record
+fisici in 16 pagine, 558.390 byte e 3.809 unità mock cumulative; massimo per
+pagina 25 righe/20 record/512 KiB/4.096 unità. Digest, ripresa, replay dopo
+ACK perso, restart, pending, budget byte, payload ricevuta corrotto, alias
+operationId mancante/duplicato, righe mancanti/duplicate, riferimento non
+pubblicato, sconosciuto e append concorrente sono verificati. Fixture applicativa isolata: 1.000 identità, 2.000 commit,
+3.648 riferimenti logici compattati, 12.018 righe fisiche conservate, 1.401
+fault/replay. Inventario a S=2.023: 620 pagine, 17.135 letture, 37.479 righe,
+129.160 celle, 80.075.990 byte e massimi 25 righe/100 celle/43.012 byte per
+lettura; zero ricerche durante le pagine; `unversionedPayloadRecord` mantiene il proof alias
+bloccato. Begin separato: 4 TextFinder su 59.100 righe candidate. Questo lookup non è ancora bounded. Spazio fisico recuperato:
+0 righe/0 byte. L’alias operationId è
+riconciliato con commit e ricevuta committed; il Bloom conservativo può bloccare
+anche per collisione e non autorizza eliminazioni.
+
+Idempotenza temporale, Docs baseline, lease lettori, copertura legacy e
+discovery iniziale del checkpoint senza scansione dell’indice restano non
+dimostrati. `unversionedPayloadRecord` blocca la prova alias sulla fixture 1k. La capability e il minimo cursore restano disattivati; il
+pacchetto 12 non è chiuso. Il costo è misurato solo nel mock locale; non inferire
+prestazioni o atomicità Apps Script/Google. `test:repository`, `test:release`, `test:commit-capacity`,
+`test:physical-retention`, `test:bootstrap-checkpoint` e `test:habit-log-continuous`
+sono passati. Sul ledger sintetico da 1k, snapshot HTTP/Chromium ha letto 1.012
+log in 20 pagine e replayato 2.002 commit in 401 richieste feed (2.004 con write
+concorrente); il consumer ha confrontato checkpoint/origine e riaperto IndexedDB.
+La matrice snapshot 127/128/129/256/1k con limiti 1/25/100 e pagine vuote/finali
+è passata. Costi mock e confronto prima/dopo nel rapporto retention. Nessun costo
+Google inferito. Dettagli
+in [verifica retention fisica](VERIFICA-RETENTION-FISICA.md).
+
 ## Snapshot HabitLogs mirate — 7 novembre, seguito locale
 
 Dalla base `a06f8ee`, l'endpoint seleziona le identità prima di caricare route,
