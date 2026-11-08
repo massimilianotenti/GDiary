@@ -45,7 +45,163 @@ adapter di ritiro. È una prova di protocollo e integrazione locale, non una
 prova HTTP, Chromium, Apps Script o Google. Nessun recupero di spazio fisico è
 dimostrato; pacchetto 12 resta aperto.
 
-## Inventario fisico paginato commit/ricevute/alias — 8 novembre 2026
+## Discovery iniziale limitata e riprendibile — seguito dell’8 novembre 2026
+
+L’avvio dell’inventario non chiama più `retentionHeadStatus()` né
+`bootstrapDiscover()`: questi percorsi ordinari conservano i propri lookup,
+ma non sono dipendenze della discovery retention. `begin` fissa soltanto
+scope, generazione/digest richiesti e ultima riga fisica, pubblicando lo stato
+`sync-retention-inventory/v1` in fase `discovery`. Non attesta ancora il
+checkpoint: `upperSequence` resta zero e `complete` resta falso.
+
+`step` visita finestre di massimo 25 righe dell’indice, caricando solo head,
+puntatore `bootstrap:published` e manifest immutabile della generazione
+richiesta. Limiti: massimo 20 payload, 512 KiB e 4.096 unità per passo;
+lo stato conserva il limite di 196.608 byte e pagina più nuovo stato quello
+di 1 MiB. Cursore, conteggi, digest cumulativo e ultime revisioni dei tre
+candidati sono persistenti, scoped e coperti dal digest dello stato.
+Il costo totale resta proporzionale alle righe dell’indice; questa tranche
+limita il lavoro di ogni chiamata, non introduce una discovery totale O(1).
+Le revisioni append-only della discovery aumentano lo spazio fisico occupato.
+
+Alla fine si verifica il checksum del head più recente e si rifiutano pending,
+puntatori mancanti, ambigui o fuori scope e manifest mancanti, duplicati,
+non pubblicati, corrotti o non coerenti con il puntatore. Il manifest usa lo
+stesso validatore del bootstrap ordinario, senza letture implicite; sequenza e
+cursore devono essere coerenti con il head. Solo allora si passa a `inventory`
+con la sequenza verificata e la stessa fotografia fisica iniziale.
+Il rifiuto del pending avviene al termine della discovery, senza recovery
+implicito. Dopo recovery applicativa o append concorrente occorre un nuovo
+`begin`, che fissa una nuova fotografia.
+
+Le revisioni sono ancorate all’ultima riga fisica, come nell’inventario:
+CAS, riapertura, riparazione della pubblicazione completa con ACK perso e replay
+non ripetono il lavoro già salvato. Un append estraneo invalida il cursore;
+`status` restituisce `invalidated`. Gli stati inventory precedenti senza
+campi `phase`/`discovery` restano leggibili e riprendibili. Un begin ripetuto
+sulla stessa fotografia restituisce lo stato salvato senza discovery implicita.
+Incompleto, legacy o corrotto non diventa una prova positiva.
+
+`verify-retention-discovery.cjs`, incluso nella suite retention e in `npm test`,
+verifica budget reali dei range mock, assenza di ricerche, riapertura a ogni
+passo, replay ACK, CAS, interruzioni prima/dopo la pubblicazione di riferimento
+e marker, append concorrente, scope, checksum head, manifest/puntatore corrotti,
+manifest mancante/duplicato/non pubblicato e compatibilità degli stati inventory
+precedenti. La prova sostituisce i metodi di lookup ordinari con funzioni che
+falliscono se invocate: non nasconde letture dietro risposte fabricate.
+
+Le misure precedenti qui sotto descrivono la base `158e8af`; in particolare il
+begin con 4 TextFinder su 59.100 righe candidate è il confronto prima della
+tranche, non il comportamento corrente. Il piano di eligibility separato può
+ancora usare il bootstrap ordinario: non è una chiamata di discovery/inventario.
+Capability reali spente, minimo zero, nessuna eliminazione o accesso Google.
+Idempotenza temporale, dipendenze Docs, lease lettori, copertura legacy,
+compatibilità client e convalida Apps Script restano gate separati; il pacchetto
+12 rimane aperto.
+
+### Misure sulla fixture da 1.000 identità
+
+Confronto locale su checkpoint S=2.023. Il benchmark carica l’implementazione
+precedente di `syncPhysicalRetentionInventoryAudit_` dalla base `158e8af`
+in un secondo contesto V8 con una copia dello stesso ledger/checkpoint;
+non sostituisce gli adapter né le risposte. Parametri riproducibili del test:
+`GDIARY_CONTINUOUS_FIXTURE`, `GDIARY_RETENTION_AUDIT_ONLY=1` e, per il confronto
+opzionale, `GDIARY_RETENTION_BASELINE_SOURCE` con il sorgente estratto dalla
+base Git. Nessuna dipendenza dalla cronologia Git nella suite ordinaria.
+
+| Fase | Chiamate del protocollo | Letture mock | Righe | Celle | Byte letti | Ricerche / righe candidate |
+|---|---:|---:|---:|---:|---:|---:|
+| Begin precedente, stessa fixture | 1 | 816 | 816 | 3.252 | 411.079 | 4 / 59.100 |
+| Nuovo begin | 1 | 8 | 8 | 26 | 5.269 | 0 / 0 |
+| Nuova discovery, cumulativo | 591 | 6.311 | 20.513 | 77.496 | 13.676.237 | 0 / 0 |
+| Inventario dopo discovery, cumulativo | 620 | 17.135 | 38.037 | 130.837 | 85.686.510 | 0 / 0 |
+
+Massimi osservati per **intera chiamata**, inclusi lettura e verifica dello stato:
+
+| Fase | Letture | Righe | Celle | Byte |
+|---|---:|---:|---:|---:|
+| Discovery | 19 | 45 | 162 | 66.489 |
+| Inventario | 30 | 76 | 255 | 270.569 |
+
+Massimo singolo range: discovery 25 righe / 100 celle / 13.240 byte;
+inventario 25 righe / 100 celle / 45.992 byte. Le prove impongono inoltre un
+tetto di regressione sull’intera chiamata della fixture: 100 letture,
+512 righe, 1.600 celle e 1 MiB; sul solo begin iniziale della fixture,
+massimo 20 letture e 32 KiB (non sui replay di stati già popolati).
+Questi massimi osservati e tetti di test vanno distinti dai budget del protocollo
+per pagina e stato, che contano i payload serializzati e il lavoro logico.
+Non costituiscono una misura di trasporto, quote o latenza Google.
+
+Il confronto storico dell’inventario prima della discovery era 620 pagine,
+17.135 letture, 129.160 celle e 80.075.990 byte. Le pagine restano 620 e le
+letture 17.135; lo stato aggiuntivo della discovery incrementa celle e byte
+riletti durante l’inventario. In totale il nuovo percorso begin + discovery +
+inventario legge 23.454 range mock e 99.368.016 byte: non viene dichiarata una
+riduzione del lavoro totale. Il vantaggio dimostrato è eliminare dall’avvio
+le ricerche crescenti e rendere il lavoro riprendibile con limiti per chiamata.
+
+A metà discovery della fixture 1k, riapertura del contesto V8 e replay della
+revisione precedente restituiscono lo stesso cursore/digest. Un commit
+applicativo in una copia della stessa fotografia invalida il passo successivo
+con `ScopeChanged`; `status` riporta `invalidated`. Il run termina con 2.023
+commit verificati, zero ricevute/alias mancanti rilevati e i blocker
+`unversionedPayloadRecord`, finestra ricevute, Docs, lettori e legacy.
+La prova alias resta quindi assente e il minimo cursore resta zero.
+
+Nel run integrato successivo `test:habit-log-continuous` sono passati anche
+1.401 fault/replay, 1.000 creazioni/2.000 commit, 3.648 riferimenti logici
+compattati e 12.018 righe fisiche conservate. Matrice snapshot 127/128/129/256/1k,
+contesa e consumer HTTP/Chromium con riapertura IndexedDB superati. Il consumer
+continuativo ha applicato 2.002 commit, oppure 2.004 con scrittura concorrente;
+il successivo scenario checkpoint S=2.023 ha ricostruito 2.030 commit dall’origine
+o checkpoint più 7 delta, raggiungendo lo stesso cursore.
+Le misure della retention integrata confermano 591 passi discovery e 620
+inventario, con gli stessi conteggi di letture/righe/celle della tabella.
+I byte inventory in quel run sono 85.693.230, max range 46.012 byte e max
+chiamata 270.249 byte: sono un’esecuzione distinta dal confronto sopra,
+non un’identità byte per byte fra due fixture costruite separatamente.
+La discovery mantiene gli stessi massimi e zero ricerche.
+
+Il residuo `unversionedPayloadRecord` ha un riscontro concreto nella fixture
+applicativa: 4.016 payload senza `format`, con envelope
+`archive/collection/data/deleted/id/sequence/version`. La prossima tranche può
+classificare e verificare questi envelope canonici, mantenendo il blocco sui
+payload legacy o ambigui; questa osservazione non li promuove già a prova alias.
+
+### Verifiche finali della tranche
+
+Esiti locali dell’8 novembre 2026, Node 24.22.1 e Chrome headless tramite
+`CHROME_PATH`, su Demo e ledger sintetici:
+
+| Comando / controllo | Esito |
+|---|---|
+| `npm run build` | Passato; Index rigenerato, sei file staging, nessun upload |
+| `npm run test:physical-retention` | Passato, inclusa discovery e compatibilità inventory precedente |
+| `node tests/verify-retention-discovery.cjs` | Passato; anche budget target/byte e digest discovery alterato |
+| `npm run test:bootstrap-checkpoint` | Passato; protocollo, fault/restart e HTTP/Chromium |
+| `npm run test:habit-log-continuous` | Passato; 1k, 1.401 fault/replay, snapshot, contesa, HTTP/Chromium e checkpoint/feed |
+| `npm run test:commit-capacity` | Passato |
+| `npm run test:repository` | Passato |
+| `npm run test:release` | Passato su Demo |
+| `npm test` | Passato |
+| P59 build/deploy simulato, invarianti sorgenti e `git diff --check` | Passati |
+
+La build e la suite retention completa sono state ripetute dopo l’ultimo
+allineamento del limite numerico del head: come il lettore ordinario,
+la discovery rifiuta `committedThrough >= Number.MAX_SAFE_INTEGER`.
+La prova usa un checksum valido per distinguere questo limite da corruzione
+del checksum. Nessuna modifica frontend funzionale; Index rigenerato invariato,
+Demo con backend aggiornato. UTF-8, sei file Apps Script, segnaposto
+`ROOT_FOLDER_ID` e policy retention reale spenta verificati.
+
+Il confronto retention 1k separato con sorgente precedente è terminato con
+exit 0. Il protocollo retention rimane server-only: le prove HTTP/Chromium
+riguardano snapshot/feed/consumer; non sono una RPC browser dell’audit né un
+collaudo Apps Script/Google. Zero righe, payload e byte recuperati. Nessuna
+capability reale, deploy, setupDrive, migrazione reale, commit o modifica ai
+dati reali. Il pacchetto 12 non è chiuso.
+
+## Inventario fisico paginato — base 158e8af dell’8 novembre 2026
 
 La nuova scansione `sync-retention-inventory/v1` fissa sul server checkpoint,
 scope archive/principal/epoch e ultima riga fisica. Il client passa solo
@@ -97,11 +253,9 @@ non promuove una copertura incompleta a prova positiva. Il piano segnala anche
 
 Costo separato dell’avvio: 816 letture, 816 righe, 3.252 celle e 411.079 byte;
 4 TextFinder hanno esaminato complessivamente 59.100 righe candidate per la
-scoperta/verifica iniziale del checkpoint. Quindi la scansione paginata è
-bounded, ma l’avvio corrente conserva un lookup che cresce con l’indice. È un
-gate residuo esplicito: prima di usare questo audit come inventario totalmente
-bounded, serve una scoperta del checkpoint con directory/puntatore server
-recuperabile a costo limitato. La policy e il minimo cursore restano disattivati/
+scoperta/verifica iniziale del checkpoint. Nella base precedente la scansione paginata era
+bounded, ma l’avvio conservava un lookup che cresce con l’indice. Questo limite dell’avvio è affrontato dalla discovery paginata descritta
+sopra; le misure di questo paragrafo sono il confronto precedente. La policy e il minimo cursore restano disattivati/
 zero anche perché ricevute non hanno una finestra d’idempotenza provabile, e
 Docs baseline, lease lettori e copertura legacy non sono enumerate.
 

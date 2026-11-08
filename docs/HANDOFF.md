@@ -1,6 +1,50 @@
 # Passaggio di consegne — 17 ottobre 2026
 
-## Inventario fisico retention paginato — 8 novembre 2026
+## Discovery retention limitata e riprendibile — 8 novembre 2026
+
+Seguito locale di `158e8af`: `beginPhysicalRetentionAudit_` non invoca più
+lookup logici del head o `bootstrapDiscover`. Fissa scope e ultima riga fisica,
+poi `stepPhysicalRetentionAudit_` esegue una fase persistente `discovery`:
+max 25 righe, 20 payload mirati, 512 KiB e 4.096 unità per passo. Seleziona e
+verifica head, puntatore pubblicato e manifest immutabile scoped prima di
+iniziare l’inventario sullo stesso confine fisico. La sequenza è zero e lo
+stato non è completo finché il checkpoint non è verificato. I totali della
+discovery sono separati dall’inventario; CAS, digest, replay ACK, riparazione
+della pubblicazione completa, riavvio e invalidazione per append sono
+preservati. Stati inventory precedenti senza fase restano riprendibili.
+Pending e checkpoint errati emergono durante la discovery, senza recovery
+implicito; un nuovo begin dopo recovery/appends fissa una nuova fotografia.
+
+Confronto sulla stessa fixture applicativa da 1.000 identità, checkpoint S=2.023:
+begin precedente 816 letture/411.079 byte e 4 TextFinder su 59.100 righe
+candidate; nuovo begin 8 letture/5.269 byte e zero ricerche. Discovery: 591
+passi, 6.311 letture/13.676.237 byte, massimo per intera chiamata 19 letture,
+45 righe, 162 celle e 66.489 byte. Inventario: 620 passi, 17.135 letture,
+38.037 righe, 130.837 celle e 85.686.510 byte; massimo per chiamata 30 letture,
+76 righe, 255 celle e 270.569 byte. Nessuna ricerca in entrambe le fasi.
+Il costo totale aumenta per scansione e stato aggiuntivi: non è una discovery
+O(1), ma ogni chiamata è limitata e il progresso è riprendibile.
+
+La fixture 1k verifica anche riavvio, replay ACK e append concorrente a metà
+discovery. Prove dedicate: interruzioni prima/dopo le scritture, riapertura a
+ogni passo, CAS, scope, head/checkpoint corrotti, manifest mancante/duplicato/
+non pubblicato, budget target/byte e compatibilità inventory precedente.
+`unversionedPayloadRecord` continua a bloccare la prova alias: nella fixture
+4.016 payload hanno envelope canonico senza `format`. La prossima tranche
+può classificarli/verificarli senza ammettere il legacy ambiguo. Idempotenza
+temporale, Docs baseline, lease lettori, copertura legacy e collaudo Google
+restano gate separati. Pacchetto 12 aperto, capability spente, minimo zero,
+nessuna eliminazione, Google, deploy, setupDrive, migrazione reale o commit.
+
+Build, retention/discovery, capacità commit, bootstrap checkpoint, repository
+e release superati, così come la suite continuativa completa (1.401 fault/replay,
+matrice snapshot, contesa e HTTP/Chromium) e `npm test`. Dopo l’allineamento del
+limite numerico del head al lettore ordinario, build e retention/discovery sono
+stati ripetuti con esito positivo, incluso il caso `Number.MAX_SAFE_INTEGER`.
+Sei file Apps Script, UTF-8, segnaposto e Demo preservati. Costi solo mock:
+[verifica retention fisica](VERIFICA-RETENTION-FISICA.md).
+
+## Inventario fisico retention paginato — prima tranche dell’8 novembre 2026
 
 Da `555178b` aggiunto `sync-retention-inventory/v1`, server-only e separato
 dallo snapshot/feed. Fissa checkpoint, scope archive/principal/epoch e ultima
