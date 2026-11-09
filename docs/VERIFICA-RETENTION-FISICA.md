@@ -45,6 +45,171 @@ adapter di ritiro. È una prova di protocollo e integrazione locale, non una
 prova HTTP, Chromium, Apps Script o Google. Nessun recupero di spazio fisico è
 dimostrato; pacchetto 12 resta aperto.
 
+## Envelope canonici senza `format` — 9 novembre 2026
+
+Tranche locale successiva a `857487c`. Il writer `afterImages` del protocollo
+produce esattamente `archive/collection/data/deleted/id/sequence/version`;
+`entityValue` li legge senza un discriminante `format`. L’inventario ora
+riconosce questa rappresentazione esistente, senza riscriverla o attribuirle
+un nuovo formato persistito. `canonical-entity-envelope` è solo una classe
+interna della pagina, rifiutata se compare come `format` nel payload.
+
+Il verificatore richiede i sette campi esatti, archive/epoch uguali allo store,
+una delle 15 collection del protocollo, ID non vuoto di massimo 200 caratteri,
+sequenza intera positiva inferiore a `Number.MAX_SAFE_INTEGER`, versione
+`commit-N`, booleano deleted e data oggetto oppure null per una cancellazione.
+Verifica chiave entity derivata da collection/ID e alias vuoto del riferimento;
+checksum, digest, pubblicazione, frammenti e proiezione `ref.state` restano
+verificati dal lettore fisico. Un envelope incompleto, con campi aggiuntivi,
+fuori scope o con `format` spurio non viene promosso a record valido.
+Payload senza discriminante non riconoscibili conservano
+`unversionedPayloadRecord` e impediscono la prova alias.
+
+La sola validità strutturale non basta. Il writer pubblica gli after-image
+prima del commit immutabile; la compattazione dei riferimenti ritira righe in
+situ senza spostare quelle conservate. L’audit mantiene al massimo 25 tuple
+collection/ID/sequenza/digest in `entityCoverage.pending`, sigillate nello stato
+insieme al conteggio `verified`. Il successivo commit deve contenere ciascuna
+impronta del payload completo. Payload discordanti, duplicati, orfani, ordine
+non dimostrabile e superamento del limite producono `entityCommitMismatch` e
+non autorizzano prove. Non si richiede che ogni after-image abbia ancora un
+riferimento pubblicato: quelli ritirati restano nel commit, ma non sono
+payload fisici classificati da questa tranche. Restano separati inventario
+legacy e recupero dello spazio nei blocchi.
+
+I commit verificano anche scope, checksum, unicità dei membri e lo stesso
+contratto envelope; le ricevute mantengono il controllo del checksum e
+accettano le stesse 15 collection del writer. Per ogni record il preflight del
+lavoro riserva altre 25 unità per il confronto degli after-image. Non vengono
+aggiunti lookup, TextFinder o mappe proporzionali all’archivio. Limiti per
+pagina e stato invariati: 25 righe, 20 record, 512 KiB, 4.096 unità,
+stato 196.608 byte e pagina più stato 1 MiB.
+
+Gli stati precedenti restano leggibili. Se manca `entityCoverage` in un audit
+parziale già avanzato, la ripresa mantiene `entityCoverageUnverified`; uno
+stato completo precedente non acquisisce retroattivamente la prova. Occorre
+una nuova scansione da una nuova fotografia/generazione. Il gate alias richiede
+copertura completa, nessun pending e nessuno dei blocker preesistenti o nuovi;
+non basta rimuovere `unversionedPayloadRecord`.
+
+### Prove e risultati
+
+`verify-retention-entity-envelopes.cjs`, incluso in `test:physical-retention`
+e quindi in `npm test`, verifica 45 envelope applicativi, incluse tombstone,
+28 casi malformati/ambigui, alterazioni di dati/identità/sequenza e commit,
+chiave/alias/proiezione del riferimento, scope, payload legacy, riferimenti
+ritirati, tutte le 15 collection e un commit di 25 mutazioni. Verifica inoltre
+riapertura con impronte pending, ACK replay, append concorrente, digest e forma
+dello stato, compatibilità conservativa degli audit precedenti. Un test di
+protocollo con pagina sintetica verifica inoltre il limite dello stato con
+ID Unicode e Bloom densi: meno di 196.608 caratteri JavaScript ma oltre
+196.608 byte UTF-8 viene rifiutato senza pubblicare o avanzare il cursore.
+Questa prova negativa non è una misura di performance della scansione. Il
+conteggio dello stato persistito ora usa `traceBytes_`, come la discovery.
+Le nuove prove
+sono di protocollo locale; non sono RPC browser della retention.
+
+Confronto eseguito sulla **stessa copia del ledger e del checkpoint** S=2.023,
+caricando in un secondo contesto V8 le funzioni audit/store della base
+`857487c`, senza sostituire adapter o risposte. Il test supporta il confronto
+opzionale tramite `GDIARY_RETENTION_ENVELOPE_BASELINE_SOURCE` (sorgente Code.gs
+precedente), insieme a `GDIARY_CONTINUOUS_FIXTURE` e
+`GDIARY_RETENTION_AUDIT_ONLY=1`. La suite ordinaria non richiede la cronologia
+Git. La fixture originale contiene 4.016 envelope pubblicati (3.016 settings e
+1.000 HabitLogs); `enrich` ne aggiunge 37 prima del checkpoint applicativo.
+Il test conta quindi 4.053 riferimenti pubblicati e richiede che tutti siano
+verificati, invece di usare il numero storico come atteso fisso.
+
+| Esito / costo mock | Base 857487c | Nuova classificazione |
+|---|---:|---:|
+| Commit verificati a S | 2.023 | 2.023 |
+| Envelope canonici riconosciuti e confrontati | 0 | 4.053 |
+| `unversionedPayloadRecord` | Presente | Assente |
+| Prova `operationAliases` | Assente | Presente |
+| Discovery / inventory | 591 / 620 passi | 591 / 620 passi |
+| Letture dei passi, escluso begin | 23.446 | 23.446 |
+| Righe / celle dei passi | 58.551 / 208.336 | 58.584 / 208.435 |
+| Byte dei passi, escluso begin | 99.371.319 | 99.716.843 |
+| Ricerche nei passi | 0 | 0 |
+| Massimo per chiamata: letture / righe / celle | 30 / 77 / 258 | 30 / 77 / 258 |
+| Massimo byte per chiamata | 270.305 | 270.389 |
+
+La nuova discovery totalizza 6.311 letture, 20.513 righe, 77.496 celle e
+13.782.617 byte; inventario 17.135 letture, 38.071 righe, 130.939 celle e
+85.934.226 byte. Begin separato: 8 letture, 8 righe, 26 celle, 5.389 byte,
+zero ricerche. Il massimo singolo range è 25 righe/100 celle; massimo byte
+inventory 46.276 e discovery 13.240. Nessuna lettura aggiuntiva rispetto alla
+base: lo stato durevole incrementa i byte dei passi di 345.524 (circa 0,35%).
+Non viene dichiarato un miglioramento della latenza o del costo Google.
+
+Audit completo: zero alias/ricevute mancanti, nessun pending envelope;
+restano esattamente `receiptIdempotencyWindowUnproven`,
+`docsBaselinesUnverified`, `readerLeasesUnverified`, `legacyCoverageUnverified`.
+Il piano produce la prova alias ma resta bloccato da policy spenta e dalle
+quattro dipendenze indipendenti. La prova di ripresa/replay/append a metà
+discovery 1k è ancora superata.
+
+Verifiche della tranche, Node 24.22.1, npm 12.2.2 e Chrome locale
+(`CHROME_PATH=/usr/bin/google-chrome`):
+
+| Comando / controllo | Esito |
+|---|---|
+| `npm run build` | Passato; Demo aggiornata dal backend, Index rigenerato invariato |
+| `npm test` | Passato, inclusa la nuova suite envelope |
+| `npm run test:physical-retention` | Passato sulla versione finale, incluse discovery, envelope e compatibilità |
+| `npm run test:commit-capacity` | Passato; ripercorso anche da npm test finale |
+| `npm run test:bootstrap-checkpoint` | Passato; protocollo e HTTP/Chromium |
+| `npm run test:repository` | Passato |
+| `npm run test:release` | Passato su Demo |
+| Confronto retention-only 1k con base 857487c | Passato, exit 0 |
+| `npm run test:habit-log-continuous` | Passato, exit 0; 1.401 fault/replay, matrice, contesa, HTTP/Chromium e checkpoint/feed |
+
+Dopo l’ultimo allineamento del conteggio dello stato ai byte UTF-8 sono stati
+ripetuti build e `test:physical-retention`, compreso il caso Unicode al limite.
+La suite generale era già passata; la parte retention del run continuativo
+finale usa il sorgente rigenerato con questa correzione.
+
+Il run continuativo finale ha creato 1.000 identità/2.000 commit, superato
+1.401 fault/replay, compattato 3.648 riferimenti logici e conservato 12.018
+righe fisiche. Matrici 127/128/129/256/1.000, contesa, HTTP/Chromium e riapertura
+IndexedDB superati: 1.012 log, 20 snapshot, 401 pagine feed, 2.002 commit statici
+o 2.004 con scrittura concorrente. A S=2.023 il consumer ricostruisce lo stesso
+cursore finale 2.030 dall’origine o da checkpoint più sette delta.
+
+Il confronto retention integrato è un’esecuzione distinta da quella della
+tabella: stessi 591/620 passi, 4.053 envelope e prova alias, con inventory
+17.135 letture/38.069 righe/130.933 celle/85.936.950 byte; massimo per chiamata
+30 letture/76 righe/255 celle/270.021 byte. Discovery invariata rispetto alla
+tabella. I passi della base corrispondente leggono 99.374.043 byte, contro
+99.719.567 nuovi: stessa differenza di 345.524 byte e zero ricerche. Non si
+sommano contatori di fixture o esecuzioni differenti. HTTP/Chromium verifica
+snapshot/feed/consumer; l’audit rimane una prova server locale, non una RPC
+browser né un collaudo Apps Script.
+
+UTF-8, Demo, segnaposto e lista dei sei file Apps Script preservati;
+`git diff --check` superato. Index rigenerato invariato; nessuna modifica
+frontend funzionale o nuova attivazione.
+
+Il primo tentativo bootstrap nel sandbox è stato rifiutato su `listen`
+127.0.0.1 (`EPERM`); le suite HTTP/browser sono state eseguite con permesso
+fuori sandbox su dati sintetici. Il primo run continuativo nel sandbox aveva
+superato fault/matrici, poi era stato bloccato su `spawnSync git EPERM`; anche
+questo limite ambientale è stato risolto con l’esecuzione autorizzata fuori
+sandbox. npm non era nel PATH: è stato scaricato in
+`/tmp` con autorizzazione, senza modificare dipendenze o lockfile del progetto.
+I test non hanno richiesto credenziali Google. La prima asserzione numerica del
+confronto è stata corretta dopo aver distinto i 4.016 record originali dai 37
+aggiunti da `enrich`: l’atteso finale è contato dalla fotografia fisica prima
+dell’audit e non dal risultato del verificatore.
+
+
+Policy reale spenta, minimo disponibile zero, nessuna eliminazione o recupero
+di righe/payload/byte. La prova alias non è una finestra d’idempotenza:
+restano ricevute senza scadenza verificabile, baseline Docs, lease lettori,
+copertura legacy, compatibilità dei client e collaudo Apps Script/Google.
+Pacchetto 12 aperto, conteggio 8/12 invariato. Nessun Google, deploy, setupDrive,
+migrazione reale o commit.
+
 ## Discovery iniziale limitata e riprendibile — seguito dell’8 novembre 2026
 
 L’avvio dell’inventario non chiama più `retentionHeadStatus()` né

@@ -1,6 +1,6 @@
 # Stato dei pacchetti SPEC-004
 
-Stato consolidato all’8 novembre 2026; gli aggiornamenti successivi alla tabella
+Stato consolidato al 9 novembre 2026; gli aggiornamenti successivi alla tabella
 conservano il dettaglio delle tranche e delle prove.
 Il riferimento di ambito resta la [SPEC-004, sezione 15](specs/004-usabilita-locale-e-sincronizzazione.md#15-pacchetti-di-implementazione).
 Questa tabella non riduce il piano ai soli incrementi già implementati e non
@@ -25,7 +25,7 @@ più sottoattività, con dimensioni molto diverse.
 | 9 | Bootstrap coerente e riconciliazione Docs | Pagine keyset con checkpoint/feed per Entries, Projects, Days, Weeks, HabitLogs, Goals, Habits, Files, settings (privacy/reflection) e layouts; consumer client per snapshot/feed, idratazione contenuti canonici, scansione Docs legacy a richiesta e checkpoint scoped dietro capability spente; replay del feed dall'origine ricostruisce Files/Layout canonici senza enumerare tutte le Entries per pagina; scheduler avviato su opt-in UI dopo bootstrap; import corpo/titolo, rebase e `getContentsBatch`; [consumer](VERIFICA-CONSUMER-SNAPSHOT-FEED.md), [scheduler](VERIFICA-SCHEDULER-SYNC.md), [pagine snapshot](VERIFICA-PAGINE-SNAPSHOT.md), [import](VERIFICA-RICONCILIAZIONE-DOCS-ENTRIES.md), [rebase](VERIFICA-REBASE-DOCS-ENTRIES.md), [contenuti](VERIFICA-CONTENUTI-BATCH-ENTRIES.md), [checkpoint/feed](VERIFICA-FEED-COMMIT-API.md) | Capability Demo spenta e avvio sync UI non collaudato contro staging; bootstrap applicativo da checkpoint verificato per diario/Task, Settimana/Abitudini; restano altre viste, percorsi legacy Files/Layouts, retention effettiva e collaudo iframe |
 | 10 | Indice e ricerca locale | IndexedDB v9 senza posting duplicati, con indice allegati per voce e refresh mirato; UI usa n-gramma worker senza scansione persistita per query; bozze migrate dopo conferma, CAS e conflitti tra schede protetti; test equivalenza 2.500, worker/fallback 201; heap Node 48,67 MB/10k e 180,99 MB/50k; Chromium 10k 4,73 MB/740–745 ms e 50k 16,84–17,63 MB/3,80–3,87 s, scan ~1,05 s; [verifica](VERIFICA-INDICE-RICERCA-LOCALE.md) | Capability server spenta e CSP staging non collaudata; stress su testi/bozze rappresentativi e archivio completo |
 | 11 | Outbox e conflitti | Fondazione atomica draft+outbox; IndexedDB v11 con indici per stato e per voce/stato; lease owner/token cross-tab, claim FIFO con dipendenze ACK e tentativi; full jitter 1–300 s e classificazione; coalescenza limitata a una mutazione compatibile non inviata con ID preservato; writer upsert/delete idempotenti per operationId; UI note/task salva prima in IndexedDB e Elimina accoda il delete dopo commit locale; dispatcher trasporta upsert/delete con gate `operations:true`; ACK aggiorna baseline draft e dipendenze nella stessa transazione; operazioni pending ripristinate alla riapertura; confronto e scelte di recupero per conflitti note/task, anche per voce assente e cancellazione; test controller, repository/outbox/UI, identity, Entries browser e release passati; Days/Weeks/HabitLogs con snapshot completi atomici, ricevute scoped, ACK/retry/conflitti, UI e checklist storiche/cataloghi verificati; [verifica generale](VERIFICA-OUTBOX-LOCALE.md), [Days](VERIFICA-OUTBOX-GIORNATE.md), [Weeks](VERIFICA-OUTBOX-SETTIMANE.md), [HabitLogs](VERIFICA-OUTBOX-REGISTRAZIONI.md) | Capability operations ancora falsa nel manifest; trasporto collaudato solo contro backend sintetico, nessun collaudo Google; directory HabitLogs v2 a 16 shard (massimo teorico 2.176, con bucket saturabili) e lettura compatibile v1; policy di manutenzione opt-in verificata con 1.000 identità/2.000 commit e snapshot/feed HTTP/Chromium; il limite 512 resta nello scenario senza compattazione, mentre nessuna riga fisica è eliminata; restano retention fisica e compatibilità dei client distribuiti; gestione completa degli errori e delle dipendenze più complesse, copertura delle altre mutazioni e verifiche con server attivo |
-| 12 | Retention, compattazione e stress | Preflight e piani scoped; discovery iniziale riprendibile senza TextFinder, con budget per chiamata e validazione scoped di head/puntatore/manifest; inventario fisico `sync-retention-inventory/v1` a cursore persistente, max 25 righe/20 record/512 KiB/4.096 unità per pagina, stato max 196.608 byte e digest pagina/cumulativo; classifica pubblicato/non pubblicato/ritirato/sconosciuto e verifica commit, fingerprint ricevuta, alias, versioni, tombstone e catena commit-ricevuta; test piccoli coprono missing/duplicate/unpublished/unknown, ACK perso/replay e riavvio; policy spenta, minimo zero e nessun ritiro fisico. [Capacità](VERIFICA-CAPACITA-COMMIT.md), [audit retention](VERIFICA-RETENTION-FISICA.md) | Finestra d’idempotenza, prova alias bloccata da `unversionedPayloadRecord` nella fixture 1k, inventario e conservazione dipendenze Docs, lease lettori, copertura legacy, client distribuiti, ritiro/minimo cursore e collaudo Apps Script/Google; nessuna retention fisica dimostrata |
+| 12 | Retention, compattazione e stress | Preflight e piani scoped; discovery iniziale riprendibile senza TextFinder, con budget per chiamata e validazione scoped di head/puntatore/manifest; inventario fisico `sync-retention-inventory/v1` a cursore persistente, max 25 righe/20 record/512 KiB/4.096 unità per pagina, stato max 196.608 byte e digest pagina/cumulativo; classifica pubblicato/non pubblicato/ritirato/sconosciuto e verifica envelope canonici senza `format`, corrispondenza dei payload con il commit, fingerprint ricevuta, alias, versioni, tombstone e catena commit-ricevuta; test piccoli coprono missing/duplicate/unpublished/unknown, ACK perso/replay e riavvio; prova alias sulla fixture 1k con tutti i 4.053 envelope pubblicati confrontati con i commit; policy spenta, minimo zero e nessun ritiro fisico. [Capacità](VERIFICA-CAPACITA-COMMIT.md), [audit retention](VERIFICA-RETENTION-FISICA.md) | Finestra d’idempotenza, inventario e conservazione dipendenze Docs, lease lettori, copertura legacy, client distribuiti, ritiro/minimo cursore e collaudo Apps Script/Google; nessuna retention fisica dimostrata |
 
 Il pacchetto 4 ha completato la tranche locale del worker coordinato; resta
 aperto per la convalida del fence contro Docs reale. I pacchetti 7, 8, 9, 10,
@@ -199,3 +199,33 @@ Build, retention/discovery, bootstrap checkpoint, suite continuativa completa,
 capacità commit, repository, release e `npm test` superati sulla tranche;
 P59 e diff verificati. Il confronto retention prima/dopo è separato dalle
 prove HTTP/Chromium del consumer e non dimostra costi Google.
+
+
+## Envelope canonici retention senza `format` — 9 novembre 2026
+
+L’inventario riconosce e verifica gli envelope a sette campi del writer,
+compresi tombstone e tutte le 15 collection. La classificazione non migra o
+riscrive record: verifica scope, chiave/alias e corrispondenza del payload
+completo con il commit, con massimo 25 impronte persistite e budget invariati.
+Envelope discordanti e vecchi audit parziali senza copertura mantengono blocker
+specifici; il legacy ambiguo conserva `unversionedPayloadRecord`.
+
+Sulla stessa fixture 1k e checkpoint S=2.023 contro `857487c`, verificati tutti
+i 4.053 envelope pubblicati (4.016 originali più 37 dell’arricchimento
+applicativo): il blocker `unversionedPayloadRecord` scompare e la prova alias
+è presente. Zero alias/ricevute mancanti; stessi 591/620 passi e 23.446 letture,
+nessuna ricerca. Byte dei passi +0,35% per lo stato aggiuntivo. Misure solo mock.
+
+Build, npm test, retention, capacità, bootstrap checkpoint, repository,
+release e suite continuativa completa superati. Nel run finale 1.401
+fault/replay, matrici, contesa, HTTP/Chromium e checkpoint/feed a cursore 2.030
+sono passati; prova alias confermata dopo il conteggio UTF-8 del budget dello
+stato, con build/retention ripetuti e caso negativo Unicode. Gli impedimenti
+ambientali del sandbox sono stati risolti con esecuzioni locali autorizzate,
+senza Google.
+
+Non chiude il pacchetto 12: restano finestra ricevute/idempotenza, baseline
+Docs, lease lettori, copertura legacy, compatibilità dei client distribuiti,
+ritiro/minimo cursore e collaudo reale. Policy spenta, minimo zero, nessuna
+eliminazione o attivazione reale. Conteggio 8/12 invariato. Contratto, prove e
+misure: [retention fisica](VERIFICA-RETENTION-FISICA.md).

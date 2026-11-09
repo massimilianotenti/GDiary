@@ -1,5 +1,60 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Envelope canonici retention senza `format` — 9 novembre 2026
+
+Seguito locale di `857487c`: l’inventario riconosce l’envelope esatto a sette
+campi già prodotto da `afterImages`, verifica scope archive/epoch, collection,
+ID, sequenza/versione, dati/tombstone e chiave/alias del riferimento. Nessuna
+riscrittura o migrazione. Forme incomplete, ambigue, fuori scope o corrotte
+restano errori/blocker; il legacy sconosciuto conserva
+`unversionedPayloadRecord`.
+
+La prova richiede anche corrispondenza con il payload completo nel commit:
+`entityCoverage` persiste massimo 25 impronte e il conteggio verificato;
+ordine non dimostrabile, duplicati e payload discordanti/orfani producono
+`entityCommitMismatch`. Commit e ricevute verificano checksum; il confronto
+usa le 15 collection del writer. Riferimenti ritirati in situ non vengono
+confusi con envelope pubblicati mancanti. Nessun lookup crescente aggiunto;
+budget invariati. Gli audit precedenti rimangono leggibili/riprendibili ma
+non acquisiscono retroattivamente la prova: se già parzialmente scanditi
+senza copertura conservano `entityCoverageUnverified`.
+
+Confronto sulla stessa fixture/checkpoint S=2.023 contro `857487c`: 4.016
+envelope nella fixture continuativa originale e 37 aggiunti dall’arricchimento
+applicativo, tutti i 4.053 pubblicati verificati. `unversionedPayloadRecord`
+assente e prova `operationAliases` presente, zero alias/ricevute mancanti;
+591 passi discovery e 620 inventory. Letture dei passi invariate a 23.446,
+zero ricerche, byte 99.371.319→99.716.843 (+0,35%) per lo stato aggiuntivo.
+Massimi per chiamata 30 letture/77 righe/258 celle/270.389 byte; begin 8
+letture/5.389 byte. Costi solo mock, nessuna latenza Google inferita.
+
+Build, `npm test`, retention, capacità, bootstrap checkpoint, repository e
+release superati. Suite continuativa completa conclusa con exit 0: 1.401
+fault/replay, matrici 127/128/129/256/1k, contesa, HTTP/Chromium, 1.012 log e
+2.002/2.004 commit; checkpoint a S=2.023 più sette delta e replay dall’origine
+raggiungono entrambi 2.030. Nel run integrato la prova alias è confermata;
+le misure specifiche, distinte dal confronto sopra, sono nel rapporto.
+Dopo l’allineamento del limite dello stato ai byte UTF-8 (nuovi ID Unicode
+nelle impronte pending), ripetuti build e retention, con prova negativa di
+stato sopra il limite byte ma sotto il limite in caratteri; il run continuativo
+finale verifica anche la retention rigenerata con questa correzione.
+
+Ambiente: Node 24.22.1, npm temporaneo in /tmp e Chrome locale; gli impedimenti
+del sandbox a server HTTP, browser e sottoprocesso Git sono stati risolti con
+esecuzioni autorizzate fuori sandbox. Nessuna credenziale Google necessaria.
+Sei file, bootstrap UTF-8 e segnaposto preservati; Index rigenerato invariato,
+Demo con backend aggiornato e diff verificato.
+
+Prossimo incremento proposto: contratto server verificabile della finestra
+d’idempotenza per ricevute/operationId e riconciliazione dei retry oltre tale
+finestra. Non attivare ritiro o minimo cursore prima degli altri gate.
+
+Restano finestra d’idempotenza, baseline Docs, lease lettori, copertura legacy,
+compatibilità client e collaudo Google. Pacchetto 12 aperto, conteggio 8/12
+invariato, capability spente e minimo zero. Nessuna eliminazione, Google,
+deploy, setupDrive, migrazione reale o commit. Dettagli:
+[retention fisica](VERIFICA-RETENTION-FISICA.md).
+
 ## Discovery retention limitata e riprendibile — 8 novembre 2026
 
 Seguito locale di `158e8af`: `beginPhysicalRetentionAudit_` non invoca più
