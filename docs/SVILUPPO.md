@@ -19,6 +19,7 @@ Comandi:
 - `npm run build`: crea Index.html, aggiorna Demo.html e prepara .build/apps-script.
 - `npm test`: backend simulato, validazioni, conflitti, cache, ricerca e pipeline.
 - `npx playwright install chromium`: installa il browser locale per i test.
+- `npm run test:operation-window`: contratto server opt-in di ammissione/scadenza con clock controllato, costi mock e HTTP/Chromium/IndexedDB con riavvio, riconciliazione durevole e nessun reinvio dopo scadenza; nessuna attivazione reale.
 - `npm run test:release`: regressioni recenti delle release precedenti alla 2.0.4.
 - `npm run test:incremental`: risposte di salvataggio limitate e merge browser senza riletture complete.
 - `npm run test:cycle`: design del ciclo, form, bozze/conflitti, riflessione rich, tracker e geometrie nelle quattro palette.

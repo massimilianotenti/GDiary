@@ -1,3 +1,4 @@
+import {validOperationAdmission} from './operation-window.mjs';
 import {periodOperation} from './period-operation.mjs';
 import {canonicalDayJSON} from './day-operation.mjs';
 const validId=value=>typeof value==='string'&&/^[a-zA-Z0-9-]{10,80}$/.test(value);
@@ -30,13 +31,14 @@ export function createOutboxDispatcher(options={}){
  }
  function classify(error){
   const name=errorName(error),message=String(error?.message||error).toLowerCase();
+  if(name==='ReconciliationRequired')return 'failed';
   if(['ConflictError','ScopeChanged','OperationMismatch'].includes(name)||/modificat[oaie]\s+altrove|conflitto|versione.*diversa|(?:nota|voce) .{0,12}cambiat|voce non trovata/.test(message))return 'conflict';
   if(transientCodes.has(name)||/timeout|temporane|riprova tra poco|network|offline|service unavailable/.test(message))return 'retry';
   return 'failed';
  }
  async function lookupReceipt(operation,request){
-  requireScope();const proof=await call(periodOperation(operation.kind)?periodOperation(operation.kind).receiptMethod:operation.action==='delete'?'getJournalDeleteReceipt':'getJournalOperationReceipt',{scope:{...expectedScope},request:periodOperation(operation.kind)?request.payload.operation:request.payload});requireScope();
-  if(!proof||!proof.scope||['archiveId','principalId','epoch','protocolVersion','schemaVersion'].some(key=>proof.scope[key]!==expectedScope[key])||proof.operationId!==operation.operationId||!['committed','conflict','unknown'].includes(proof.status))throw Object.assign(Error('ProtocolCorrupt'),{name:'ProtocolCorrupt'});
+  requireScope();const proof=await call(periodOperation(operation.kind)?periodOperation(operation.kind).receiptMethod:operation.action==='delete'?'getJournalDeleteReceipt':'getJournalOperationReceipt',{scope:{...expectedScope},request:periodOperation(operation.kind)?request.payload.operation:request.payload,...(operation.operationWindow?{operationWindow:operation.operationWindow}:{})});requireScope();
+  if(!proof||!proof.scope||['archiveId','principalId','epoch','protocolVersion','schemaVersion'].some(key=>proof.scope[key]!==expectedScope[key])||proof.operationId!==operation.operationId||!['committed','conflict','unknown','reconciliationRequired'].includes(proof.status))throw Object.assign(Error('ProtocolCorrupt'),{name:'ProtocolCorrupt'});
   if(proof.status==='committed'&&(proof.id!==operation.id||!/^commit-[1-9][0-9]{0,15}$/.test(proof.version||'')||!Number.isSafeInteger(Number(proof.version.slice(7)))))throw Object.assign(Error('ProtocolCorrupt'),{name:'ProtocolCorrupt'});
   return proof;
  }
@@ -56,13 +58,26 @@ export function createOutboxDispatcher(options={}){
     let request=null,sent=false;
     try{
      request=requestFor(operation);
+     const windowEnabled=options.operationWindow?.enabled?.()===true;
+     if(operation.operationWindow&&!windowEnabled)throw Object.assign(Error('Riconciliazione necessaria'),{name:'ReconciliationRequired'});
+     if(windowEnabled){
+      if(!operation.operationWindow){
+       if(operation.attempts!==1||typeof options.operationWindow.admit!=='function')throw Object.assign(Error('Riconciliazione necessaria'),{name:'ReconciliationRequired'});
+       const admission=await options.operationWindow.admit(operation,request);requireScope();
+       if(admission?.status==='reconciliationRequired')throw Object.assign(Error('Riconciliazione necessaria'),{name:'ReconciliationRequired'});
+       if(!validOperationAdmission(admission,expectedScope,operation.operationId))throw Object.assign(Error('Invalid admission'),{name:'ProtocolCorrupt'});
+       const saved=await invoke('attachOutboxWindow',{owner,token,operationId:operation.operationId,admission,now:now()});operation.operationWindow=saved.admission;
+      }
+      if(!validOperationAdmission(operation.operationWindow,expectedScope,operation.operationId))throw Object.assign(Error('Invalid admission'),{name:'ProtocolCorrupt'});
+     }
      if(operation.attempts>1){
-      let proof;try{proof=await lookupReceipt(operation,request);}catch(error){if(['ScopeChanged','ScopeChangedError','OperationMismatch','ProtocolCorrupt'].includes(errorName(error)))throw error;throw Object.assign(Error('ProtocolUnavailable'),{name:'ProtocolUnavailable'});}
+      let proof;try{proof=await lookupReceipt(operation,request);}catch(error){if(['ScopeChanged','ScopeChangedError','OperationMismatch','ProtocolCorrupt','ReconciliationRequired'].includes(errorName(error)))throw error;throw Object.assign(Error('ProtocolUnavailable'),{name:'ProtocolUnavailable'});}
+      if(proof.status==='reconciliationRequired')throw Object.assign(Error('Riconciliazione necessaria'),{name:'ReconciliationRequired'});
       if(proof.status==='committed'){await invoke('settleOutboxOperation',{owner,token,operationId:operation.operationId,outcome:'ack',now:now(),serverVersion:proof.version});processed++;try{if(operation.action==='delete')await options.onAck?.(operation,{id:operation.id,updatedAt:proof.version});else await options.onReconciled?.(operation,{id:operation.id,updatedAt:proof.version});}catch{}continue;}
       if(proof.status==='conflict'){await invoke('settleOutboxOperation',{owner,token,operationId:operation.operationId,outcome:'conflict',errorCode:'ConflictError',now:now()});try{await options.onFailure?.(operation,'conflict');}catch{}continue;}
       lease=await invoke('renewOutboxLease',{owner,token,now:now(),leaseMs});
      }
-     sent=true;const response=await call(request.method,request.payload),matches=operation.action==='delete'?null:Array.isArray(response?.entries)?response.entries.filter(item=>item?.clientId===request.clientId):[],entry=periodOperation(operation.kind)?response?.[operation.kind]?{...response[operation.kind],id:response[operation.kind][periodOperation(operation.kind).key]}:null:operation.action==='delete'?response?.deletedNoteId===operation.id?{id:operation.id,updatedAt:response.updatedAt||''}:null:matches.length===1?matches[0]:null;
+     sent=true;const response=await call(request.method,operation.operationWindow?{...request.payload,operationWindow:operation.operationWindow}:request.payload);if(response?.status==='reconciliationRequired')throw Object.assign(Error('Riconciliazione necessaria'),{name:'ReconciliationRequired'});const matches=operation.action==='delete'?null:Array.isArray(response?.entries)?response.entries.filter(item=>item?.clientId===request.clientId):[],entry=periodOperation(operation.kind)?response?.[operation.kind]?{...response[operation.kind],id:response[operation.kind][periodOperation(operation.kind).key]}:null:operation.action==='delete'?response?.deletedNoteId===operation.id?{id:operation.id,updatedAt:response.updatedAt||''}:null:matches.length===1?matches[0]:null;
      requireScope();if(operation.action==='delete'&&response?.alreadyAbsent===true)throw Object.assign(Error('ConflictError'),{name:'ConflictError'});if(!entry||entry.id!==operation.id||typeof entry.updatedAt!=='string'||!entry.updatedAt.trim()||entry.updatedAt.length>200)throw Object.assign(Error('ProtocolCorrupt'),{name:'ProtocolCorrupt'});
      if(periodOperation(operation.kind)){
       const spec=periodOperation(operation.kind),{updatedAt,...snapshot}=response[operation.kind];
@@ -72,17 +87,18 @@ export function createOutboxDispatcher(options={}){
      try{await options.onAck?.(operation,entry);}catch{}
     }catch(error){
      requireScope();if(['ScopeChanged','ScopeChangedError'].includes(errorName(error)))throw error;let outcome=classify(error);
-     if(sent&&['upsert','delete'].includes(operation.action)){
+     if(sent&&errorName(error)!=='ReconciliationRequired'&&['upsert','delete'].includes(operation.action)){
       // Query the original request, without interpreting an absent receipt as
       // evidence that the server did not commit it.
       lease=await invoke('renewOutboxLease',{owner,token,now:now(),leaseMs});let proof=null;
-      try{proof=await lookupReceipt(operation,request);}catch(lookupError){requireScope();if(['ScopeChanged','ScopeChangedError'].includes(errorName(lookupError)))throw lookupError;if(errorName(lookupError)==='ProtocolCorrupt')outcome='failed';else if(errorName(lookupError)==='OperationMismatch')outcome='conflict';}
+      try{proof=await lookupReceipt(operation,request);}catch(lookupError){requireScope();if(['ScopeChanged','ScopeChangedError'].includes(errorName(lookupError)))throw lookupError;if(errorName(lookupError)==='ProtocolCorrupt')outcome='failed';else if(errorName(lookupError)==='OperationMismatch')outcome='conflict';else if(errorName(lookupError)==='ReconciliationRequired'){outcome='failed';error=lookupError;}}
       if(proof?.status==='committed'){await invoke('settleOutboxOperation',{owner,token,operationId:operation.operationId,outcome:'ack',now:now(),serverVersion:proof.version});processed++;try{if(operation.action==='delete')await options.onAck?.(operation,{id:operation.id,updatedAt:proof.version});else await options.onReconciled?.(operation,{id:operation.id,updatedAt:proof.version});}catch{}continue;}
+      if(proof?.status==='reconciliationRequired'){outcome='failed';error=Object.assign(Error('Riconciliazione necessaria'),{name:'ReconciliationRequired'});}
       if(proof?.status==='conflict')outcome='conflict';
      }
      if(outcome==='retry')await invoke('retryOutboxFailure',{owner,token,operationId:operation.operationId,now:now(),errorCode:transientCodes.has(errorName(error))?errorName(error):'NetworkError'});
      else await invoke('settleOutboxOperation',{owner,token,operationId:operation.operationId,outcome,errorCode:errorName(error)||'ProtocolCorrupt',now:now()});
-     if(outcome!=='retry')try{await options.onFailure?.(operation,outcome);}catch{}
+     if(outcome!=='retry')try{await options.onFailure?.(operation,outcome,errorName(error));}catch{}
     }
    }
    return {ok:true,value:{processed,claimed:batch.operations.length,leaseExpiresAt:lease.expiresAt}};

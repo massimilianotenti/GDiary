@@ -25,7 +25,7 @@ più sottoattività, con dimensioni molto diverse.
 | 9 | Bootstrap coerente e riconciliazione Docs | Pagine keyset con checkpoint/feed per Entries, Projects, Days, Weeks, HabitLogs, Goals, Habits, Files, settings (privacy/reflection) e layouts; consumer client per snapshot/feed, idratazione contenuti canonici, scansione Docs legacy a richiesta e checkpoint scoped dietro capability spente; replay del feed dall'origine ricostruisce Files/Layout canonici senza enumerare tutte le Entries per pagina; scheduler avviato su opt-in UI dopo bootstrap; import corpo/titolo, rebase e `getContentsBatch`; [consumer](VERIFICA-CONSUMER-SNAPSHOT-FEED.md), [scheduler](VERIFICA-SCHEDULER-SYNC.md), [pagine snapshot](VERIFICA-PAGINE-SNAPSHOT.md), [import](VERIFICA-RICONCILIAZIONE-DOCS-ENTRIES.md), [rebase](VERIFICA-REBASE-DOCS-ENTRIES.md), [contenuti](VERIFICA-CONTENUTI-BATCH-ENTRIES.md), [checkpoint/feed](VERIFICA-FEED-COMMIT-API.md) | Capability Demo spenta e avvio sync UI non collaudato contro staging; bootstrap applicativo da checkpoint verificato per diario/Task, Settimana/Abitudini; restano altre viste, percorsi legacy Files/Layouts, retention effettiva e collaudo iframe |
 | 10 | Indice e ricerca locale | IndexedDB v9 senza posting duplicati, con indice allegati per voce e refresh mirato; UI usa n-gramma worker senza scansione persistita per query; bozze migrate dopo conferma, CAS e conflitti tra schede protetti; test equivalenza 2.500, worker/fallback 201; heap Node 48,67 MB/10k e 180,99 MB/50k; Chromium 10k 4,73 MB/740–745 ms e 50k 16,84–17,63 MB/3,80–3,87 s, scan ~1,05 s; [verifica](VERIFICA-INDICE-RICERCA-LOCALE.md) | Capability server spenta e CSP staging non collaudata; stress su testi/bozze rappresentativi e archivio completo |
 | 11 | Outbox e conflitti | Fondazione atomica draft+outbox; IndexedDB v11 con indici per stato e per voce/stato; lease owner/token cross-tab, claim FIFO con dipendenze ACK e tentativi; full jitter 1–300 s e classificazione; coalescenza limitata a una mutazione compatibile non inviata con ID preservato; writer upsert/delete idempotenti per operationId; UI note/task salva prima in IndexedDB e Elimina accoda il delete dopo commit locale; dispatcher trasporta upsert/delete con gate `operations:true`; ACK aggiorna baseline draft e dipendenze nella stessa transazione; operazioni pending ripristinate alla riapertura; confronto e scelte di recupero per conflitti note/task, anche per voce assente e cancellazione; test controller, repository/outbox/UI, identity, Entries browser e release passati; Days/Weeks/HabitLogs con snapshot completi atomici, ricevute scoped, ACK/retry/conflitti, UI e checklist storiche/cataloghi verificati; [verifica generale](VERIFICA-OUTBOX-LOCALE.md), [Days](VERIFICA-OUTBOX-GIORNATE.md), [Weeks](VERIFICA-OUTBOX-SETTIMANE.md), [HabitLogs](VERIFICA-OUTBOX-REGISTRAZIONI.md) | Capability operations ancora falsa nel manifest; trasporto collaudato solo contro backend sintetico, nessun collaudo Google; directory HabitLogs v2 a 16 shard (massimo teorico 2.176, con bucket saturabili) e lettura compatibile v1; policy di manutenzione opt-in verificata con 1.000 identità/2.000 commit e snapshot/feed HTTP/Chromium; il limite 512 resta nello scenario senza compattazione, mentre nessuna riga fisica è eliminata; restano retention fisica e compatibilità dei client distribuiti; gestione completa degli errori e delle dipendenze più complesse, copertura delle altre mutazioni e verifiche con server attivo |
-| 12 | Retention, compattazione e stress | Preflight e piani scoped; discovery iniziale riprendibile senza TextFinder, con budget per chiamata e validazione scoped di head/puntatore/manifest; inventario fisico `sync-retention-inventory/v1` a cursore persistente, max 25 righe/20 record/512 KiB/4.096 unità per pagina, stato max 196.608 byte e digest pagina/cumulativo; classifica pubblicato/non pubblicato/ritirato/sconosciuto e verifica envelope canonici senza `format`, corrispondenza dei payload con il commit, fingerprint ricevuta, alias, versioni, tombstone e catena commit-ricevuta; test piccoli coprono missing/duplicate/unpublished/unknown, ACK perso/replay e riavvio; prova alias sulla fixture 1k con tutti i 4.053 envelope pubblicati confrontati con i commit; policy spenta, minimo zero e nessun ritiro fisico. [Capacità](VERIFICA-CAPACITA-COMMIT.md), [audit retention](VERIFICA-RETENTION-FISICA.md) | Finestra d’idempotenza, inventario e conservazione dipendenze Docs, lease lettori, copertura legacy, client distribuiti, ritiro/minimo cursore e collaudo Apps Script/Google; nessuna retention fisica dimostrata |
+| 12 | Retention, compattazione e stress | Preflight e piani scoped; discovery iniziale riprendibile senza TextFinder, con budget per chiamata e validazione scoped di head/puntatore/manifest; inventario fisico `sync-retention-inventory/v1` a cursore persistente, max 25 righe/20 record/512 KiB/4.096 unità per pagina, stato max 196.608 byte e digest pagina/cumulativo; classifica pubblicato/non pubblicato/ritirato/sconosciuto e verifica envelope canonici senza `format`, corrispondenza dei payload con il commit, fingerprint ricevuta, alias, versioni, tombstone e catena commit-ricevuta; test piccoli coprono missing/duplicate/unpublished/unknown, ACK perso/replay e riavvio; prova alias sulla fixture 1k con tutti i 4.053 envelope pubblicati confrontati con i commit; contratto locale di ammissione temporale immutabile/clock durevole e outbox con riconciliazione necessaria, senza prova receiptWindow; policy spenta, minimo zero e nessun ritiro fisico. [Capacità](VERIFICA-CAPACITA-COMMIT.md), [audit retention](VERIFICA-RETENTION-FISICA.md) | Prova globale della finestra d’idempotenza (contratto opt-in locale implementato, legacy/routing/ammissioni ancora non dimostrati), inventario e conservazione dipendenze Docs, lease lettori, copertura legacy, client distribuiti, ritiro/minimo cursore e collaudo Apps Script/Google; nessuna retention fisica dimostrata |
 
 Il pacchetto 4 ha completato la tranche locale del worker coordinato; resta
 aperto per la convalida del fence contro Docs reale. I pacchetti 7, 8, 9, 10,
@@ -229,3 +229,34 @@ Docs, lease lettori, copertura legacy, compatibilità dei client distribuiti,
 ritiro/minimo cursore e collaudo reale. Policy spenta, minimo zero, nessuna
 eliminazione o attivazione reale. Conteggio 8/12 invariato. Contratto, prove e
 misure: [retention fisica](VERIFICA-RETENTION-FISICA.md).
+
+
+## Contratto finestra d’idempotenza — 9 novembre 2026
+
+Dalla base `c939073`, contratto server privato opt-in con anchor/clock/
+ammissioni scoped e immutabili per operationId/fingerprint. Intervallo server
+chiuso a sinistra/aperto a destra, nessun rinnovo: oltre il termine o su clock
+regredito/metadati mancanti il retry richiede riconciliazione. Dentro il termine
+ACK/fallback al commit e recupero pending usano il protocollo esistente.
+Outbox conserva ammissione prima dell’RPC, ID, payload, rich e bozze; stato
+ReconciliationRequired durevole, niente retry automatico/manuale ordinario o
+downgrade. Capability reali spente, nessuna RPC nuova attivata.
+
+Il prototipo non certifica tutti i gateway, i client già distribuiti, il clock
+Google o la conservazione/scala del registro ammissioni. `verifyReceiptWindow`
+rimane null con blocker specifici: non viene dedotta una prova positiva da
+24 ore di timeout o dai test. Legacy e policy di ritiro restano invariati;
+nessun record viene riscritto per aggiungergli una data di ammissione.
+
+Build, npm test, retention, capacità, bootstrap checkpoint, repository,
+release e suite continuativa superati. Nuove prove server con 36 fault di
+pubblicazione, HTTP/Chromium/IndexedDB con riavvio e costi sulla stessa fixture
+superate. L’ultima guardia per admission assente/undefined/null è verificata
+con build, retention e comando mirato ripetuti. La regressione 1k (nuova
+capability spenta) conserva 4.053 envelope/prova alias e arriva a cursore 2.030;
+non dimostra scala o copertura globale del contratto attivo.
+
+Non chiude pacchetto 12: restano prova globale della finestra, routing e
+provisioning, ammissioni/legacy/client, Docs baseline, lease lettori, ritiro e
+collaudo Google. Minimo zero e conteggio 8/12 aperti invariati. Contratto,
+misure e limiti nel [rapporto retention](VERIFICA-RETENTION-FISICA.md).

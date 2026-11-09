@@ -30,7 +30,8 @@ pubblicazione del minimo cursore o autorizzazione a eliminare dati.
 ## Limiti e gate
 
 Questa implementazione non completa la retention fisica. Il repository non
-fornisce ancora una scadenza verificabile delle ricevute e degli alias; i
+fornisce ancora una prova globale verificata della scadenza di ricevute e alias
+(il contratto opt-in locale è descritto sotto); i
 commit sono una prova alternativa usata dai retry quando la ricevuta manca.
 Non esiste inoltre un inventario completo delle baseline Docs né lease dei
 lettori per generazione. Perciò non si può approvare un piano sicuro con le
@@ -44,6 +45,231 @@ CAS, il controller Demo con checkpoint realmente pubblicato e assenza degli
 adapter di ritiro. È una prova di protocollo e integrazione locale, non una
 prova HTTP, Chromium, Apps Script o Google. Nessun recupero di spazio fisico è
 dimostrato; pacchetto 12 resta aperto.
+
+## Finestra d’idempotenza: contratto locale — 9 novembre 2026
+
+Tranche dalla base `c939073`. Aggiunto `syncOperationWindow_`, contratto server
+interno separato dal protocollo legacy e spento da
+`syncOperationWindowEnabled_()`. Non esiste una nuova RPC Apps Script abilitata,
+né provisioning reale. Le chiamate di prova usano esplicitamente servizi server
+sintetici; l’app non abilita automaticamente il nuovo trasporto.
+
+### Contratto e autorità
+
+La finestra ammette un **inizio di tentativo** in `[issuedAt, expiresAt)`:
+sul confine `now === expiresAt` è già scaduta. Una scrittura accettata entro
+la finestra può completare dopo il confine; il suo pending rimane protetto.
+La durata è policy server immutabile per lo scope, da 1 ms a 30 giorni; il
+default del prototipo è 24 ore, non una durata di produzione approvata.
+Il client non invia un tempo autorevole e non decide localmente la scadenza.
+
+Tre metadati versionati, fuori dal feed applicativo:
+
+| Record | Persistenza / contenuto |
+|---|---|
+| `sync-operation-window-anchor/v1` | Checkpoint immutabile: archive, scope archive/principal/epoch, policyId, windowMs, startedAt e checksum |
+| `sync-operation-window-clock/v1` | Checkpoint mutabile append-only: stesso scope/policy e observedAt, massimo tempo server osservato durevolmente |
+| `sync-operation-window-admission/v1` | Checkpoint immutabile per operationId: stesso scope/policy, fingerprint canonico, issuedAt/expiresAt, nonce server e checksum |
+
+Chiavi private `[principalId, operation-window:epoch:anchor|clock|admission:ID]`.
+`initialize` richiede autorizzazione server esplicita, capability e head
+canonico zero senza pending. Non certifica l’assenza di dati legacy e non
+attiva un archivio esistente. Un’inizializzazione parziale non viene riparata
+ricreando silenziosamente l’orologio: resta da riconciliare. Anchor, clock e
+ammissioni non sono eliminabili in questa tranche.
+
+`admit` normalizza e valida la richiesta con lo stesso protocollo dei commit.
+Il fingerprint riguarda operationId e cambiamenti canonici; la ricevuta o il
+commit preesistente impediscono di adottare un’operazione legacy nella nuova
+finestra. Con ammissione già presente, stesso ID/payload restituisce lo stesso
+record soltanto entro il termine; payload diverso produce OperationMismatch.
+Né retry né aggiornamento della configurazione rinnovano il termine.
+
+`execute` e `lookup` richiedono ammissione esatta, integra, presente nel
+registro immutabile e coerente con il payload e lo scope. Il checksum è un
+sigillo d’integrità, **non una firma autosufficiente**: ricalcolare un checksum
+sul client non autorizza una variante del record server. Non basta che la
+ricevuta sia assente per ammettere un nuovo tentativo.
+
+L’orologio autorevole è `services.now` server (default Date.now), mai un campo
+della richiesta. Prima di eseguire si controlla il watermark persistente sotto
+lo stesso lock; avanzamenti vengono salvati prima delle scritture applicative.
+Una regressione rispetto al watermark blocca con `clockRegression`. Un salto
+in avanti non rinnova la finestra e non si annulla tornando indietro. La prova
+locale non certifica una sorgente UTC affidabile in Google né rileva regressioni
+mai osservate/persistite: queste assunzioni non diventano una prova retention.
+Il lookup del nuovo contratto può aggiornare il clock; il lookup legacy delle
+ricevute conserva il comportamento read-only.
+
+### Retry, pending e compatibilità
+
+| Caso | Comportamento |
+|---|---|
+| Ammissione valida e tempo entro la finestra | Protocollo recuperabile esistente: ACK stabile, fingerprint, conflitti e recupero pending |
+| Ricevuta assente, commit/alias presente entro finestra | Replay riconosciuto dal commit; stessa risposta, nessuna seconda applicazione |
+| Confine o scadenza superati | `status: reconciliationRequired`, reason windowExpired; nessun execute/recovery applicativo implicito |
+| Orologio regredito o clock/anchor assente | Riconciliazione richiesta; nessuna ricostruzione automatica del watermark |
+| Ammissione assente o diversa | Riconciliazione richiesta; nessun tentativo nuovo fondato sulla sola assenza della ricevuta |
+| Metadati corrotti / scope errato / payload differente | Errori espliciti ProtocolCorrupt / ScopeChanged / OperationMismatch |
+| Record o client legacy senza metadati | Percorso precedente conservato, nessuna migrazione implicita, copertura retention non dimostrata |
+
+La guardia protegge i tentativi del nuovo contratto. Le letture/il recupero
+server del protocollo precedente possono ancora completare lavori già accettati;
+non sono una nuova autorizzazione al replay del client. Il routing esclusivo di
+**tutti** i gateway non è implementato o certificato da questo prototipo.
+Non si possono quindi ritirare ricevute/alias legacy o ammissioni, neppure se
+una fixture del nuovo contratto è interamente scaduta. La soppressione di tutte
+le tracce di un ID non è un metodo per dimostrare che sia nuovo. Il percorso
+di prima ammissione assume il registro permanente integro: non possiede una
+prova autonoma di novità se vengono cancellati anche registro e storia. Per
+questo la permanenza delle ammissioni rimane un blocker e il verifier globale
+non viene abilitato.
+
+### Outbox e UI
+
+Il dispatcher ha un adattatore `operationWindow` opt-in, non configurato dal
+bootstrap dell’app. Alla prima trasmissione salva l’ammissione in IndexedDB con
+`attachOutboxWindow`, sotto lease e scope verificati, **prima** dell’RPC. Il
+campo opzionale non cambia schema IndexedDB v11. L’ammissione non può essere
+sostituita e una mutazione ammessa non viene accorpata a una nuova bozza.
+
+Un’operazione con tentativi precedenti ma senza ammissione non ne richiede una
+nuova automaticamente. Un ticket persistito non può essere spedito in modalità
+legacy se l’adattatore viene disabilitato. Payload e operationId restano quelli
+originari, anche dopo ACK perso, errore nel preflight ricevute o riavvio.
+
+`reconciliationRequired` e ReconciliationRequired diventano stato outbox
+`failed` con lastError **ReconciliationRequired**, distinto dagli errori
+ritentabili. Sono gestiti risposta diretta, errore RPC, preflight e lookup dopo
+ACK incerto. Nessuna nuova ricerca di ACK può trasformare una scadenza esplicita
+in conferma automatica. `retryFailedOutbox` rifiuta questo stato; dipendenze
+successive restano ferme. Bozze e formattazione sono conservate e modifiche
+successive possono restare salvate come intenti dipendenti.
+
+Le viste giornaliere, settimanali, registrazioni e voci mostrano
+«Riconciliazione necessaria» e non propongono il normale reinvio quando il flag
+è noto. Questo è un blocco esplicito, **non un flusso completo di riconciliazione
+manuale**: confronto, eventuale applicazione intenzionale e provisioning restano
+sviluppi successivi. Nessuna attivazione della feature nella UI ordinaria.
+
+### Retention e prove
+
+`verifyReceiptWindow` resta null: non vengono trasformati timeout, callback di
+abilitazione o prove sintetiche in attestazioni positive. Il piano espone anche
+`operationWindowLegacyCoverageUnverified`, `operationAdmissionRetentionUnproven`
+e `operationWindowRoutingUnverified`, oltre al normale receiptWindowUnverified.
+Baseline Docs, lease lettori e copertura legacy restano indipendenti.
+
+L’inventario fisico verifica le tre nuove forme, campi esatti, checksum, scope,
+chiave e assenza di alias impropri, senza nuove ricerche o letture mirate. Le
+forme future sconosciute con prefisso sync-operation-window vengono rifiutate.
+Restano budget, CAS, digest, replay, ripresa e invalidazione per append.
+
+- `verify-operation-window.cjs`: clock controllabile, prima/confine/dopo,
+  invarianti di ammissione/fingerprint, ACK stabili per create/edit/delete e
+  conflitti, fallback commit, record
+  legacy, perdita degli outcome, scope/corruzione, rollback dopo riavvio,
+  contesa del lock e 36 interruzioni prima/dopo scritture di pubblicazione.
+  Verifica pending lasciato intatto dal retry scaduto, più scanner fisico reale
+  per i metadati, zero ricerche e corruzioni di sigillo/chiave/alias/versione.
+- `verify-operation-window-browser.cjs`: HTTP dedicato con planner canonico
+  Days e store reale simulato, ammissione persistita, commit con ACK perso sul
+  confine, riconciliazione durevole e riavvio del processo Chromium. Verifica
+  payload/rich/ID, bozza successiva, dipendenza bloccata, assenza di RPC/reissue
+  al riavvio e nessun downgrade. Verifica controlli Day generati dall’app e un
+  editor **isolato** con nodo/focus/selezione conservati: non è prova della
+  feature attiva su ogni editor o gateway applicativo.
+- `verify-outbox-dispatcher.cjs`: sei ordini risposta/errore/preflight/lookup/
+  downgrade con ticket, senza retry o rinnovo dopo riconciliazione esplicita.
+- `verify-operation-window-costs.cjs`: letture e scritture effettive del mock,
+  con confronto opzionale del vecchio protocollo sulla stessa fixture tramite
+  GDIARY_OPERATION_WINDOW_BASELINE_SOURCE. Nessuna dipendenza Git obbligatoria.
+
+Il nuovo comando `test:operation-window` riunisce server, costi e browser;
+server incluso in npm test, browser in test:repository.
+
+### Prima/dopo e costi mock
+
+Confronto con Code.gs di `c939073` caricato in un contesto V8 separato sulla
+stessa fotografia: il normale execute legacy conserva risposta **e tutti i
+contatori** (53 letture, 15 eventi di scrittura, 24.945 byte).
+
+| Fase | Letture range | Righe / celle | Byte letti | Ricerche / righe candidate | Eventi di scrittura |
+|---|---:|---:|---:|---:|---:|
+| Execute ordinario, prima e dopo | 53 | 53 / 177 | 24.945 | 5 / 5 | 15 |
+| Chiamata contratto disabilitato | 0 | 0 / 0 | 0 | 0 / 0 | 0 |
+| Inizializzazione locale | 18 | 18 / 58 | 6.913 | 3 / 3 | 6 |
+| Prima ammissione | 15 | 15 / 50 | 6.601 | 6 / 18 | 3 |
+| Execute ammesso | 59 | 59 / 198 | 28.201 | 8 / 32 | 15 |
+| Replay entro finestra | 17 | 17 / 61 | 8.245 | 6 / 54 | 0 |
+| Retry sul confine | 19 | 19 / 65 | 8.333 | 3 / 27 | 3 |
+
+È una fixture piccola e clock fisso a 1.000 fino al retry sul confine 1.100.
+I tre eventi del retry scaduto persistono soltanto il watermark: l’unico commit
+applicativo rimane uno. Non sono misure di latenza/quote Google né una prova di
+lookup bounded nel nuovo percorso ordinario. La crescita del clock append-only
+resta soggetta al limite del commit store e alla manutenzione già esistente;
+non è dimostrata la sostenibilità di un registro ammissioni permanente.
+Prima il protocollo legacy riconosceva indefinitamente il retry tramite le
+tracce conservate; il nuovo contratto blocca il retry scaduto anche con quelle
+tracce presenti o con outcome mancanti, preservando la barriera di ammissione.
+
+### Verifiche finali e limiti ambientali
+
+Node 24.22.1, npm 12.2.2 disponibile nel percorso temporaneo della sessione,
+Chrome locale tramite CHROME_PATH. Tutte le suite richieste sono concluse:
+
+| Comando | Esito |
+|---|---|
+| `npm run build` | Passato; ripetuto sulla guardia finale dell’ammissione |
+| `npm test` | Passato; nuovo protocollo server e regressioni outbox inclusi |
+| `npm run test:physical-retention` | Passato; ripetuto dopo l’ultimo controllo dell’ammissione |
+| `npm run test:commit-capacity` | Passato |
+| `npm run test:bootstrap-checkpoint` | Passato; protocollo e HTTP/Chromium |
+| `npm run test:habit-log-continuous` | Passato, exit 0 |
+| `npm run test:repository` | Passato; nuova prova HTTP/Chromium inclusa |
+| `npm run test:release` | Passato su Demo |
+| `npm run test:operation-window` con baseline `c939073` | Passato sul sorgente finale: server, costi e browser |
+| `node tests/verify-outbox-dispatcher.cjs` | Passato, compresi i sei nuovi ordini di riconciliazione |
+
+Il controllo finale ha reso esplicitamente non autorizzanti anche il campo
+admission assente e quello presente con valore undefined, oltre a null. Le
+prove verificano execute e lookup e head ancora zero; nessuna richiesta senza
+ticket viene interpretata come autorizzata. Dopo questa modifica circoscritta
+sono stati ripetuti build, retention e l’intero comando mirato (server, costi e
+browser). Il resto dei percorsi legacy è coperto dalle suite generali sopra.
+
+Suite continuativa: 1.000 identità, 2.000 commit, 3.648 riferimenti ritirati
+logicamente, 12.018 righe fisiche conservate e 1.401 fault/replay; matrici
+127/128/129/256/1.000 e contesa superate. Consumer HTTP/Chromium: 1.012 log,
+20 snapshot e 401 pagine feed, 2.002 commit statici o 2.004 con scrittura
+concorrente, riapertura IndexedDB. Checkpoint S=2.023 più sette delta e replay
+dall’origine raggiungono entrambi cursore 2.030. La fixture conserva prova
+operationAliases, tutti i 4.053 envelope e 591/620 passi discovery/inventory;
+receiptWindowUnverified e i tre nuovi blocker specifici sono presenti.
+
+Questo stress mantiene il nuovo contratto **spento**: verifica le regressioni
+sul protocollo esistente e non certifica 1.000 operazioni con ammissione attiva.
+Le prove della nuova modalità sono le fixture mirate descritte sopra. Nessuna
+sostenibilità del clock/registro permanente o compatibilità totale dei client
+è inferita dal risultato della suite continuativa.
+
+Il sandbox ha rifiutato listen su 127.0.0.1; i test HTTP/browser e le suite con
+sottoprocesso Git sono stati eseguiti con autorizzazione fuori sandbox, sempre
+su dati sintetici. Una prima fixture browser usava un editor dell’app ancora
+soggetto al render iniziale: la nuova prova isola esplicitamente il nodo editor,
+mentre le suite repository esistenti conservano i test degli editor applicativi.
+È stata completata anche la fixture di identità dopo il riavvio. Non sono
+presentati questi aggiustamenti della fixture come risultati di staging.
+
+Build/staging conserva i sei file Apps Script e il segnaposto ROOT_FOLDER_ID;
+UTF-8 e bootstrap preservati, Demo mantenuta e Index rigenerato dai sorgenti.
+`git diff --check` superato. Nessuna modifica a dipendenze o lockfile.
+
+
+Pacchetto 12 aperto e conteggio 8/12 invariato. Policy e capability reali spente,
+minimumAvailable zero, nessuna eliminazione di righe/payload/byte. Nessun
+Google, setupDrive, deploy, migrazione reale, commit Git o pubblicazione remota.
 
 ## Envelope canonici senza `format` — 9 novembre 2026
 

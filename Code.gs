@@ -2414,7 +2414,7 @@ function syncPhysicalRetentionEvidence_(bootstrap,protocol,scope,input,audit){
  return {verifyCheckpoint:()=>evidence.checkpoint,verifyTombstonesAndRoutes:()=>evidence.tombstonesAndRoutes,verifyOperationAliases:()=>evidence.operationAliases||null,
   // The current ledger has no receipt expiry contract, baseline inventory,
   // active-reader leases, or canonical coverage proof for legacy sheets.
-  verifyReceiptWindow:()=>null,verifyDocsBaselines:()=>null,verifyReaderLeases:()=>null,verifyLegacyCoverage:()=>null};
+  receiptWindowBlockers:['operationWindowLegacyCoverageUnverified','operationAdmissionRetentionUnproven','operationWindowRoutingUnverified'],verifyReceiptWindow:()=>null,verifyDocsBaselines:()=>null,verifyReaderLeases:()=>null,verifyLegacyCoverage:()=>null};
 }
 function syncPhysicalRetentionAudit_(store,protocol,bootstrap,scope,services={}){
  const fail=name=>{throw Object.assign(Error(name),{name});},trusted={archiveId:scope.archiveId,epoch:scope.epoch,principalId:scope.principalId},path=([trusted.principalId,'retention:audit:'+trusted.epoch+':']);
@@ -2511,6 +2511,7 @@ function syncPhysicalRetentionPolicy_(input,services={}){
   if(!proof||Object.keys(proof).sort().join(',')!=='digest,records,scope,sequence,verified'||proof.verified!==true||proof.digest!==input.checkpointDigest||proof.sequence!==input.checkpointSequence||!proof.scope||['archiveId','epoch','principalId'].some(key=>proof.scope[key]!==scope[key])||!Number.isSafeInteger(proof.records)||proof.records<0||proof.records>1000000)blockers.push(key+'Unverified');else evidence[key]={digest:proof.digest,sequence:proof.sequence,records:proof.records};
  }
  const proven=blockers.length===0;
+ if(!evidence.receiptWindow&&services.receiptWindowBlockers){if(!Array.isArray(services.receiptWindowBlockers)||services.receiptWindowBlockers.some(value=>!['operationWindowLegacyCoverageUnverified','operationAdmissionRetentionUnproven','operationWindowRoutingUnverified'].includes(value)))fail('DataError');blockers.push(...services.receiptWindowBlockers);}
  const core={format:'sync-retention-plan/v1',scope,checkpoint:{generation:input.checkpointGeneration,sequence:input.checkpointSequence,digest:input.checkpointDigest},evidence,requestedFloor:input.checkpointSequence,minimumAvailable:proven?input.checkpointSequence:0,eligibleCommits:proven?input.checkpointSequence:0,eligiblePayloads:0,retired:0,blockers};
  return {...core,digest:services.digest?.(syncCommitCanonical_(core))||syncCommitCanonical_(core)};
 }
@@ -2621,6 +2622,39 @@ function syncBootstrapCheckpoint_(store,trustedScope,services={}){
  });
 }
 
+// Server-only admission contract. No caller or real provisioning is enabled.
+function syncOperationWindowEnabled_(){return false;}
+function syncOperationWindowRecord_(record,hash){
+ const fail=name=>{throw Object.assign(Error(name),{name});},same=(a,b)=>syncCommitCanonical_(a)===syncCommitCanonical_(b),id=v=>typeof v==='string'&&/^[a-zA-Z0-9-]{10,80}$/.test(v),integer=v=>Number.isSafeInteger(v)&&v>=0&&v<Number.MAX_SAFE_INTEGER;
+ const common=['format','archive','scope','policyId','windowMs','checksum'],extra=record?.format==='sync-operation-window-anchor/v1'?['startedAt']:record?.format==='sync-operation-window-clock/v1'?['observedAt']:record?.format==='sync-operation-window-admission/v1'?['operationId','fingerprint','issuedAt','expiresAt','nonce']:null;
+ if(!extra||!record||Object.keys(record).sort().join(',')!==common.concat(extra).sort().join(',')||!record.scope||Object.keys(record.scope).sort().join(',')!=='archiveId,epoch,principalId'||!Object.values(record.scope).every(id)||!same(record.archive,{archiveId:record.scope.archiveId,epoch:record.scope.epoch})||!id(record.policyId)||!Number.isSafeInteger(record.windowMs)||record.windowMs<1||record.windowMs>2592000000)fail('ProtocolCorrupt');
+ const {checksum,...body}=record;if(checksum!==hash(syncCommitCanonical_(body)))fail('ProtocolCorrupt');
+ if(record.format==='sync-operation-window-anchor/v1'&&!integer(record.startedAt)||record.format==='sync-operation-window-clock/v1'&&!integer(record.observedAt)||record.format==='sync-operation-window-admission/v1'&&(!id(record.operationId)||!id(record.nonce)||typeof record.fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(record.fingerprint)||!integer(record.issuedAt)||!integer(record.expiresAt)||record.expiresAt-record.issuedAt!==record.windowMs))fail('ProtocolCorrupt');
+ return record;
+}
+function syncOperationWindow_(store,trustedScope,services={}){
+ const fail=name=>{throw Object.assign(Error(name),{name});},copy=value=>JSON.parse(syncCommitCanonical_(value)),same=(a,b)=>syncCommitCanonical_(a)===syncCommitCanonical_(b),scope=copy(trustedScope),archive={archiveId:scope.archiveId,epoch:scope.epoch},policyId=services.policyId||'operation-window-policy-v1',windowMs=services.windowMs===undefined?86400000:services.windowMs;
+ if(Object.keys(scope).sort().join(',')!=='archiveId,epoch,principalId'||!Object.values(scope).every(v=>typeof v==='string'&&/^[a-zA-Z0-9-]{10,80}$/.test(v))||typeof policyId!=='string'||!/^[a-zA-Z0-9-]{10,80}$/.test(policyId)||!Number.isSafeInteger(windowMs)||windowMs<1||windowMs>2592000000)fail('DataError');
+ let owned=false;const nested={...store,withLock(fn){if(!owned)fail('ProtocolUnavailable');return fn();}},protocol=syncCommitProtocol_(nested,scope),unwrap=result=>{if(!result.ok)fail(result.error);return result.value;},enabled=()=>services.enabled?services.enabled()===true:syncOperationWindowEnabled_(),key=kind=>[scope.principalId,'operation-window:'+scope.epoch+':'+kind],seal=body=>({...body,checksum:store.digest(syncCommitCanonical_(body))}),base=format=>({format,archive,scope,policyId,windowMs}),reconcile=(operationId,reason)=>({status:'reconciliationRequired',operationId,reason});
+ const now=()=>{const value=(services.now||Date.now)();if(!Number.isSafeInteger(value)||value<0||value>=Number.MAX_SAFE_INTEGER)fail('ProtocolCorrupt');return value;};
+ function run(fn){if(!enabled())return {ok:false,error:'ProtocolUnavailable'};try{return store.withLock(()=>{if(owned)fail('BusyError');owned=true;try{const value=fn();if(!enabled())fail('ProtocolUnavailable');return {ok:true,value:copy(value)};}finally{owned=false;}});}catch(error){return {ok:false,error:['DataError','ProtocolUnavailable','ProtocolCorrupt','ScopeChanged','OperationMismatch','CommitBlocked','BusyError','StorageError'].includes(error.name)?error.name:'StorageError'};}}
+ function read(kind,immutable){const raw=store.readCheckpoint(key(kind),immutable);if(raw===null)return null;const record=syncOperationWindowRecord_(raw,store.digest);if(!same(record.scope,scope))fail('ScopeChanged');if(record.policyId!==policyId||record.windowMs!==windowMs||record.format!==(kind==='anchor'?'sync-operation-window-anchor/v1':kind==='clock'?'sync-operation-window-clock/v1':'sync-operation-window-admission/v1')||kind.startsWith('admission:')&&record.operationId!==kind.slice(10))fail('ProtocolCorrupt');return record;}
+ function write(kind,record,immutable=false){store.writeCheckpoint(key(kind),record,immutable);if(!same(read(kind,immutable),record))fail('ProtocolCorrupt');}
+ function clock(operationId){const anchor=read('anchor',true),previous=read('clock',false);if(!anchor||!previous)return {blocked:reconcile(operationId,'clockOrAnchorMissing')};if(anchor.format!=='sync-operation-window-anchor/v1'||previous.format!=='sync-operation-window-clock/v1'||previous.observedAt<anchor.startedAt)fail('ProtocolCorrupt');const time=now();if(time<previous.observedAt)return {blocked:reconcile(operationId,'clockRegression')};if(time>previous.observedAt)write('clock',seal({...base('sync-operation-window-clock/v1'),observedAt:time}));return {time};}
+ function admission(request,ticket){const normalized=unwrap(protocol.validateOperation(request)),record=read('admission:'+normalized.request.operationId,true);if(record){if(record.format!=='sync-operation-window-admission/v1'||record.operationId!==normalized.request.operationId)fail('ProtocolCorrupt');if(record.fingerprint!==normalized.fingerprint)fail('OperationMismatch');}
+  if(ticket!==undefined&&ticket!==null){syncOperationWindowRecord_(ticket,store.digest);if(!same(ticket.scope,scope))fail('ScopeChanged');if(!record||!same(record,ticket))return {...normalized,blocked:reconcile(normalized.request.operationId,'admissionMissingOrDifferent')};}
+  return {...normalized,record};
+ }
+ function authorized(input){if(!input||!['request','admission,request'].includes(Object.keys(input).sort().join(',')))fail('DataError');const admitted=admission(input.request,input.admission),operationId=admitted.request.operationId;if(admitted.blocked)return admitted;if(!admitted.record||input.admission===undefined||input.admission===null)return {blocked:reconcile(operationId,'admissionRequired')};const checked=clock(operationId);if(checked.blocked)return checked;if(checked.time<admitted.record.issuedAt||checked.time>=admitted.record.expiresAt)return {blocked:reconcile(operationId,'windowExpired')};return admitted;}
+ return Object.freeze({
+  initialize:()=>run(()=>{if(services.allowInitialize?.()!==true)fail('ProtocolUnavailable');const anchor=read('anchor',true),previous=read('clock',false);if(anchor&&previous)return {initialized:true,policyId,windowMs};if(anchor||previous)return reconcile(null,'incompleteInitialization');const head=unwrap(protocol.retentionHeadStatus());if(head.pending||head.committedThrough!==0)return reconcile(null,'legacyStoreNotEmpty');const time=now();write('anchor',seal({...base('sync-operation-window-anchor/v1'),startedAt:time}),true);write('clock',seal({...base('sync-operation-window-clock/v1'),observedAt:time}));return {initialized:true,policyId,windowMs};}),
+  admit:input=>run(()=>{if(!input||Object.keys(input).join(',')!=='request')fail('DataError');const admitted=admission(input.request),operationId=admitted.request.operationId,checked=clock(operationId);if(checked.blocked)return checked.blocked;if(admitted.record)return checked.time<admitted.record.issuedAt||checked.time>=admitted.record.expiresAt?reconcile(operationId,'windowExpired'):{status:'admitted',admission:admitted.record};const head=unwrap(protocol.retentionHeadStatus());if(head.pending||store.readReceipt(scope.principalId,operationId)!==null||store.findCommitByOperation(scope.principalId,operationId)!==null)return reconcile(operationId,'legacyOperationUnproven');const nonce=(services.uuid||(()=>Utilities.getUuid()))(),record=seal({...base('sync-operation-window-admission/v1'),operationId,fingerprint:admitted.fingerprint,issuedAt:checked.time,expiresAt:checked.time+windowMs,nonce});syncOperationWindowRecord_(record,store.digest);write('admission:'+operationId,record,true);return {status:'admitted',admission:record};}),
+  execute:input=>run(()=>{const value=authorized(input);return value.blocked||unwrap(protocol.execute(value.request));}),
+  lookup:input=>run(()=>{const value=authorized(input);return value.blocked||unwrap(protocol.lookupOperationReceipt({operationId:value.request.operationId,request:value.request}));}),
+  coverage:()=>({verified:false,blockers:['operationWindowLegacyCoverageUnverified','operationAdmissionRetentionUnproven','operationWindowRoutingUnverified']})
+ });
+}
+
 function syncCommitProtocol_(store,trustedScope){
  const fail=name=>{throw Object.assign(new Error(name),{name});},copy=value=>JSON.parse(syncCommitCanonical_(value));
  const same=(a,b)=>syncCommitCanonical_(a)===syncCommitCanonical_(b);
@@ -2715,6 +2749,7 @@ function syncCommitProtocol_(store,trustedScope){
  }
  const cursor=sequence=>({format:'sync-cursor/v1',...scope,sequence});
  return Object.freeze({
+  validateOperation:input=>guarded(()=>{const request=requestValue(input);return {request,fingerprint:hash(request)};}),
   inventoryRetainedReceipts:input=>guarded(()=>{
    if(!input||Object.keys(input).sort().join(',')!=='afterRow,limit,upperRow'||!Number.isSafeInteger(input.afterRow)||input.afterRow<1||!Number.isSafeInteger(input.limit)||input.limit<1||input.limit>25||!(input.upperRow===null||Number.isSafeInteger(input.upperRow)&&input.upperRow>=input.afterRow))fail('DataError');
    if(typeof store.scanReceiptReferences!=='function')fail('ProtocolUnavailable');const head=headValue();if(head.pending!==null)fail('ProtocolUnavailable');
@@ -2910,6 +2945,9 @@ function syncSheetsCommitStore_(indexSheet,blockSheet,trustedArchive,services={}
    workUnits+=estimatedWork;bytes+=actualBytes;records++;
    if(workUnits>input.limits.workUnits||bytes>input.limits.bytes)fail('RetentionAuditBudgetExceeded');
    const item={row,class:'published',key:ref.key,operation:ref.operation,recordDigest:ref.digest,recordFormat:typeof record.format==='string'?record.format:'unversioned-record',sequence:Number.isSafeInteger(record.sequence)?record.sequence:(Number.isSafeInteger(record.response?.sequence)?record.response.sequence:null),principalId:typeof record.principalId==='string'?record.principalId:null,operationId:typeof record.operationId==='string'?record.operationId:null,fingerprint:typeof record.fingerprint==='string'?record.fingerprint:null,receiptStatus:record.response?.status||null,pending:record.format==='sync-head/v1'&&record.pending!==null,versions:Array.isArray(record.changes)?record.changes.map(change=>({collection:change.collection,id:change.id,version:change.version,deleted:change.deleted})):Array.isArray(record.response?.versions)?record.response.versions.map(change=>({collection:change.collection,id:change.id,version:change.version,deleted:change.deleted})):[]};
+   if(typeof record.format==='string'&&record.format.startsWith('sync-operation-window-')){
+    syncOperationWindowRecord_(record,hash);if(!same(record.archive,archive))fail('ProtocolCorrupt');const kind=record.format==='sync-operation-window-clock/v1'?'clock':record.format==='sync-operation-window-anchor/v1'?'anchor':'admission:'+record.operationId,id=[record.scope.principalId,'operation-window:'+record.scope.epoch+':'+kind];if(ref.operation!==''||ref.key!==key(kind==='clock'?'checkpoint':'checkpoint-record',id))fail('ProtocolCorrupt');
+   }
    if(!Object.hasOwn(record,'format')){
     const candidate=['collection','id','sequence','version','deleted','data'].some(k=>Object.hasOwn(record,k));
     if(candidate){

@@ -1,5 +1,78 @@
 # Passaggio di consegne — 17 ottobre 2026
 
+## Contratto locale finestra d’idempotenza — 9 novembre 2026
+
+Base `c939073`, nessuna migrazione o attivazione reale. Introdotto
+`syncOperationWindow_` privato, con capability reale spenta, inizializzazione
+server esplicita soltanto su head canonico zero senza pending e tre metadati
+scoped archive/principal/epoch: anchor, clock watermark e ammissione immutabile
+per operationId/fingerprint. Tempi del server, policy immutabile nello scope,
+intervallo `[issuedAt, expiresAt)`: sul confine è già scaduto. Nessun rinnovo
+al retry; durata default del prototipo 24 ore, non policy di produzione.
+
+Entro il termine viene usato il protocollo recuperabile esistente: ACK stabile,
+fingerprint, conflitti, pending e fallback al commit quando manca la ricevuta.
+Fuori finestra, su regressione del clock o ammissione mancante/diversa viene
+restituito `reconciliationRequired` senza iniziare/riprendere scritture
+applicative dal retry. Scope/metadati corrotti producono errori espliciti.
+Clock mancante e inizializzazione parziale restano bloccati: non viene
+ricostruito un watermark perso. Le ammissioni non vengono rimosse; conservarle
+è parte dell’assunzione di sicurezza, non una retention già risolta.
+
+Dispatcher opt-in con ammissione salvata in IndexedDB prima dell’RPC, schema
+v11 invariato, nessun reinvio legacy di un ticket persistito e nessuna nuova
+ammissione automatica per tentativi incerti. Stato durevole failed con
+lastError ReconciliationRequired: retry ordinario rifiutato, bozze/rich/ID
+conservati e dipendenze successive ferme. Le viste mostrano riconciliazione
+necessaria; il flusso manuale completo non è ancora implementato. L’app non
+configura automaticamente l’adattatore e non pubblica una nuova RPC abilitata.
+
+`verifyReceiptWindow` rimane null. Il piano conserva receiptWindowUnverified
+e aggiunge blocker specifici per legacy, permanenza delle ammissioni e routing
+distribuito. L’inventario fisico verifica le nuove forme senza nuove ricerche,
+con budget/CAS/digest/replay e fencing precedenti preservati.
+
+Prove mirate: 36 interruzioni prima/dopo pubblicazione, scadenza prima/sul/dopo
+confine, ACK perso, commit senza ricevuta, outcome assenti, pending protetto,
+clock regredito/avanzato, scope/corruzione e contesa. HTTP/Chromium con planner
+canonico Days verifica perdita ACK sul confine, riavvio reale del browser,
+rich/draft/ID/dipendenze e zero RPC al riavvio, retry manuale e downgrade
+bloccati. Editor isolato conservato; non è collaudo di tutti i gateway attivi.
+Nuovo `test:operation-window`; backend incluso in npm test, browser in repository.
+
+Confronto sulla stessa fixture contro `c939073`: percorso ordinario identico
+(53 letture/15 eventi scrittura/24.945 byte); chiamata al contratto disabilitato
+zero I/O. Contratto attivo: init 18 letture/6 scritture, admit 15/3, execute
+59/15, replay 17/0, scaduto 19/3 (solo clock; nessun nuovo commit applicativo).
+Costi solo mock; registro permanente, orologio Google e lookup in scala non
+certificati. Dettagli nel [rapporto retention](VERIFICA-RETENTION-FISICA.md).
+
+Build, npm test, retention, capacità commit, bootstrap checkpoint, repository,
+release e suite continuativa completa superati (exit 0), oltre ai nuovi test
+server/costi/browser. L’ultimo controllo blocca anche admission assente,
+undefined o null: ripetuti build, retention e test:operation-window completi
+con baseline c939073. Dipendenze/lockfile invariati, sei file e segnaposto
+preservati, Index rigenerato e diff verificato.
+
+Regressione continuativa con contratto nuovo spento: 1.000 identità/2.000
+commit, 1.401 fault/replay, matrici/contesa, 1.012 log, 20 snapshot e 401 feed,
+2.002/2.004 commit e riapertura IndexedDB; checkpoint S=2.023 più sette delta e
+replay dall’origine raggiungono entrambi 2.030. Restano tutti i 4.053 envelope
+verificati e prova alias; la prova receiptWindow resta assente e
+i tre nuovi blocker restano presenti. Non è stress della modalità ammessa.
+
+Il sandbox ha bloccato il server localhost: prove HTTP/browser/Git eseguite con
+autorizzazione fuori sandbox e dati sintetici, senza credenziali Google.
+
+Pacchetto 12 e conteggio 8/12 aperti invariati. Restano routing/provisioning e
+client distribuiti, audit completo delle ammissioni e dipendenze legacy,
+baseline Docs, lease lettori e collaudo Google. Minimo zero, capability spente,
+nessuna eliminazione, Google, setupDrive, deploy, migrazione reale o commit Git.
+Prossimo incremento: collegamento opt-in del primo gateway Days al contratto
+in uno scope di prova, con piani/fingerprint immutabili. Successivamente audit
+riprendibile della copertura delle ammissioni; ogni record legacy resta non
+eleggibile finché non dimostrato il contrario.
+
 ## Envelope canonici retention senza `format` — 9 novembre 2026
 
 Seguito locale di `857487c`: l’inventario riconosce l’envelope esatto a sette

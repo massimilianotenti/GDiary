@@ -1,3 +1,4 @@
+import {validOperationAdmission} from './operation-window.mjs';
 import {periodOperation} from './period-operation.mjs';
 import {canonicalDayJSON,validDayDate} from './day-operation.mjs';
 import {commonReadRanges} from './common-read-cache.js';
@@ -10,7 +11,7 @@ const DB_NAME='gdiary-local-v1',VERSION=11,TIMEOUT=5000;
 const STORES=['archiveMeta','entries','contents','commonRecords','drafts','outbox','searchDocuments'];
 const REMOTE=['archiveMeta','entries','contents','commonRecords','searchDocuments'];
 const KEYS={projects:'slug',days:'date',weeks:'week',goals:'id',habits:'id',habitLogs:'key',taskPlans:'entryId',files:'id',settings:'id',layouts:'entryId'};
-const SAFE=new Set(['DataCloneError','NotEnabledError','IdentityError','ScopeChangedError','ClosedError','SchemaError','DataError','ConflictError','BusyError','StaleVersionError','QuotaExceededError','SecurityError','NotSupportedError','VersionError','AbortError','TimeoutError','BlockedError','InvalidStateError']);
+const SAFE=new Set(['ReconciliationRequired','DataCloneError','NotEnabledError','IdentityError','ScopeChangedError','ClosedError','SchemaError','DataError','ConflictError','BusyError','StaleVersionError','QuotaExceededError','SecurityError','NotSupportedError','VersionError','AbortError','TimeoutError','BlockedError','InvalidStateError']);
 const fail=name=>Object.assign(new Error(name),{name});
 const safe=error=>SAFE.has(error?.name)?error.name:'StorageError';
 const id=value=>typeof value==='string'&&value.length>0&&value.length<=200;
@@ -304,7 +305,7 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
     request(outbox.get(operationKey),existing=>{
      if(existing)throw fail('ConflictError');
      const write=()=>request(outbox.index('byScopeEntityStatus').getAll(environment.IDBKeyRange.bound([...scopeKey(scope),input.kind,input.id,'pending',0,''],[...scopeKey(scope),input.kind,input.id,'pending',Number.MAX_SAFE_INTEGER,'\uffff'])),candidates=>{
-      const compatible=candidates.filter(item=>item.status==='pending'&&item.attempts===0&&item.leaseToken===undefined&&item.baseVersion===input.baseVersion&&syncDependenciesEqual(item.dependencies||[],input.dependencies||[]));
+      const compatible=candidates.filter(item=>item.status==='pending'&&item.attempts===0&&!item.operationWindow&&item.leaseToken===undefined&&item.baseVersion===input.baseVersion&&syncDependenciesEqual(item.dependencies||[],input.dependencies||[]));
       const coalesced=compatible.length===1?compatible[0]:null,localRevision=(old?.localRevision||0)+1,draft={...scope,kind:input.kind,id:input.id,baseVersion:input.baseVersion||'',localRevision,snapshot:structuredClone(input.snapshot)};
       const operation=coalesced?{...coalesced,action:input.action,payload:{...structuredClone(input.payload),operationId:coalesced.operationId},localRevision}:{...scope,operationId:input.operationId,kind:input.kind,id:input.id,action:input.action,baseVersion:input.baseVersion,payload:structuredClone(input.payload),localRevision,dependencies:[...(input.dependencies||[])],status:'pending',attempts:0,createdAt:Date.now(),nextAttemptAt:0,lastError:null};
       drafts.put(draft);outbox.put(operation);invalidateDraftSearch(scope,tx,request,()=>done({operationId:operation.operationId,localRevision,status:operation.status,coalesced:!!coalesced,baseVersion:operation.baseVersion}),!periodOperation(input.kind));
@@ -332,8 +333,12 @@ export function createLocalRepository({identity,enabled=()=>false,environment=gl
    }else continueSave();
   });}),
   getOutbox:operationId=>readOne('outbox',[operationId]),
+  attachOutboxWindow:input=>result(()=>{input=structuredClone(input);return execute('readwrite',['archiveMeta','outbox'],({scope,tx,request,done})=>{
+   if(!input||Object.keys(input).sort().join(',')!=='admission,now,operationId,owner,token'||!id(input.owner)||!id(input.token)||!id(input.operationId)||!Number.isSafeInteger(input.now)||input.now<0||!validOperationAdmission(input.admission,scope,input.operationId))throw fail('DataError');
+   const ticket=structuredClone(input.admission),meta=tx.objectStore('archiveMeta'),store=tx.objectStore('outbox');request(meta.get(scopeKey(scope)),stored=>{const lease=validMeta(stored,scope).outboxLease;if(!lease||lease.owner!==input.owner||lease.token!==input.token||lease.expiresAt<=input.now)throw fail('BusyError');request(store.get([...scopeKey(scope),input.operationId]),operation=>{if(!operation||operation.status!=='sending'||operation.leaseToken!==input.token||operation.operationWindow&&stableLocalJSON(operation.operationWindow)!==stableLocalJSON(ticket))throw fail('ConflictError');store.put({...operation,operationWindow:ticket});done({admission:ticket});});});
+  });}),
   retryFailedOutbox:operationId=>result(()=>execute('readwrite',['outbox','archiveMeta'],({scope,tx,request,done})=>{
-   if(!id(operationId))throw fail('DataError');const store=tx.objectStore('outbox');request(store.get([...scopeKey(scope),operationId]),operation=>{if(!operation||operation.status!=='failed')throw fail('ConflictError');store.put({...operation,status:'pending',nextAttemptAt:0});invalidateDraftSearch(scope,tx,request,()=>done({operationId,status:'pending'}),!periodOperation(operation.kind));});
+   if(!id(operationId))throw fail('DataError');const store=tx.objectStore('outbox');request(store.get([...scopeKey(scope),operationId]),operation=>{if(!operation||operation.status!=='failed')throw fail('ConflictError');if(operation.lastError==='ReconciliationRequired')throw fail('ReconciliationRequired');store.put({...operation,status:'pending',nextAttemptAt:0});invalidateDraftSearch(scope,tx,request,()=>done({operationId,status:'pending'}),!periodOperation(operation.kind));});
   })),
   confirmMissingDelete:input=>result(()=>execute('readwrite',['drafts','outbox','archiveMeta'],({scope,tx,request,done})=>{
    if(!input||!['note','task'].includes(input.kind)||!id(input.id)||!id(input.operationId)||!Number.isSafeInteger(input.expectedRevision)||input.expectedRevision<1)throw fail('DataError');
